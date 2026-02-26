@@ -1,11 +1,69 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36717.8 d17.14
+VisualStudioVersion = 17.14.36717.8
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Common.Domain", "src\Common\GastronomePlatform.Common.Domain\GastronomePlatform.Common.Domain.csproj", "{887DBBEC-D081-4A43-A5C0-F08162C80D9A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Common.Application", "src\Common\GastronomePlatform.Common.Application\GastronomePlatform.Common.Application.csproj", "{F55034BB-AA3E-4FC0-8801-C9982EF7708E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Common.Infrastructure", "src\Common\GastronomePlatform.Common.Infrastructure\GastronomePlatform.Common.Infrastructure.csproj", "{48AFA437-DBA6-4C6A-8D49-A3A25F80F953}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.WebAPI", "src\GastronomePlatform.WebAPI\GastronomePlatform.WebAPI.csproj", "{E2FF9964-835A-4261-8407-78087412530F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Common.UnitTests", "tests\Unit\GastronomePlatform.Common.UnitTests\GastronomePlatform.Common.UnitTests.csproj", "{768F555E-D78E-4C62-B61D-CE23DAB82B5B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{36D591C7-65C7-A0D1-1CBC-10CDE441BDC8}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{ECE1BA8F-EDEC-4E4E-A853-6050512ABD06}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Modules", "Modules", "{00711347-4A39-4E92-801B-F2B91A6AD02B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{B7B55D3F-160F-4C4E-9A21-3ED7EB05AFF6}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Unit", "Unit", "{60116043-105E-4410-A384-FF8A7CE28C96}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{CDA549DC-F2AD-4C4C-BCAE-294E62931B8E}"
+EndProject
 Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{887DBBEC-D081-4A43-A5C0-F08162C80D9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{887DBBEC-D081-4A43-A5C0-F08162C80D9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{887DBBEC-D081-4A43-A5C0-F08162C80D9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{887DBBEC-D081-4A43-A5C0-F08162C80D9A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F55034BB-AA3E-4FC0-8801-C9982EF7708E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F55034BB-AA3E-4FC0-8801-C9982EF7708E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F55034BB-AA3E-4FC0-8801-C9982EF7708E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F55034BB-AA3E-4FC0-8801-C9982EF7708E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{48AFA437-DBA6-4C6A-8D49-A3A25F80F953}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48AFA437-DBA6-4C6A-8D49-A3A25F80F953}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48AFA437-DBA6-4C6A-8D49-A3A25F80F953}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48AFA437-DBA6-4C6A-8D49-A3A25F80F953}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2FF9964-835A-4261-8407-78087412530F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2FF9964-835A-4261-8407-78087412530F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2FF9964-835A-4261-8407-78087412530F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2FF9964-835A-4261-8407-78087412530F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{768F555E-D78E-4C62-B61D-CE23DAB82B5B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{768F555E-D78E-4C62-B61D-CE23DAB82B5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{768F555E-D78E-4C62-B61D-CE23DAB82B5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{768F555E-D78E-4C62-B61D-CE23DAB82B5B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{887DBBEC-D081-4A43-A5C0-F08162C80D9A} = {ECE1BA8F-EDEC-4E4E-A853-6050512ABD06}
+		{F55034BB-AA3E-4FC0-8801-C9982EF7708E} = {ECE1BA8F-EDEC-4E4E-A853-6050512ABD06}
+		{48AFA437-DBA6-4C6A-8D49-A3A25F80F953} = {ECE1BA8F-EDEC-4E4E-A853-6050512ABD06}
+		{E2FF9964-835A-4261-8407-78087412530F} = {36D591C7-65C7-A0D1-1CBC-10CDE441BDC8}
+		{768F555E-D78E-4C62-B61D-CE23DAB82B5B} = {60116043-105E-4410-A384-FF8A7CE28C96}
+		{ECE1BA8F-EDEC-4E4E-A853-6050512ABD06} = {36D591C7-65C7-A0D1-1CBC-10CDE441BDC8}
+		{00711347-4A39-4E92-801B-F2B91A6AD02B} = {36D591C7-65C7-A0D1-1CBC-10CDE441BDC8}
+		{60116043-105E-4410-A384-FF8A7CE28C96} = {B7B55D3F-160F-4C4E-9A21-3ED7EB05AFF6}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0F038E81-ECD2-4406-A5D1-FF6E377DF99A}
