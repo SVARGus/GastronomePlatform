@@ -10,4 +10,12 @@
     <ProjectReference Include="..\GastronomePlatform.Common.Domain\GastronomePlatform.Common.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Behaviors\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="14.1.0" />
+  </ItemGroup>
+
 </Project>
