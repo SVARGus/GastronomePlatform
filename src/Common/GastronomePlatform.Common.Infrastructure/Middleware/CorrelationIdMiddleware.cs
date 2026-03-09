@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
+using Serilog.Context;
 
 namespace GastronomePlatform.Common.Infrastructure.Middleware
 {
@@ -38,10 +39,15 @@ namespace GastronomePlatform.Common.Infrastructure.Middleware
                 return Task.CompletedTask;
             });
 
-            _logger.LogDebug("Запрос {Method} {Path} — CorrelationId: {CorrelationId}",
-                context.Request.Method, context.Request.Path, correlationId);
+            // Serilog: добавляем CorrelationId во ВСЕ логи в рамках этого запроса
+            using (LogContext.PushProperty("CorrelationId", correlationId))
+            {
+                _logger.LogDebug("Запрос {Method} {Path} — CorrelationId: {CorrelationId}",
+                    context.Request.Method, context.Request.Path, correlationId);
 
-            await _next(context);
+                await _next(context);
+            }
+            // После выхода из using — свойство автоматически убирается
         }
 
         private static string GetOrGenerateCorrelationId(HttpContext context)
