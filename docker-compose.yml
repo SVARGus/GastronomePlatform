@@ -1,0 +1,69 @@
+﻿# docker-compose.yml
+# Инфраструктурные зависимости для локальной разработки GastronomePlatform
+
+# Версия формата Docker Compose была убрана, так как последняя версия docker-compose не требует указывать версию "version: '3.8'"
+
+services:
+
+  # === PostgreSQL 16 — основная база данных ===
+  postgres:
+    image: postgres:16-alpine          # alpine — облегчённый образ Linux
+    container_name: gastronome-postgres
+    restart: unless-stopped            # Перезапуск при падении (кроме ручной остановки)
+    ports:
+      - "5432:5432"                    # HOST_PORT:CONTAINER_PORT
+    environment:
+      # Эти переменные создают пользователя и БД при первом запуске
+      POSTGRES_USER: gastronome                 # Имя пользователя
+      POSTGRES_PASSWORD: gastronome123          # Пароль (для разработки, не продакшен!)
+      POSTGRES_DB: gastronome_db                # Имя базы данных
+    volumes:
+      # Без volume данные теряются при удалении контейнера!
+      # Формат: NAMED_VOLUME:PATH_IN_CONTAINER
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gastronome -d gastronome_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # === RabbitMQ — брокер сообщений ===
+  rabbitmq:
+    image: rabbitmq:3-management       # management = с веб-панелью
+    container_name: gastronome-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"                    # AMQP (для приложения)
+      - "15672:15672"                  # Веб-панель управления
+    environment:
+      RABBITMQ_DEFAULT_USER: gastronome         # Логин для веб-панели
+      RABBITMQ_DEFAULT_PASS: gastronome123      # Пароль
+    volumes:
+     - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # === Seq — агрегатор логов ===
+  seq:
+    image: datalust/seq:latest
+    container_name: gastronome-seq
+    restart: unless-stopped
+    ports:
+      - "5341:5341"                    # Ingestion API (Serilog пишет сюда)
+      - "8081:80"                      # Веб-интерфейс
+    environment:
+      ACCEPT_EULA: Y                   # Обязательно для Seq
+      SEQ_FIRSTRUN_ADMINPASSWORD: gastronome123
+    volumes:
+      - seq-data:/data
+
+# === Volumes — именованные тома для хранения данных ===
+volumes:
+  postgres-data:                       # Docker управляет расположением на диске
+  rabbitmq-data:
+  seq-data:

@@ -19,6 +19,7 @@ Log.Logger = new LoggerConfiguration()
         rollingInterval: RollingInterval.Day, 
         retainedFileCountLimit: 7,
         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.Seq("http://localhost:5341")
     .CreateLogger();
 
 try
