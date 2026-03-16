@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -42,7 +42,7 @@ namespace GastronomePlatform.Common.Infrastructure.Middleware
         private async Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
             // 1. Получаем Correlation ID (добавлен CorrelationIdMiddleware ранее в конвейере)
-            var correlationId = context.Items[CorrelationIdMiddleware.ItemKey]?.ToString()
+            var correlationId = context.Items[CorrelationIdMiddleware.ITEM_KEY]?.ToString()
                 ?? "unknown";
 
             // 2. Логируем полную информацию об исключении (только в логи, не клиенту!)

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using Serilog.Context;
@@ -12,8 +12,8 @@ namespace GastronomePlatform.Common.Infrastructure.Middleware
     /// </summary>
     public class CorrelationIdMiddleware
     {
-        public const string HeaderName = "X-Correlation-ID";
-        public const string ItemKey = "CorrelationId";
+        public const string HEADER_NAME = "X-Correlation-ID";
+        public const string ITEM_KEY = "CorrelationId";
 
         private readonly ILogger<CorrelationIdMiddleware> _logger;
         private readonly RequestDelegate _next;
@@ -28,13 +28,13 @@ namespace GastronomePlatform.Common.Infrastructure.Middleware
         {
             string correlationId = GetOrGenerateCorrelationId(context);
 
-            context.Items[ItemKey] = correlationId;
+            context.Items[ITEM_KEY] = correlationId;
 
             context.Response.OnStarting(() =>
             {
-                if (!context.Response.Headers.ContainsKey(HeaderName))
+                if (!context.Response.Headers.ContainsKey(HEADER_NAME))
                 {
-                    context.Response.Headers[HeaderName] = correlationId;
+                    context.Response.Headers[HEADER_NAME] = correlationId;
                 }
                 return Task.CompletedTask;
             });
@@ -52,7 +52,7 @@ namespace GastronomePlatform.Common.Infrastructure.Middleware
 
         private static string GetOrGenerateCorrelationId(HttpContext context)
         {
-            if (context.Request.Headers.TryGetValue(HeaderName, out StringValues correlationId) &&
+            if (context.Request.Headers.TryGetValue(HEADER_NAME, out StringValues correlationId) &&
                 !StringValues.IsNullOrEmpty(correlationId))
             {
                 return correlationId.ToString();
