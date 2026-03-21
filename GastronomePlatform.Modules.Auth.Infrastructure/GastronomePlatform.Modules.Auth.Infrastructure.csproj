@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\GastronomePlatform.Modules.Auth.Application\GastronomePlatform.Modules.Auth.Application.csproj" />
+    <ProjectReference Include="..\src\Common\GastronomePlatform.Common.Infrastructure\GastronomePlatform.Common.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Persistence\Configurations\" />
+    <Folder Include="Repositories\" />
+  </ItemGroup>
+
+</Project>

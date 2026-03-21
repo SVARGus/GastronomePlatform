@@ -1,4 +1,4 @@
-﻿namespace GastronomePlatform.Common.Domain.Primitives
+namespace GastronomePlatform.Common.Domain.Primitives
 {
     /// <summary>
     /// Базовый класс для всех доменных сущностей.
@@ -11,7 +11,7 @@
         /// <summary>
         /// Уникальный идентификатор сущности.
         /// </summary>
-        public TId Id { get; protected init; }
+        public TId Id { get; protected init; } = default!;
 
         /// <summary>
         /// Конструктор без параметров для EF Core.

@@ -1,0 +1,24 @@
+<Project>
+
+    <PropertyGroup>
+        <!-- Целевой фреймворк и язык -->
+        <TargetFramework>net8.0</TargetFramework>
+        <LangVersion>12</LangVersion>
+
+        <!-- Современные возможности C# -->
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- Качество кода: нарушения стиля ломают сборку -->
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+        <!-- Метаданные -->
+        <Authors>SVARGus</Authors>
+        <Company>GastronomePlatform</Company>
+
+        <!-- Детерминированная сборка (хорошая практика, нужна для CI/CD) -->
+        <Deterministic>true</Deterministic>
+    </PropertyGroup>
+
+</Project>
