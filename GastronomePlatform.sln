@@ -27,11 +27,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{CDA549DC-F
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Auth", "Auth", "{078CD48E-40E7-4A0F-8C04-0782530F008F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Auth.Application", "GastronomePlatform.Modules.Auth.Application\GastronomePlatform.Modules.Auth.Application.csproj", "{F7BE0148-8A1B-49B8-BA2A-0BAACBD1E78A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Auth.Application", "src\Modules\Auth\GastronomePlatform.Modules.Auth.Application\GastronomePlatform.Modules.Auth.Application.csproj", "{F7BE0148-8A1B-49B8-BA2A-0BAACBD1E78A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Auth.Infrastructure", "GastronomePlatform.Modules.Auth.Infrastructure\GastronomePlatform.Modules.Auth.Infrastructure.csproj", "{6DBAA0CB-1C0F-49BF-91FB-DA194A78A143}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Auth.Infrastructure", "src\Modules\Auth\GastronomePlatform.Modules.Auth.Infrastructure\GastronomePlatform.Modules.Auth.Infrastructure.csproj", "{6DBAA0CB-1C0F-49BF-91FB-DA194A78A143}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Auth.Domain", "GastronomePlatform.Modules.Auth.Domain\GastronomePlatform.Modules.Auth.Domain.csproj", "{85B97919-1DFB-4C95-A841-09E90D54D661}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Auth.Domain", "src\Modules\Auth\GastronomePlatform.Modules.Auth.Domain\GastronomePlatform.Modules.Auth.Domain.csproj", "{85B97919-1DFB-4C95-A841-09E90D54D661}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

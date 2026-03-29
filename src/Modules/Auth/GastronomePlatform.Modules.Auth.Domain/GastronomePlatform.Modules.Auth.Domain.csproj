@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="..\src\Common\GastronomePlatform.Common.Domain\GastronomePlatform.Common.Domain.csproj" />
+    <ProjectReference Include="..\..\..\Common\GastronomePlatform.Common.Domain\GastronomePlatform.Common.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="ValueObjects\" />
