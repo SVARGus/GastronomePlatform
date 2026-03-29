@@ -1,3 +1,10 @@
+using GastronomePlatform.Modules.Auth.Application.Abstractions;
+using GastronomePlatform.Modules.Auth.Domain.Repositories;
+using GastronomePlatform.Modules.Auth.Infrastructure.Identity;
+using GastronomePlatform.Modules.Auth.Infrastructure.Persistence;
+using GastronomePlatform.Modules.Auth.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,14 +24,44 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Extensions
         /// <returns>Коллекция сервисов для цепочки вызовов.</returns>
         public static IServiceCollection AddAuthModule(this IServiceCollection services, IConfiguration configuration)
         {
+            // Регистрация MediatR
             services.AddMediatR(cfg =>
                 cfg.RegisterServicesFromAssembly(
-                    typeof(Auth.Application.AssemblyReference).Assembly));
+                    typeof(GastronomePlatform.Modules.Auth.Application.AssemblyReference).Assembly));
 
-            // TODO: Этап 1 — DbContext (Auth schema)
-            // TODO: Этап 1 — Repositories
-            // TODO: Этап 1 — JWT-сервис
-            // TODO: Этап 1 — ASP.NET Core Identity
+            // Регистрация DbContext
+            services.AddDbContext<AuthDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("Database")));
+
+            // Регистрация ASP.NET Core Identity
+            services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
+            {
+                // Настройки пароля
+                options.Password.RequireDigit = true;
+                options.Password.RequiredLength = 8;
+                options.Password.RequireNonAlphanumeric = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireLowercase = true;
+
+                // Блокировка при неудачных попытках
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.AllowedForNewUsers = true;
+
+                // Настройки пользователя
+                options.User.RequireUniqueEmail = true;
+            })
+            .AddEntityFrameworkStores<AuthDbContext>()
+            .AddDefaultTokenProviders();
+
+            // Регистрация IOptions<JwtSettings>
+            services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SECTION_NAME));
+
+            // Регистрация Repositories
+            services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+
+            // Регистрация JWT-сервиса
+            services.AddScoped<IJwtService, JwtService>();
 
             return services;
         }

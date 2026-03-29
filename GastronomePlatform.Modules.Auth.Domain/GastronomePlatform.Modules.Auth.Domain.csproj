@@ -3,9 +3,6 @@
     <ProjectReference Include="..\src\Common\GastronomePlatform.Common.Domain\GastronomePlatform.Common.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Entities\" />
     <Folder Include="ValueObjects\" />
-    <Folder Include="Events\" />
-    <Folder Include="Repositories\" />
   </ItemGroup>
 </Project>

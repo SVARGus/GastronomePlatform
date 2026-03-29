@@ -1,4 +1,4 @@
-﻿namespace GastronomePlatform.Common.Application.Abstractions
+namespace GastronomePlatform.Common.Application.Abstractions
 {
     /// <summary>
     /// Абстракция над системным временем.
@@ -9,11 +9,11 @@
         /// <summary>
         /// Текущее время в UTC с информацией о смещении.
         /// </summary>
-        DateTimeOffset UtcNow { get; }
+        public DateTimeOffset UtcNow { get; }
 
         /// <summary>
         /// Текущая дата (без времени).
         /// </summary>
-        DateTime Today { get; }
+        public DateTime Today { get; }
     }
 }
