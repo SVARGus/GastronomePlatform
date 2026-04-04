@@ -1,4 +1,4 @@
-﻿# docker-compose.yml
+# docker-compose.yml
 # Инфраструктурные зависимости для локальной разработки GastronomePlatform
 
 # Версия формата Docker Compose была убрана, так как последняя версия docker-compose не требует указывать версию "version: '3.8'"
@@ -11,7 +11,7 @@ services:
     container_name: gastronome-postgres
     restart: unless-stopped            # Перезапуск при падении (кроме ручной остановки)
     ports:
-      - "5432:5432"                    # HOST_PORT:CONTAINER_PORT
+      - "5433:5432"                    # HOST_PORT:CONTAINER_PORT
     environment:
       # Эти переменные создают пользователя и БД при первом запуске
       POSTGRES_USER: gastronome                 # Имя пользователя

@@ -1,6 +1,9 @@
+using System.Text;
 using GastronomePlatform.Common.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Auth.Infrastructure.Extensions;
 using MediatR.NotificationPublishers;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Serilog.Events;
 
@@ -43,10 +46,32 @@ try
         cfg.NotificationPublisher = new TaskWhenAllPublisher();
     });
 
-    builder.Services.AddCommonInfrastructure();
-
     // === 3.1. Регистрация модулей ===
     builder.Services.AddAuthModule(builder.Configuration);
+
+    // === 3.2. Настройка JWT Authentication pipeline ===
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        IConfiguration config = builder.Configuration;
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = config["JwtSettings:Issuer"],
+            ValidateAudience = true,
+            ValidAudience = config["JwtSettings:Audience"],
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(config["JwtSettings:Secret"]!)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero  // без допуска на расхождение времени
+        };
+    });
 
     WebApplication app = builder.Build();
 
@@ -61,6 +86,7 @@ try
 
     app.UseHttpsRedirection();
 
+    app.UseAuthentication();
     app.UseAuthorization();
 
     app.MapControllers();
