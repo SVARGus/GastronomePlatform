@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Common\GastronomePlatform.Common.Infrastructure\GastronomePlatform.Common.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Auth\GastronomePlatform.Modules.Auth.Infrastructure\GastronomePlatform.Modules.Auth.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Users\GastronomePlatform.Modules.Users.Infrastructure\GastronomePlatform.Modules.Users.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

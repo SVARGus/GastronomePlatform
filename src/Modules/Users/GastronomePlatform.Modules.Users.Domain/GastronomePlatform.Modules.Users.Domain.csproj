@@ -1,0 +1,10 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Common\GastronomePlatform.Common.Domain\GastronomePlatform.Common.Domain.csproj" />
+    <ProjectReference Include="..\..\Auth\GastronomePlatform.Modules.Auth.Domain\GastronomePlatform.Modules.Auth.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="ValueObjects\" />
+    <Folder Include="Events\" />
+  </ItemGroup>
+</Project>

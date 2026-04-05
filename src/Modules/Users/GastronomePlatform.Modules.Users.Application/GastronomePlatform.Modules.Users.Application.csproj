@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Common\GastronomePlatform.Common.Application\GastronomePlatform.Common.Application.csproj" />
+    <ProjectReference Include="..\GastronomePlatform.Modules.Users.Domain\GastronomePlatform.Modules.Users.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Abstractions\" />
+    <Folder Include="Commands\" />
+    <Folder Include="Queries\" />
+    <Folder Include="DTOs\" />
+  </ItemGroup>
+</Project>

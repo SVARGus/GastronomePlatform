@@ -1,6 +1,7 @@
 using System.Text;
 using GastronomePlatform.Common.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Auth.Infrastructure.Extensions;
+using GastronomePlatform.Modules.Users.Infrastructure.Extensions;
 using MediatR.NotificationPublishers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -48,6 +49,7 @@ try
 
     // === 3.1. Регистрация модулей ===
     builder.Services.AddAuthModule(builder.Configuration);
+    builder.Services.AddUsersModule(builder.Configuration);
 
     // === 3.2. Настройка JWT Authentication pipeline ===
     builder.Services.AddAuthentication(options =>

@@ -1,8 +1,10 @@
 using GastronomePlatform.Modules.Auth.Application.Abstractions;
+using GastronomePlatform.Modules.Auth.Domain.Contracts;
 using GastronomePlatform.Modules.Auth.Domain.Repositories;
 using GastronomePlatform.Modules.Auth.Infrastructure.Identity;
 using GastronomePlatform.Modules.Auth.Infrastructure.Persistence;
 using GastronomePlatform.Modules.Auth.Infrastructure.Repositories;
+using GastronomePlatform.Modules.Auth.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -62,6 +64,9 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Extensions
 
             // Регистрация JWT-сервиса
             services.AddScoped<IJwtService, JwtService>();
+
+            // Регистрация межмодульных сервисов
+            services.AddScoped<IAuthUserService, AuthUserService>();
 
             return services;
         }
