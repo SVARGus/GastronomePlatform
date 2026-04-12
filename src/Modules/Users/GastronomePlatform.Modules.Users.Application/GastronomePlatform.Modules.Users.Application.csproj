@@ -5,8 +5,5 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Abstractions\" />
-    <Folder Include="Commands\" />
-    <Folder Include="Queries\" />
-    <Folder Include="DTOs\" />
   </ItemGroup>
 </Project>

@@ -18,6 +18,8 @@ namespace GastronomePlatform.WebAPI.Controllers.Auth
     [Route("api/auth")]
     public sealed class AuthController : ApiController
     {
+        #region Request Models
+
         // Request-объекты — входные данные от клиента
         /// <summary>
         /// Данные для регистрации нового пользователя.
@@ -52,6 +54,10 @@ namespace GastronomePlatform.WebAPI.Controllers.Auth
         /// </summary>
         /// <param name="sender">Отправитель команд MediatR.</param>
         public AuthController(ISender sender) : base(sender) { }
+
+        #endregion
+
+        #region POST Endpoints
 
         /// <summary>
         /// Регистрирует нового пользователя в системе.
@@ -134,5 +140,7 @@ namespace GastronomePlatform.WebAPI.Controllers.Auth
 
             return MapResult(result);
         }
+
+        #endregion
     }
 }

@@ -1,4 +1,4 @@
-﻿using GastronomePlatform.Common.Application.Abstractions;
+using GastronomePlatform.Common.Application.Abstractions;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
 
@@ -16,9 +16,9 @@ namespace GastronomePlatform.Common.Infrastructure.Services
         /// </summary>
         private static class JwtClaims
         {
-            public const string UserId = "sub";
-            public const string Email = "email";
-            public const string Role = "role";
+            public const string USER_ID = "sub";
+            public const string EMAIL = "email";
+            public const string ROLE = "role";
         }
 
         private readonly IHttpContextAccessor _httpContextAccessor;
@@ -38,12 +38,12 @@ namespace GastronomePlatform.Common.Infrastructure.Services
         {
             get
             {
-                var userIdClaim = User?.FindFirst(JwtClaims.UserId)?.Value;
+                var userIdClaim = User?.FindFirst(JwtClaims.USER_ID)?.Value;
                 return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
             }
         }
 
-        public string? UserEmail => User?.FindFirst(JwtClaims.Email)?.Value;
+        public string? UserEmail => User?.FindFirst(JwtClaims.EMAIL)?.Value;
 
         public bool IsAuthenticated => User?.Identity?.IsAuthenticated ?? false;
 
@@ -57,7 +57,7 @@ namespace GastronomePlatform.Common.Infrastructure.Services
                     return Array.Empty<string>();
 
                 return user.Claims
-                    .Where(c => c.Type == JwtClaims.Role)
+                    .Where(c => c.Type == JwtClaims.ROLE)
                     .Select(c => c.Value)
                     .Distinct()
                     .ToArray();

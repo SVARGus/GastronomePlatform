@@ -66,7 +66,7 @@ namespace GastronomePlatform.Modules.Auth.Domain.Contracts
         /// <param name="cancellationToken">Токен отмены операции.</param>
         /// <returns>
         /// <see cref="Result.Success"/> если изменение выполнено;
-        /// <see cref="Result.Failure"/> с ошибкой если email уже занят.
+        /// <c>Result.Failure</c> с ошибкой если email уже занят.
         /// </returns>
         Task<Result> ChangeEmailAsync(Guid userId, string newEmail, CancellationToken cancellationToken = default);
 
@@ -79,7 +79,7 @@ namespace GastronomePlatform.Modules.Auth.Domain.Contracts
         /// <param name="cancellationToken">Токен отмены операции.</param>
         /// <returns>
         /// <see cref="Result.Success"/> если изменение выполнено;
-        /// <see cref="Result.Failure"/> с ошибкой если телефон уже занят.
+        /// <c>Result.Failure</c> с ошибкой если телефон уже занят.
         /// </returns>
         Task<Result> ChangePhoneAsync(Guid userId, string newPhone, CancellationToken cancellationToken = default);
 
@@ -92,9 +92,23 @@ namespace GastronomePlatform.Modules.Auth.Domain.Contracts
         /// <param name="cancellationToken">Токен отмены операции.</param>
         /// <returns>
         /// <see cref="Result.Success"/> если изменение выполнено;
-        /// <see cref="Result.Failure"/> с ошибкой если никнейм уже занят.
+        /// <c>Result.Failure</c> с ошибкой если никнейм уже занят.
         /// </returns>
         Task<Result> ChangeUserNameAsync(Guid userId, string newUserName, CancellationToken cancellationToken = default);
+
+        #endregion
+
+        #region User Info
+
+        /// <summary>
+        /// Возвращает список ролей пользователя.
+        /// </summary>
+        /// <param name="userId">Идентификатор пользователя.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// Список ролей пользователя; пустой список если роли не назначены.
+        /// </returns>
+        Task<IReadOnlyCollection<string>> GetUserRolesAsync(Guid userId, CancellationToken cancellationToken = default);
 
         #endregion
     }

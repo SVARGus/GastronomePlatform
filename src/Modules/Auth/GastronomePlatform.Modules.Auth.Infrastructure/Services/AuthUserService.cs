@@ -142,5 +142,20 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Services
         /// <inheritdoc/>
         public async Task<bool> ExistsByUserNameAsync(string userName, CancellationToken cancellationToken = default)
             => await _authDbContext.Users.AnyAsync(u => u.UserName == userName, cancellationToken);
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyCollection<string>> GetUserRolesAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            ApplicationUser? user = await _userManager.FindByIdAsync(userId.ToString());
+
+            if (user is null)
+            {
+                return Array.Empty<string>();
+            }
+
+            IList<string> roles = await _userManager.GetRolesAsync(user);
+
+            return roles.AsReadOnly();
+        }
     }
 }

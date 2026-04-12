@@ -19,6 +19,8 @@
 
         <!-- Детерминированная сборка (хорошая практика, нужна для CI/CD) -->
         <Deterministic>true</Deterministic>
+
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
 </Project>
