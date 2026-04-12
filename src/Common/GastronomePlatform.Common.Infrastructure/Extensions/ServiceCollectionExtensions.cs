@@ -1,5 +1,7 @@
 using GastronomePlatform.Common.Application.Abstractions;
+using GastronomePlatform.Common.Application.Behaviors;
 using GastronomePlatform.Common.Infrastructure.Services;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace GastronomePlatform.Common.Infrastructure.Extensions
@@ -17,8 +19,12 @@ namespace GastronomePlatform.Common.Infrastructure.Extensions
 
             // Pipeline Behaviors и handlers Common.Application регистрируются здесь
             services.AddMediatR(cfg =>
-                cfg.RegisterServicesFromAssembly(
-                    typeof(Common.Application.AssemblyReference).Assembly));
+            {
+                cfg.RegisterServicesFromAssembly(typeof(Common.Application.AssemblyReference).Assembly);
+
+                // ValidationBehavior запускается автоматически для всех команд и запросов
+                cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+            });
 
             return services;
         }

@@ -1,3 +1,4 @@
+using FluentValidation;
 using GastronomePlatform.Modules.Users.Domain.Repositories;
 using GastronomePlatform.Modules.Users.Infrastructure.Persistence;
 using GastronomePlatform.Modules.Users.Infrastructure.Repositories;
@@ -24,6 +25,9 @@ namespace GastronomePlatform.Modules.Users.Infrastructure.Extensions
             services.AddMediatR(cfg =>
                 cfg.RegisterServicesFromAssembly(
                     typeof(GastronomePlatform.Modules.Users.Application.AssemblyReference).Assembly));
+
+            // Регистрация Валидаторов
+            services.AddValidatorsFromAssembly(typeof(GastronomePlatform.Modules.Users.Application.AssemblyReference).Assembly);
 
             // Регистрация DbContext
             services.AddDbContext<UsersDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("Database")));
