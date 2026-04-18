@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
@@ -21,8 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Common\GastronomePlatform.Common.Application\GastronomePlatform.Common.Application.csproj" />
-    <ProjectReference Include="..\..\..\src\Common\GastronomePlatform.Common.Domain\GastronomePlatform.Common.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Auth\GastronomePlatform.Modules.Auth.Application\GastronomePlatform.Modules.Auth.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Auth\GastronomePlatform.Modules.Auth.Domain\GastronomePlatform.Modules.Auth.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -21,8 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Common\GastronomePlatform.Common.Application\GastronomePlatform.Common.Application.csproj" />
-    <ProjectReference Include="..\..\..\src\Common\GastronomePlatform.Common.Domain\GastronomePlatform.Common.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Users\GastronomePlatform.Modules.Users.Application\GastronomePlatform.Modules.Users.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Users\GastronomePlatform.Modules.Users.Domain\GastronomePlatform.Modules.Users.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

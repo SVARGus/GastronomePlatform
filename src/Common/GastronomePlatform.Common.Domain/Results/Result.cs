@@ -1,4 +1,4 @@
-﻿namespace GastronomePlatform.Common.Domain.Results
+namespace GastronomePlatform.Common.Domain.Results
 {
     /// <summary>
     /// Результат операции без возвращаемого значения.
@@ -32,10 +32,14 @@
         protected Result(bool isSuccess, Error error)
         {
             if (isSuccess && error != Error.None)
+            {
                 throw new ArgumentException("Successful result cannot have an error", nameof(error));
+            }
 
             if (!isSuccess && error == Error.None)
+            {
                 throw new ArgumentException("Failed result must have a meaningful error", nameof(error));
+            }
 
             IsSuccess = isSuccess;
             _error = error;
@@ -87,7 +91,9 @@
             get
             {
                 if (IsFailure)
+                {
                     throw new InvalidOperationException($"Cannot access value of failed result: {Error}");
+                }
 
                 return _value!;
             }

@@ -64,7 +64,9 @@ namespace GastronomePlatform.Modules.Auth.Domain.Entities
         public void Revoke(DateTimeOffset revokedAt)
         {
             if (!IsActive)
+            {
                 return;
+            }
 
             RevokedAt = revokedAt;
         }

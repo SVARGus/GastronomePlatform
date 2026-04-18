@@ -1,4 +1,4 @@
-﻿namespace GastronomePlatform.Common.Domain.Results
+namespace GastronomePlatform.Common.Domain.Results
 {
     /// <summary>
     /// Представляет доменную ошибку.

@@ -26,7 +26,9 @@ namespace GastronomePlatform.Common.Domain.Primitives
         protected Entity(TId id)
         {
             if (id is null)
+            {
                 throw new ArgumentNullException(nameof(id), "Id не может быть пустым");
+            }
 
             Id = id;
         }
@@ -39,13 +41,19 @@ namespace GastronomePlatform.Common.Domain.Primitives
         public bool Equals(Entity<TId>? other)
         {
             if (other is null)
+            {
                 return false;
+            }
 
             if (ReferenceEquals(this, other))
+            {
                 return true;
+            }
 
             if (GetType() != other.GetType())
+            {
                 return false;
+            }
 
             return Id.Equals(other.Id);
         }
@@ -76,10 +84,14 @@ namespace GastronomePlatform.Common.Domain.Primitives
         public static bool operator == (Entity<TId>? left, Entity<TId>? right)
         {
             if (left is null && right is null)
+            {
                 return true;
+            }
 
             if (left is null || right is null)
+            {
                 return false;
+            }
 
             return left.Equals(right);
         }
