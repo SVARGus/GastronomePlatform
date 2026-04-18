@@ -79,8 +79,9 @@ namespace GastronomePlatform.Common.Application.Behaviors
                 }
             }
 
-            // Fallback — если не удалось создать failure (не должно происходить)
-            return await next();
+            // Throw вместо тихого bypass, чтобы ошибки валидации не терялись молча.
+            throw new InvalidOperationException(
+                $"ValidationBehavior поддерживает только Result и Result<T>, получен '{responseType.Name}'.");
         }
     }
 }

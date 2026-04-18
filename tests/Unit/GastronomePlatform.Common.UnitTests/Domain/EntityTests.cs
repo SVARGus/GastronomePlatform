@@ -25,6 +25,15 @@ namespace GastronomePlatform.Common.UnitTests.Domain
             public AnotherEntity(Guid id) : base(id) { }
         }
 
+        /// <summary>
+        /// Сущность с идентификатором reference-типа — нужна для проверки
+        /// ветки `if (id is null) throw` в Entity(TId id).
+        /// </summary>
+        private sealed class StringEntity : Entity<string>
+        {
+            public StringEntity(string id) : base(id) { }
+        }
+
         #region Constructor
 
         [Fact]
@@ -41,14 +50,14 @@ namespace GastronomePlatform.Common.UnitTests.Domain
         }
 
         [Fact]
-        public void Constructor_WithNullId_ShouldThrowArgumentNullException()
+        public void Constructor_WithNullReferenceId_ShouldThrowArgumentNullException()
         {
-            // Act
-            Action action = () => new TestEntity(default);
+            // Act — Entity<string>, reference-тип Id, позволяет передать null
+            Action action = () => new StringEntity(null!);
 
-            // Assert — default(Guid) = Guid.Empty, не null
-            // Guid — struct, не может быть null, поэтому исключения нет
-            action.Should().NotThrow();
+            // Assert
+            action.Should().Throw<ArgumentNullException>()
+                .WithParameterName("id");
         }
 
         #endregion
@@ -113,6 +122,32 @@ namespace GastronomePlatform.Common.UnitTests.Domain
 
             // Assert — GetType() != other.GetType() ветка
             entity1.Equals(entity2).Should().BeFalse();
+        }
+
+        [Fact]
+        public void ObjectEquals_WithNullObject_ShouldBeFalse()
+        {
+            // Arrange
+            TestEntity entity = new(Guid.NewGuid());
+
+            // Act — вызываем перегрузку Equals(object?)
+            bool result = entity.Equals((object?)null);
+
+            // Assert
+            result.Should().BeFalse();
+        }
+
+        [Fact]
+        public void ObjectEquals_WithNonEntityType_ShouldBeFalse()
+        {
+            // Arrange
+            TestEntity entity = new(Guid.NewGuid());
+
+            // Act — ветка `obj is Entity<TId>` → false
+            bool result = entity.Equals("не-сущность");
+
+            // Assert
+            result.Should().BeFalse();
         }
 
         #endregion
@@ -192,14 +227,14 @@ namespace GastronomePlatform.Common.UnitTests.Domain
         }
 
         [Fact]
-        public void GetHashCode_WithDifferentId_ShouldNotBeEqual()
+        public void GetHashCode_ShouldMatch_IdGetHashCode()
         {
-            // Arrange
-            TestEntity entity1 = new(Guid.NewGuid());
-            TestEntity entity2 = new(Guid.NewGuid());
+            // Arrange — реализация: hash строится только на Id.GetHashCode()
+            Guid id = Guid.NewGuid();
+            TestEntity entity = new(id);
 
-            // Assert — высокая вероятность разных хэшей для разных Guid
-            entity1.GetHashCode().Should().NotBe(entity2.GetHashCode());
+            // Assert — проверяем инвариант, а не статистическую не-коллизию
+            entity.GetHashCode().Should().Be(id.GetHashCode());
         }
 
         #endregion

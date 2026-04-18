@@ -8,6 +8,15 @@ namespace GastronomePlatform.Common.UnitTests.Domain
     /// </summary>
     public sealed class ResultTests
     {
+        /// <summary>
+        /// Тестовый наследник Result с публичным конструктором —
+        /// позволяет достучаться до защищённой валидации Result(bool, Error).
+        /// </summary>
+        private sealed class TestableResult : Result
+        {
+            public TestableResult(bool isSuccess, Error error) : base(isSuccess, error) { }
+        }
+
         #region Result (без значения)
 
         [Fact]
@@ -58,6 +67,20 @@ namespace GastronomePlatform.Common.UnitTests.Domain
 
             // Assert
             action.Should().Throw<ArgumentException>().WithMessage("*meaningful error*");
+        }
+
+        [Fact]
+        public void Constructor_SuccessWithNonNoneError_ShouldThrowArgumentException()
+        {
+            // Arrange — инвариант: успешный результат не может нести ошибку
+            Error error = Error.NotFound("TEST.NOT_FOUND", "Не найдено.");
+
+            // Act
+            Action action = () => new TestableResult(true, error);
+
+            // Assert
+            action.Should().Throw<ArgumentException>()
+                .WithMessage("*cannot have an error*");
         }
 
         [Fact]
@@ -161,13 +184,25 @@ namespace GastronomePlatform.Common.UnitTests.Domain
         }
 
         [Fact]
-        public void Success_WithNullValue_ShouldThrowArgumentNullException()
+        public void Success_WithNullValue_ForResultWithValue_ShouldThrowArgumentNullException()
         {
             // Act
             Action action = () => Result<string>.Success(null!);
 
             // Assert
             action.Should().Throw<ArgumentNullException>();
+        }
+
+        [Fact]
+        public void Failure_WithErrorNone_ForResultWithValue_ShouldThrowArgumentException()
+        {
+            // Act — Result<T>.Failure(Error.None) должен провалиться на проверке
+            // в protected base-конструкторе (!isSuccess && error == Error.None)
+            Action action = () => Result<string>.Failure(Error.None);
+
+            // Assert
+            action.Should().Throw<ArgumentException>()
+                .WithMessage("*meaningful error*");
         }
 
         #endregion

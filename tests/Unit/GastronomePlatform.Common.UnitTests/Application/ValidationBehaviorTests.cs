@@ -233,10 +233,9 @@ namespace GastronomePlatform.Common.UnitTests.Application
                 (ct) => Task.FromResult(Result.Success()),
                 CancellationToken.None);
 
-            // Assert
+            // Assert — фиксируем и содержимое, и точный разделитель "; "
             result.IsFailure.Should().BeTrue();
-            result.Error.Message.Should().Contain("Ошибка 1.");
-            result.Error.Message.Should().Contain("Ошибка 2.");
+            result.Error.Message.Should().Be("Ошибка 1.; Ошибка 2.");
         }
 
         [Fact]
@@ -268,6 +267,38 @@ namespace GastronomePlatform.Common.UnitTests.Application
 
             // Assert — сообщение встречается один раз (Distinct)
             result.Error.Message.Should().Be("Одинаковая ошибка.");
+        }
+
+        #endregion
+
+        #region CancellationToken
+
+        [Fact]
+        public async Task Handle_ShouldPassCancellationTokenToValidatorsAsync()
+        {
+            // Arrange
+            using CancellationTokenSource cts = new();
+            CancellationToken expectedToken = cts.Token;
+
+            Mock<IValidator<TestCommand>> validatorMock = new();
+            validatorMock
+                .Setup(v => v.ValidateAsync(
+                    It.IsAny<ValidationContext<TestCommand>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ValidationResult());
+
+            ValidationBehavior<TestCommand, Result> behavior = new([validatorMock.Object]);
+
+            // Act
+            await behavior.Handle(
+                new TestCommand("x"),
+                (ct) => Task.FromResult(Result.Success()),
+                expectedToken);
+
+            // Assert — фиксируем что именно наш токен долетает до ValidateAsync
+            validatorMock.Verify(
+                v => v.ValidateAsync(It.IsAny<ValidationContext<TestCommand>>(), expectedToken),
+                Times.Once);
         }
 
         #endregion

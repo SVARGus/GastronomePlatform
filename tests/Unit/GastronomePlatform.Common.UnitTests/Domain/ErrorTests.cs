@@ -140,8 +140,34 @@ namespace GastronomePlatform.Common.UnitTests.Domain
             // Arrange
             Error error = Error.NotFound("TEST.NOT_FOUND", "Не найдено.");
 
-            // Act — вызываем Equals с null напрямую
+            // Act — типизированный Equals(Error?)
             bool result = error.Equals(null);
+
+            // Assert
+            result.Should().BeFalse();
+        }
+
+        [Fact]
+        public void ObjectEquals_WithNull_ShouldBeFalse()
+        {
+            // Arrange
+            Error error = Error.NotFound("TEST.NOT_FOUND", "Не найдено.");
+
+            // Act — перегрузка Equals(object?)
+            bool result = error.Equals((object?)null);
+
+            // Assert
+            result.Should().BeFalse();
+        }
+
+        [Fact]
+        public void ObjectEquals_WithNonErrorType_ShouldBeFalse()
+        {
+            // Arrange
+            Error error = Error.NotFound("TEST.NOT_FOUND", "Не найдено.");
+
+            // Act — ветка `obj as Error` → null
+            bool result = error.Equals("строка");
 
             // Assert
             result.Should().BeFalse();
@@ -167,6 +193,40 @@ namespace GastronomePlatform.Common.UnitTests.Domain
 
             // Assert
             (error1 != error2).Should().BeTrue();
+        }
+
+        [Fact]
+        public void EqualityOperator_BothNull_ShouldBeTrue()
+        {
+            // Arrange
+            Error? left = null;
+            Error? right = null;
+
+            // Assert
+            (left == right).Should().BeTrue();
+        }
+
+        [Fact]
+        public void EqualityOperator_OneNull_ShouldBeFalse()
+        {
+            // Arrange
+            Error? left = Error.NotFound("TEST.NOT_FOUND", "Не найдено.");
+            Error? right = null;
+
+            // Assert — проверяем обе стороны
+            (left == right).Should().BeFalse();
+            (right == left).Should().BeFalse();
+        }
+
+        [Fact]
+        public void GetHashCode_WithEqualErrors_ShouldBeEqual()
+        {
+            // Arrange — Message не участвует в сравнении, хэш тоже должен совпасть
+            Error error1 = Error.NotFound("TEST.NOT_FOUND", "Сообщение 1.");
+            Error error2 = Error.NotFound("TEST.NOT_FOUND", "Сообщение 2.");
+
+            // Assert — контракт: Equals ⇒ одинаковые хэши
+            error1.GetHashCode().Should().Be(error2.GetHashCode());
         }
 
         #endregion

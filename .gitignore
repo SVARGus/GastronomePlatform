@@ -364,3 +364,6 @@ FodyWeavers.xsd
 
 # --- Local private documentation ---
 /docs/_private/
+
+# Исключить конкретный файл
+claude.exe
