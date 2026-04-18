@@ -29,7 +29,7 @@ namespace GastronomePlatform.Modules.Users.Application.Commands.UpdatePersonalIn
         /// <inheritdoc/>
         public async Task<Result> Handle(UpdatePersonalInfoCommand request, CancellationToken cancellationToken)
         {
-            UserProfile? userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId);
+            UserProfile? userProfile = await _userProfileRepository.GetByUserIdAsync(request.UserId, cancellationToken);
 
             if (userProfile is null)
             {

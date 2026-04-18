@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Common\GastronomePlatform.Common.Application\GastronomePlatform.Common.Application.csproj" />
     <ProjectReference Include="..\GastronomePlatform.Modules.Users.Domain\GastronomePlatform.Modules.Users.Domain.csproj" />
+    <ProjectReference Include="..\..\Auth\GastronomePlatform.Modules.Auth.Domain\GastronomePlatform.Modules.Auth.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Abstractions\" />
