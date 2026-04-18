@@ -112,7 +112,20 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Repositories
                 return false;
             }
 
-            return await _userManager.CheckPasswordAsync(user, password);
+            bool passwordCorrect = await _userManager.CheckPasswordAsync(user, password);
+
+            if (!passwordCorrect)
+            {
+                // Увеличиваем счётчик неудачных попыток → при достижении лимита
+                // Identity автоматически заблокирует аккаунт на DefaultLockoutTimeSpan (15 мин)
+                await _userManager.AccessFailedAsync(user);
+                return false;
+            }
+
+            // Сброс счётчика при успешном входе
+            await _userManager.ResetAccessFailedCountAsync(user);
+
+            return true;
         }
 
         /// <inheritdoc/>
