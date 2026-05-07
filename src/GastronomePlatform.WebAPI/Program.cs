@@ -1,6 +1,7 @@
 using System.Text;
 using GastronomePlatform.Common.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Auth.Infrastructure.Extensions;
+using GastronomePlatform.Modules.Dishes.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Users.Infrastructure.Extensions;
 using MediatR.NotificationPublishers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -50,6 +51,7 @@ try
     // === 3.1. Регистрация модулей ===
     builder.Services.AddAuthModule(builder.Configuration);
     builder.Services.AddUsersModule(builder.Configuration);
+    builder.Services.AddDishesModule(builder.Configuration);
 
     // === 3.2. Настройка JWT Authentication pipeline ===
     builder.Services.AddAuthentication(options =>
@@ -105,7 +107,7 @@ try
 
     app.Run();
 }
-catch (Exception ex)
+catch (Exception ex) when (ex is not Microsoft.Extensions.Hosting.HostAbortedException)
 {
     Log.Fatal(ex, "Приложение завершилось с ошибкой при старте");
 }
