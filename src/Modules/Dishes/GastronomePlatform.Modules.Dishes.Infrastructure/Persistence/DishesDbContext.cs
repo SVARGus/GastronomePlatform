@@ -30,6 +30,16 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence
         public DbSet<Category> Categories => Set<Category>();
 
         /// <summary>
+        /// Таблица справочника ингредиентов.
+        /// </summary>
+        public DbSet<Ingredient> Ingredients => Set<Ingredient>();
+
+        /// <summary>
+        /// Таблица сортов/видов ингредиентов.
+        /// </summary>
+        public DbSet<IngredientSpec> IngredientSpecs => Set<IngredientSpec>();
+
+        /// <summary>
         /// Инициализирует новый экземпляр <see cref="DishesDbContext"/>.
         /// </summary>
         /// <param name="options">Параметры конфигурации DbContext.</param>
