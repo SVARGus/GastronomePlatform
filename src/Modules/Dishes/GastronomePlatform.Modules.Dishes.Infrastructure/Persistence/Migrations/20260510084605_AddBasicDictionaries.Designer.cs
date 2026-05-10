@@ -3,6 +3,7 @@ using System;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(DishesDbContext))]
-    partial class DishesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260510084605_AddBasicDictionaries")]
+    partial class AddBasicDictionaries
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -22,48 +25,6 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Migration
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("GastronomePlatform.Modules.Dishes.Domain.Entities.Category", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("IconMediaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Order")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<Guid?>("ParentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ParentId");
-
-                    b.HasIndex("Slug")
-                        .IsUnique();
-
-                    b.ToTable("Categories", "dishes");
-                });
 
             modelBuilder.Entity("GastronomePlatform.Modules.Dishes.Domain.Entities.MeasureUnit", b =>
                 {
@@ -183,14 +144,6 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Migration
                         .IsUnique();
 
                     b.ToTable("Tags", "dishes");
-                });
-
-            modelBuilder.Entity("GastronomePlatform.Modules.Dishes.Domain.Entities.Category", b =>
-                {
-                    b.HasOne("GastronomePlatform.Modules.Dishes.Domain.Entities.Category", null)
-                        .WithMany()
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 #pragma warning restore 612, 618
         }

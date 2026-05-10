@@ -304,3 +304,8 @@ indent_size = 2
 # =============================================================================
 [*.{js,ts,jsx,tsx}]
 indent_size = 2
+
+# Auto-generated EF Core migrations — отключить style-правила
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_diagnostic.IDE0005.severity = none
