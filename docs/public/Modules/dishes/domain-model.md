@@ -1,8 +1,8 @@
 # Модуль Dishes — Доменная модель (Этап 2)
 
-> **Статус:** Проектирование
+> **Статус:** Проектирование завершено. Реализация в работе: 6 сущностей-справочников в коде (v0.8.0)
 > **Этап дорожной карты:** 2 (Контент и медиа)
-> **Дата:** 2026-04-19 (создано), 2026-04-26 (расширено)
+> **Дата:** 2026-04-19 (создано), 2026-04-26 (расширено), 2026-05-10 (отметки реализации)
 > **Связанные документы:** [[05_Дорожная-карта]], [[02_Архитектура]], [[13_Структура-проекта]], [[08_Разработка-(Development-Guide)]], `use-cases-dishes-draft.md`, `POL-001-dish-ownership.md`
 >
 > **Изменения от 2026-04-26:**
@@ -93,18 +93,18 @@
 | 2 | Рецепт | `Recipe` | 🟢 | Инструкция приготовления. Часть агрегата `Dish` | Id, DishId, IntroductionText, ServingsDefault, IsAlcoholic, AllergensMask, AuthorTips, ServingSuggestions, Notes | `Recipe → Dish (1:1)`; `Recipe → Timing (1:1)`; `Recipe → Yield (1:1)`; `Recipe → Nutrition (1:1)`; `Recipe ← RecipeStep (1:M)`; `Recipe ← RecipeIngredient (1:M)` |
 | 3 | Шаг рецепта | `RecipeStep` | 🟢 | Один шаг приготовления | Id, RecipeId, Order, Title, Description, ImageMediaId, VideoUrl, TemperatureCelsius, TimerMinutes | `RecipeStep → Recipe (M:1)` |
 | 4 | Ингредиент в рецепте | `RecipeIngredient` | 🟢 | Позиция в списке ингредиентов конкретного рецепта | Id, RecipeId, IngredientId, IngredientSpecId, FreeformText, Quantity, MeasureUnitId, Order, IsOptional, PreparationNote | `RecipeIngredient → Recipe (M:1)`; `RecipeIngredient → Ingredient (M:1, nullable)`; `RecipeIngredient → IngredientSpec (M:1, nullable)`; `RecipeIngredient → MeasureUnit (M:1)` |
-| 5 | Категория | `Category` | 🟢 | Справочник каталога. Иерархия | Id, Name, Slug, ParentId, Order, IconMediaId, IsActive | `Category → Category (self, ParentId)`; `Category ↔ Dish (M:M)`; `Category → MediaFile (через IconMediaId, кросс-модульно, без FK)` |
+| 5 | Категория | `Category` | 🟢 ✅ | Справочник каталога. Иерархия | Id, Name, Slug, ParentId, Order, IconMediaId, IsActive | `Category → Category (self, ParentId)`; `Category ↔ Dish (M:M)`; `Category → MediaFile (через IconMediaId, кросс-модульно, без FK)` |
 | 6 | Связь Блюдо ↔ Категория | `DishCategory` | 🟢 | Связующая таблица M:M (рабочая версия) | DishId, CategoryId | — (связующая) |
 | 6.1 | Связь Блюдо ↔ Категория (опубликованная) | `DishCategoryPublished` | 🟢 | Связующая таблица M:M для опубликованных версий блюд. Заполняется при `UC-DSH-004 PublishDish` | DishId, CategoryId | — (связующая) |
-| 7 | Тег | `Tag` | 🟢 | Плоский список пользовательских меток | Id, Name, NormalizedName, UsageCount, IsVerified, CreatedByUserId | `Tag ↔ Dish (M:M)` |
+| 7 | Тег | `Tag` | 🟢 ✅ | Плоский список пользовательских меток | Id, Name, NormalizedName, UsageCount, IsVerified, CreatedByUserId | `Tag ↔ Dish (M:M)` |
 | 8 | Связь Блюдо ↔ Тег | `DishTag` | 🟢 | Связующая таблица M:M (рабочая версия) | DishId, TagId | — |
 | 8.1 | Связь Блюдо ↔ Тег (опубликованная) | `DishTagPublished` | 🟢 | Связующая таблица M:M для опубликованных версий блюд. Заполняется при `UC-DSH-004 PublishDish` | DishId, TagId | — (связующая) |
-| 9 | Ингредиент (справочник) | `Ingredient` | 🟢 | Глобальный справочник продуктов | Id, Name, PluralName, Description, ImageMediaId, IsLiquid, DensityApprox, IsAllergen, AllergenType, BaseMeasureUnitId, DefaultNutritionId, IsActive | `Ingredient → MeasureUnit (M:1)`; `Ingredient → Nutrition (1:1, nullable)`; `Ingredient ← IngredientSpec (1:M)`; `Ingredient → MediaFile (через ImageMediaId, кросс-модульно, без FK)` |
-| 10 | Сорт/уточнение ингредиента | `IngredientSpec` | 🟡 | Разновидность продукта (жирность, сорт) | Id, IngredientId, SpecName, NutritionId | `IngredientSpec → Ingredient (M:1)`; `IngredientSpec → Nutrition (1:1)` |
-| 11 | Единица измерения | `MeasureUnit` | 🟢 | Справочник единиц + коэффициенты конвертации | Id, Code, NameRu, Type, ConversionToBase, IsBase | — |
+| 9 | Ингредиент (справочник) | `Ingredient` | 🟢 ✅ | Глобальный справочник продуктов | Id, Name, PluralName, Description, ImageMediaId, IsLiquid, DensityApprox, IsAllergen, AllergenType, BaseMeasureUnitId, DefaultNutritionId, IsActive | `Ingredient → MeasureUnit (M:1)`; `Ingredient → Nutrition (1:1, nullable)`; `Ingredient ← IngredientSpec (1:M)`; `Ingredient → MediaFile (через ImageMediaId, кросс-модульно, без FK)` |
+| 10 | Сорт/уточнение ингредиента | `IngredientSpec` | 🟡 ✅ | Разновидность продукта (жирность, сорт) | Id, IngredientId, SpecName, NutritionId | `IngredientSpec → Ingredient (M:1)`; `IngredientSpec → Nutrition (1:1)` |
+| 11 | Единица измерения | `MeasureUnit` | 🟢 ✅ | Справочник единиц + коэффициенты конвертации | Id, Code, NameRu, Type, ConversionToBase, IsBase | — |
 | 12 | Тайминг рецепта | `Timing` | 🟢 | Времена этапов приготовления | Id, PrepTimeMinutes, CookTimeMinutes, RestTimeMinutes, ActiveTimeMinutes, TotalTimeMinutes, IsTotalManual | — (owned by `Recipe`) |
 | 13 | Выход продукции | `Yield` | 🟢 | Сколько получается и размер порции | Id, QuantityTotal, YieldUnit, ServingsCount, GramsPerServing | — (owned by `Recipe`) |
-| 14 | КБЖУ | `Nutrition` | 🟢 | Пищевая ценность | Id, CalcMethod, Calories, Proteins, Fats, SaturatedFats, Carbs, Sugar, Fiber, Salt | — (используется `Recipe`, `Ingredient`, `IngredientSpec`) |
+| 14 | КБЖУ | `Nutrition` | 🟢 ✅ | Пищевая ценность | Id, CalcMethod, Calories, Proteins, Fats, SaturatedFats, Carbs, Sugar, Fiber, Salt | — (используется `Recipe`, `Ingredient`, `IngredientSpec`) |
 | 15 | Группа взаимозаменяемости | `IngredientGroup` | ⚪ | «Лук красный ИЛИ белый» в рамках рецепта | — | Этап 8+ |
 | 16 | Инвентарь | `Equipment` | ⚪ | Справочник оборудования | — | Этап 8+ |
 | 17 | Коэффициент потерь | `CookingLossCoefficient` | ⚪ | Уварка/ужарка для точного КБЖУ | — | Этап 8+ |
@@ -613,7 +613,7 @@ CHECK (
 
 ---
 
-### 7.5. Category 🟢
+### 7.5. Category 🟢 ✅ Реализовано в v0.8.0
 
 **Назначение.** Каталог категорий. Иерархия до 3 уровней. Управляется админом.
 
@@ -694,7 +694,7 @@ PK: `(DishId, CategoryId)`. Структура полностью идентич
 
 ---
 
-### 7.7. Tag 🟢
+### 7.7. Tag 🟢 ✅ Реализовано в v0.8.0
 
 **Назначение.** Пользовательские теги с автокомплитом по популярности.
 
@@ -745,7 +745,7 @@ PK: `(DishId, CategoryId)`. Структура полностью идентич
 
 ---
 
-### 7.9. Ingredient 🟢
+### 7.9. Ingredient 🟢 ✅ Реализовано в v0.8.0
 
 **Назначение.** Глобальный справочник продуктов. Одно название — одна запись. Сорта — через `IngredientSpec`.
 
@@ -793,7 +793,7 @@ PK: `(DishId, CategoryId)`. Структура полностью идентич
 
 До этого — работаем с полями прямо в `Ingredient`.
 
-### 7.10. MeasureUnit 🟢
+### 7.10. MeasureUnit 🟢 ✅ Реализовано в v0.8.0
 
 **Назначение.** Справочник единиц измерения с коэффициентами конвертации.
 
@@ -870,7 +870,7 @@ PK: `(DishId, CategoryId)`. Структура полностью идентич
 
 ---
 
-### 7.13. Nutrition 🟢
+### 7.13. Nutrition 🟢 ✅ Реализовано в v0.8.0
 
 **Назначение.** Пищевая ценность. Используется в `Recipe`, `Ingredient`, `IngredientSpec`.
 
@@ -901,7 +901,7 @@ PK: `(DishId, CategoryId)`. Структура полностью идентич
 
 ## 8. Stub-сущности
 
-### 8.1. IngredientSpec 🟡
+### 8.1. IngredientSpec 🟡 ✅ Реализовано в v0.8.0 (Stub)
 
 **Назначение.** Уточнение сорта/вида ингредиента (например, «Молоко» → «3.2%», «2.5%», «Безлактозное»). На Этапе 2 — минимальная реализация без развитой логики.
 
