@@ -9,5 +9,36 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
     {
         public static readonly Error DishNotFound =
             Error.NotFound("DISHES.DISH_NOT_FOUND", "Блюдо не найдено.");
+
+        public static readonly Error DishAlreadyPublished =
+            Error.Conflict("DISHES.DISH_ALREADY_PUBLISHED",
+                "Блюдо уже опубликовано, и в нём нет несохранённых изменений.");
+
+        public static readonly Error DishAlreadyArchived =
+            Error.Conflict("DISHES.DISH_ALREADY_ARCHIVED", "Блюдо уже архивировано.");
+
+        public static readonly Error DishNotPublished =
+            Error.Conflict("DISHES.DISH_NOT_PUBLISHED",
+                "Снять с публикации можно только опубликованное блюдо.");
+
+        public static readonly Error CannotPublishArchivedDish =
+            Error.Conflict("DISHES.CANNOT_PUBLISH_ARCHIVED_DISH",
+                "Архивированное блюдо нельзя опубликовать.");
+
+        public static readonly Error MainImageRequiredForPublish =
+            Error.Conflict("DISHES.MAIN_IMAGE_REQUIRED_FOR_PUBLISH",
+                "Для публикации блюда необходимо загрузить главное фото.");
+
+        public static readonly Error StepsRequiredForPublish =
+            Error.Conflict("DISHES.STEPS_REQUIRED_FOR_PUBLISH",
+                "Для публикации блюда рецепт должен содержать хотя бы один шаг.");
+
+        public static readonly Error IngredientsRequiredForPublish =
+            Error.Conflict("DISHES.INGREDIENTS_REQUIRED_FOR_PUBLISH",
+                "Для публикации блюда рецепт должен содержать хотя бы один ингредиент.");
+
+        public static readonly Error TimingRequiredForPublish =
+            Error.Conflict("DISHES.TIMING_REQUIRED_FOR_PUBLISH",
+                "Для публикации блюда требуется указать общее время приготовления.");
     }
 }

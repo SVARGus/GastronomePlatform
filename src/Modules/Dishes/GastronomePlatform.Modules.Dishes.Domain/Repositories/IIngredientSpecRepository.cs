@@ -4,7 +4,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
 {
     /// <summary>
     /// Репозиторий для работы со справочником сортов/видов ингредиентов.
-    /// На Этапе 2 — минимальный набор операций (Stub).
+    /// На текущий момент — минимальный набор операций (Stub).
     /// </summary>
     public interface IIngredientSpecRepository
     {
