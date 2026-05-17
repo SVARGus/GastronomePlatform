@@ -45,6 +45,21 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence
         public DbSet<Dish> Dishes => Set<Dish>();
 
         /// <summary>
+        /// Рецепты блюд — часть агрегата <c>Dish</c>, 1:1.
+        /// </summary>
+        public DbSet<Recipe> Recipes => Set<Recipe>();
+
+        /// <summary>
+        /// Времена этапов приготовления — часть агрегата <c>Dish</c>, 1:1 с <c>Recipe</c>.
+        /// </summary>
+        public DbSet<Timing> Timings => Set<Timing>();
+
+        /// <summary>
+        /// Выход готового продукта — часть агрегата <c>Dish</c>, 1:1 с <c>Recipe</c>.
+        /// </summary>
+        public DbSet<Yield> Yields => Set<Yield>();
+
+        /// <summary>
         /// Инициализирует новый экземпляр <see cref="DishesDbContext"/>.
         /// </summary>
         /// <param name="options">Параметры конфигурации DbContext.</param>

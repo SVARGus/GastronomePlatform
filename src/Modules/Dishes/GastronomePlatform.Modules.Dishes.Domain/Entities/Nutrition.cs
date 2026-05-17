@@ -135,5 +135,46 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         }
 
         #endregion
+
+        #region Update Methods
+
+        /// <summary>
+        /// Обновляет значения пищевой ценности. Используется, когда <see cref="Recipe"/>
+        /// владеет своей записью КБЖУ и автор изменяет её через
+        /// <c>Dish.UpdateNutrition(...)</c>.
+        /// Валидация значений ожидается на уровне команды (FluentValidation).
+        /// </summary>
+        /// <param name="calcMethod">Способ расчёта КБЖУ: на 100 г или на порцию.</param>
+        /// <param name="calories">Калорийность, ккал.</param>
+        /// <param name="proteins">Белки, г.</param>
+        /// <param name="fats">Жиры, г.</param>
+        /// <param name="saturatedFats">Насыщенные жиры, г. Опционально.</param>
+        /// <param name="carbs">Углеводы, г.</param>
+        /// <param name="sugar">Сахара, г. Опционально.</param>
+        /// <param name="fiber">Клетчатка, г. Опционально.</param>
+        /// <param name="salt">Соль, г. Опционально.</param>
+        internal void Update(
+            NutritionCalcMethod calcMethod,
+            decimal calories,
+            decimal proteins,
+            decimal fats,
+            decimal? saturatedFats,
+            decimal carbs,
+            decimal? sugar,
+            decimal? fiber,
+            decimal? salt)
+        {
+            CalcMethod = calcMethod;
+            Calories = calories;
+            Proteins = proteins;
+            Fats = fats;
+            SaturatedFats = saturatedFats;
+            Carbs = carbs;
+            Sugar = sugar;
+            Fiber = fiber;
+            Salt = salt;
+        }
+
+        #endregion
     }
 }

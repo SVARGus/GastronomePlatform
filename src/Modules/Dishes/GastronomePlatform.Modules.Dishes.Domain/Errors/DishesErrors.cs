@@ -40,5 +40,17 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
         public static readonly Error TimingRequiredForPublish =
             Error.Conflict("DISHES.TIMING_REQUIRED_FOR_PUBLISH",
                 "Для публикации блюда требуется указать общее время приготовления.");
+
+        public static readonly Error InvalidServingsDefault =
+            Error.Conflict("DISHES.INVALID_SERVINGS_DEFAULT",
+                "Количество порций по умолчанию должно быть не меньше 1.");
+
+        public static readonly Error InvalidTiming =
+            Error.Conflict("DISHES.INVALID_TIMING",
+                "Время приготовления должно быть неотрицательным.");
+
+        public static readonly Error InvalidYield =
+            Error.Conflict("DISHES.INVALID_YIELD",
+                "Выход блюда: количество порций должно быть не меньше 1, остальные значения — неотрицательные.");
     }
 }

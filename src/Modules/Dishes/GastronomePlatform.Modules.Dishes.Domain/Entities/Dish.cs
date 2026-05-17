@@ -8,8 +8,8 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
 {
     /// <summary>
     /// Блюдо — корень агрегата каталога. Публичная карточка блюда, которую видят все
-    /// пользователи (включая гостей). Содержит ссылку на <c>Recipe</c> и внутреннее
-    /// состояние: статус, модерацию, рейтинг, опубликованный снепшот.
+    /// пользователи (включая гостей). Содержит ссылку на <see cref="Recipe"/> и
+    /// внутреннее состояние: статус, модерацию, рейтинг, опубликованный снепшот.
     /// </summary>
     /// <remarks>
     /// Двухслойная модель: основные поля карточки хранятся плоско, плюс jsonb-снепшот
@@ -92,7 +92,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
 
         /// <summary>
         /// Битовая маска диетических меток (например, <c>Vegan | GlutenFree</c>).
-        /// По умолчанию — <see cref="DietLabels.None"/>. Устанавливается автором в
+        /// По умолчанию — <see cref="DietLabels.None"/>. Устанавливается автором через
         /// <see cref="UpdateCard"/>.
         /// </summary>
         public DietLabels DietLabelsMask { get; private set; }
@@ -103,7 +103,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         // для быстрого чтения в каталожных запросах.
         //
         // TODO: метод RecalculateAllergens(...) реализуется после добавления Recipe
-        // и RecipeIngredient. Вызывается из Application-handler'ов модификации состава
+        // и RecipeIngredient. Вызов из Application-handler'ов модификации состава
         // (UC-DSH-030..033), шаблон вызова:
         //
         //   var ingredientAllergens = await _ingredientRepository
@@ -180,6 +180,14 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// </summary>
         public DateTimeOffset UpdatedAt { get; private set; }
 
+        /// <summary>
+        /// Рецепт блюда — часть агрегата. Создаётся вместе с <see cref="Dish"/> в фабрике;
+        /// модификация рецепта выполняется только через wrapper-методы на <see cref="Dish"/>
+        /// (например, <see cref="UpdateRecipeIntroduction"/>, <see cref="UpdateTiming"/>),
+        /// внешний код не вызывает методы <see cref="Recipe"/> напрямую.
+        /// </summary>
+        public Recipe Recipe { get; private set; } = null!;
+
         #endregion
 
         #region Constructors
@@ -191,9 +199,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         private Dish() : base() { }
 
         /// <summary>
-        /// Создаёт новый экземпляр <see cref="Dish"/>. Используется только из фабричного
-        /// метода <see cref="Create"/>. Slug ожидается уже сгенерированным и проверенным
-        /// на уникальность на уровне Application.
+        /// Приватный конструктор, используется только из <see cref="Create"/>.
         /// </summary>
         private Dish(
             Guid authorUserId,
@@ -225,10 +231,11 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         #region Factory Methods
 
         /// <summary>
-        /// Создаёт новое блюдо в статусе <see cref="DishStatus.Draft"/>.
-        /// Поднимает доменное событие <see cref="DishCreatedEvent"/>.
+        /// Создаёт новое блюдо в статусе <see cref="DishStatus.Draft"/>. Одновременно
+        /// создаётся вложенный <see cref="Recipe"/> с пустыми <see cref="Entities.Timing"/>
+        /// и <see cref="Entities.Yield"/>. Поднимает событие <see cref="DishCreatedEvent"/>.
         /// Валидация параметров (длина строк, формат slug) ожидается на уровне команды
-        /// через FluentValidation — в фабрике проверки не выполняются.
+        /// через FluentValidation.
         /// </summary>
         /// <param name="authorUserId">Идентификатор автора (пользователя из модуля Users).</param>
         /// <param name="name">Отображаемое название блюда.</param>
@@ -237,7 +244,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// <param name="costEstimate">Грубая оценка стоимости.</param>
         /// <param name="ownerType">Тип владельца — денормализуется из ролей автора.</param>
         /// <param name="utcNow">Текущее время UTC (передаётся из <c>IDateTimeProvider</c> в Handler).</param>
-        /// <returns>Новый экземпляр <see cref="Dish"/> с зарегистрированным событием <see cref="DishCreatedEvent"/>.</returns>
+        /// <returns>Новый <see cref="Dish"/> с зарегистрированным событием <see cref="DishCreatedEvent"/>.</returns>
         public static Dish Create(
             Guid authorUserId,
             string name,
@@ -256,6 +263,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
                 ownerType,
                 utcNow);
 
+            dish.Recipe = Recipe.CreateForDish(dish.Id);
             dish.RaiseDomainEvent(new DishCreatedEvent(dish.Id, dish.AuthorUserId));
             return dish;
         }
@@ -332,6 +340,201 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             UpdatedAt = utcNow;
 
             RaiseDomainEvent(new DishUpdatedEvent(Id, AuthorUserId));
+        }
+
+        /// <summary>
+        /// Обновляет вводный текст рецепта.
+        /// </summary>
+        /// <param name="introductionText">Новый вводный текст. <see langword="null"/> — очистить.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        public void UpdateRecipeIntroduction(string? introductionText, DateTimeOffset utcNow)
+        {
+            Recipe.UpdateIntroduction(introductionText);
+            MarkAsUpdated(utcNow);
+        }
+
+        /// <summary>
+        /// Устанавливает признак содержания алкоголя в рецепте.
+        /// </summary>
+        /// <param name="isAlcoholic">Новое значение признака.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        public void SetRecipeIsAlcoholic(bool isAlcoholic, DateTimeOffset utcNow)
+        {
+            Recipe.SetIsAlcoholic(isAlcoholic);
+            MarkAsUpdated(utcNow);
+        }
+
+        /// <summary>
+        /// Обновляет советы автора в рецепте.
+        /// </summary>
+        /// <param name="authorTips">Новый текст советов. <see langword="null"/> — очистить.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        public void UpdateRecipeAuthorTips(string? authorTips, DateTimeOffset utcNow)
+        {
+            Recipe.UpdateAuthorTips(authorTips);
+            MarkAsUpdated(utcNow);
+        }
+
+        /// <summary>
+        /// Обновляет дополнительные заметки в рецепте.
+        /// </summary>
+        /// <param name="notes">Новый текст заметок. <see langword="null"/> — очистить.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        public void UpdateRecipeNotes(string? notes, DateTimeOffset utcNow)
+        {
+            Recipe.UpdateNotes(notes);
+            MarkAsUpdated(utcNow);
+        }
+
+        /// <summary>
+        /// Обновляет рекомендации по сервировке.
+        /// </summary>
+        /// <param name="servingSuggestions">Новый текст рекомендаций. <see langword="null"/> — очистить.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        public void UpdateRecipeServingSuggestions(string? servingSuggestions, DateTimeOffset utcNow)
+        {
+            Recipe.UpdateServingSuggestions(servingSuggestions);
+            MarkAsUpdated(utcNow);
+        }
+
+        /// <summary>
+        /// Устанавливает количество порций по умолчанию в рецепте.
+        /// </summary>
+        /// <param name="servingsDefault">Новое количество порций (не меньше 1).</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или
+        /// <see cref="Result.Failure(Error)"/> с <see cref="DishesErrors.InvalidServingsDefault"/>,
+        /// если значение меньше 1.
+        /// </returns>
+        public Result SetRecipeServingsDefault(int servingsDefault, DateTimeOffset utcNow)
+        {
+            var result = Recipe.SetServingsDefault(servingsDefault);
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Обновляет времена этапов приготовления. Если <paramref name="isTotalManual"/> =
+        /// <see langword="false"/>, общее время вычисляется автоматически как сумма
+        /// Prep + Cook + Rest.
+        /// </summary>
+        /// <param name="prepTimeMinutes">Время подготовки в минутах. <see langword="null"/> — не задано.</param>
+        /// <param name="cookTimeMinutes">Время основного приготовления в минутах. <see langword="null"/> — не задано.</param>
+        /// <param name="restTimeMinutes">Время отдыха в минутах. <see langword="null"/> — не задано.</param>
+        /// <param name="activeTimeMinutes">Время активной работы повара в минутах. <see langword="null"/> — не задано.</param>
+        /// <param name="totalTimeMinutes">Общее время в минутах. Используется, только если <paramref name="isTotalManual"/> = <see langword="true"/>.</param>
+        /// <param name="isTotalManual">
+        /// <see langword="true"/> — общее время задано вручную; <see langword="false"/> — вычисляется
+        /// автоматически.
+        /// </param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или
+        /// <see cref="Result.Failure(Error)"/> с <see cref="DishesErrors.InvalidTiming"/>,
+        /// если хотя бы одно значение отрицательно.
+        /// </returns>
+        public Result UpdateTiming(
+            int? prepTimeMinutes,
+            int? cookTimeMinutes,
+            int? restTimeMinutes,
+            int? activeTimeMinutes,
+            int totalTimeMinutes,
+            bool isTotalManual,
+            DateTimeOffset utcNow)
+        {
+            var result = Recipe.UpdateTiming(
+                prepTimeMinutes,
+                cookTimeMinutes,
+                restTimeMinutes,
+                activeTimeMinutes,
+                totalTimeMinutes,
+                isTotalManual);
+
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Обновляет выход рецепта (общее количество, единица, порции, грамм на порцию).
+        /// </summary>
+        /// <param name="quantityTotal">Общее количество готового продукта.</param>
+        /// <param name="yieldUnit">Единица выхода.</param>
+        /// <param name="servingsCount">Количество порций (не меньше 1).</param>
+        /// <param name="gramsPerServing">Вес одной порции в граммах. <see langword="null"/> — не задано.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или
+        /// <see cref="Result.Failure(Error)"/> с <see cref="DishesErrors.InvalidYield"/>,
+        /// если инварианты выхода нарушены.
+        /// </returns>
+        public Result UpdateYield(
+            decimal quantityTotal,
+            YieldUnit yieldUnit,
+            int servingsCount,
+            decimal? gramsPerServing,
+            DateTimeOffset utcNow)
+        {
+            var result = Recipe.UpdateYield(quantityTotal, yieldUnit, servingsCount, gramsPerServing);
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Обновляет КБЖУ рецепта. Если у Recipe ещё нет <see cref="Entities.Nutrition"/> —
+        /// создаёт новую запись; иначе обновляет существующую. Валидация значений
+        /// (неотрицательность, согласованность Sugar/Carbs, SaturatedFats/Fats) ожидается
+        /// на уровне команды.
+        /// </summary>
+        /// <param name="calcMethod">Способ расчёта КБЖУ: на 100 г или на порцию.</param>
+        /// <param name="calories">Калорийность, ккал.</param>
+        /// <param name="proteins">Белки, г.</param>
+        /// <param name="fats">Жиры, г.</param>
+        /// <param name="saturatedFats">Насыщенные жиры, г. Опционально.</param>
+        /// <param name="carbs">Углеводы, г.</param>
+        /// <param name="sugar">Сахара, г. Опционально.</param>
+        /// <param name="fiber">Клетчатка, г. Опционально.</param>
+        /// <param name="salt">Соль, г. Опционально.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        public void UpdateNutrition(
+            NutritionCalcMethod calcMethod,
+            decimal calories,
+            decimal proteins,
+            decimal fats,
+            decimal? saturatedFats,
+            decimal carbs,
+            decimal? sugar,
+            decimal? fiber,
+            decimal? salt,
+            DateTimeOffset utcNow)
+        {
+            Recipe.UpdateNutrition(
+                calcMethod,
+                calories,
+                proteins,
+                fats,
+                saturatedFats,
+                carbs,
+                sugar,
+                fiber,
+                salt);
+
+            MarkAsUpdated(utcNow);
         }
 
         /// <summary>

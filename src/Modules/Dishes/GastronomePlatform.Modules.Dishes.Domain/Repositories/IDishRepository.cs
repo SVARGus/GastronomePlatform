@@ -8,9 +8,10 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
     public interface IDishRepository
     {
         /// <summary>
-        /// Находит блюдо по идентификатору.
-        /// Используется в командах модификации (UC-DSH-002, UC-DSH-004, UC-DSH-005,
-        /// UC-DSH-006) для загрузки агрегата перед изменением состояния.
+        /// Находит блюдо по идентификатору — только корневые поля Dish, без
+        /// <see cref="Dish.Recipe"/> и подколлекций. Используется в командах модификации
+        /// карточки (UC-DSH-002), статусных переходах (UC-DSH-005, UC-DSH-006) и других UC,
+        /// где Recipe не требуется.
         /// </summary>
         /// <param name="id">Идентификатор блюда.</param>
         /// <param name="cancellationToken">Токен отмены операции.</param>
@@ -18,6 +19,34 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         /// <see cref="Dish"/>, если запись найдена; иначе <see langword="null"/>.
         /// </returns>
         Task<Dish?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Находит блюдо с подгруженным <see cref="Dish.Recipe"/> и его 1:1-связками
+        /// (<c>Timing</c>, <c>Yield</c>, <c>Nutrition</c>), но без подколлекций
+        /// <c>RecipeStep</c> и <c>RecipeIngredient</c>. Используется в командах модификации
+        /// простых полей рецепта (UC-DSH-003) и в операциях обновления Timing/Yield/Nutrition.
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see cref="Dish"/> с подгруженным <see cref="Dish.Recipe"/>, если запись найдена;
+        /// иначе <see langword="null"/>.
+        /// </returns>
+        Task<Dish?> GetByIdWithRecipeAsync(Guid id, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Находит блюдо с полностью загруженным агрегатом: <see cref="Dish.Recipe"/>,
+        /// его 1:1-связки и подколлекции (<c>RecipeStep</c>, <c>RecipeIngredient</c>),
+        /// плюс связки тегов и категорий. Используется в UC-DSH-004 (Publish) для проверки
+        /// инвариантов и сборки JSON-снепшота, а также в полной карточке для редактирования.
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see cref="Dish"/> с полностью загруженным агрегатом, если запись найдена;
+        /// иначе <see langword="null"/>.
+        /// </returns>
+        Task<Dish?> GetByIdWithFullRecipeAsync(Guid id, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Находит блюдо по уникальному <see cref="Dish.Slug"/>.
