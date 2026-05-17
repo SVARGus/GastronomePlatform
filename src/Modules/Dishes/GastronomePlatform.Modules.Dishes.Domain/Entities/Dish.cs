@@ -538,6 +538,338 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         }
 
         /// <summary>
+        /// Добавляет новый шаг к рецепту блюда. Порядковый номер назначается автоматически.
+        /// </summary>
+        /// <param name="description">Основной текст шага.</param>
+        /// <param name="title">Короткий заголовок. Опционально.</param>
+        /// <param name="imageMediaId">Идентификатор иллюстрации в Media. Опционально.</param>
+        /// <param name="videoUrl">URL внешнего видео. Опционально.</param>
+        /// <param name="temperatureCelsius">Температура приготовления. Опционально.</param>
+        /// <param name="timerMinutes">Время для таймера в минутах. Опционально.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>Идентификатор созданного шага.</returns>
+        public Guid AddRecipeStep(
+            string description,
+            string? title,
+            Guid? imageMediaId,
+            string? videoUrl,
+            int? temperatureCelsius,
+            int? timerMinutes,
+            DateTimeOffset utcNow)
+        {
+            var stepId = Recipe.AddStep(
+                description,
+                title,
+                imageMediaId,
+                videoUrl,
+                temperatureCelsius,
+                timerMinutes);
+
+            MarkAsUpdated(utcNow);
+            return stepId;
+        }
+
+        /// <summary>
+        /// Обновляет существующий шаг рецепта.
+        /// </summary>
+        /// <param name="stepId">Идентификатор шага для обновления.</param>
+        /// <param name="description">Основной текст шага.</param>
+        /// <param name="title">Короткий заголовок. <see langword="null"/> — очистить.</param>
+        /// <param name="imageMediaId">Идентификатор иллюстрации в Media. <see langword="null"/> — очистить.</param>
+        /// <param name="videoUrl">URL внешнего видео. <see langword="null"/> — очистить.</param>
+        /// <param name="temperatureCelsius">Температура приготовления. <see langword="null"/> — очистить.</param>
+        /// <param name="timerMinutes">Время для таймера в минутах. <see langword="null"/> — очистить.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/>, либо <see cref="Result.Failure(Error)"/>
+        /// с ошибкой делегирующего вызова.
+        /// </returns>
+        public Result UpdateRecipeStep(
+            Guid stepId,
+            string description,
+            string? title,
+            Guid? imageMediaId,
+            string? videoUrl,
+            int? temperatureCelsius,
+            int? timerMinutes,
+            DateTimeOffset utcNow)
+        {
+            var result = Recipe.UpdateStep(
+                stepId,
+                description,
+                title,
+                imageMediaId,
+                videoUrl,
+                temperatureCelsius,
+                timerMinutes);
+
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Удаляет шаг из рецепта и переупорядочивает оставшиеся.
+        /// </summary>
+        /// <param name="stepId">Идентификатор шага для удаления.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/>, либо <see cref="Result.Failure(Error)"/>
+        /// с <see cref="DishesErrors.StepNotFound"/>.
+        /// </returns>
+        public Result RemoveRecipeStep(Guid stepId, DateTimeOffset utcNow)
+        {
+            var result = Recipe.RemoveStep(stepId);
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Переупорядочивает шаги рецепта. Список должен содержать все Id шагов
+        /// без дубликатов.
+        /// </summary>
+        /// <param name="orderedStepIds">Список Id шагов в желаемом порядке.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/>, либо <see cref="Result.Failure(Error)"/>
+        /// с ошибкой делегирующего вызова.
+        /// </returns>
+        public Result ReorderRecipeSteps(IReadOnlyList<Guid> orderedStepIds, DateTimeOffset utcNow)
+        {
+            var result = Recipe.ReorderSteps(orderedStepIds);
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Добавляет ингредиент из справочника к рецепту блюда.
+        /// </summary>
+        /// <remarks>
+        /// После изменения состава Application Handler должен отдельно вызвать
+        /// <see cref="RecalculateAllergens"/> для пересчёта <see cref="AllergensMask"/>
+        /// и <see cref="HasUnverifiedAllergens"/>.
+        /// </remarks>
+        /// <param name="ingredientId">Идентификатор ингредиента из справочника.</param>
+        /// <param name="ingredientSpecId">Идентификатор спецификации. Опционально.</param>
+        /// <param name="quantity">Количество.</param>
+        /// <param name="measureUnitId">Идентификатор единицы измерения.</param>
+        /// <param name="isOptional">Признак опциональности.</param>
+        /// <param name="preparationNote">Заметка по подготовке. Опционально.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>Идентификатор созданной позиции.</returns>
+        public Guid AddRecipeIngredientFromCatalog(
+            Guid ingredientId,
+            Guid? ingredientSpecId,
+            decimal quantity,
+            Guid measureUnitId,
+            bool isOptional,
+            string? preparationNote,
+            DateTimeOffset utcNow)
+        {
+            var riId = Recipe.AddIngredientFromCatalog(
+                ingredientId,
+                ingredientSpecId,
+                quantity,
+                measureUnitId,
+                isOptional,
+                preparationNote);
+
+            MarkAsUpdated(utcNow);
+            return riId;
+        }
+
+        /// <summary>
+        /// Добавляет ингредиент свободным текстом — для случаев, когда нужного
+        /// в справочнике нет.
+        /// </summary>
+        /// <remarks>
+        /// Свободный текст устанавливает <see cref="HasUnverifiedAllergens"/> = <see langword="true"/>
+        /// при следующем вызове <see cref="RecalculateAllergens"/>.
+        /// </remarks>
+        /// <param name="freeformText">Свободный текст ингредиента.</param>
+        /// <param name="quantity">Количество.</param>
+        /// <param name="measureUnitId">Идентификатор единицы измерения.</param>
+        /// <param name="isOptional">Признак опциональности.</param>
+        /// <param name="preparationNote">Заметка по подготовке. Опционально.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>Идентификатор созданной позиции.</returns>
+        public Guid AddRecipeIngredientFreeform(
+            string freeformText,
+            decimal quantity,
+            Guid measureUnitId,
+            bool isOptional,
+            string? preparationNote,
+            DateTimeOffset utcNow)
+        {
+            var riId = Recipe.AddIngredientFreeform(
+                freeformText,
+                quantity,
+                measureUnitId,
+                isOptional,
+                preparationNote);
+
+            MarkAsUpdated(utcNow);
+            return riId;
+        }
+
+        /// <summary>
+        /// Обновляет существующий ингредиент рецепта. Допускает смену источника
+        /// catalog↔freeform — в этом случае Application Handler должен вызвать
+        /// <see cref="RecalculateAllergens"/> после успешного обновления.
+        /// </summary>
+        /// <param name="recipeIngredientId">Идентификатор позиции для обновления.</param>
+        /// <param name="ingredientId">Новый идентификатор ингредиента или <see langword="null"/>.</param>
+        /// <param name="ingredientSpecId">Новый идентификатор спецификации или <see langword="null"/>.</param>
+        /// <param name="freeformText">Новый свободный текст или <see langword="null"/>.</param>
+        /// <param name="quantity">Новое количество.</param>
+        /// <param name="measureUnitId">Новый идентификатор единицы измерения.</param>
+        /// <param name="isOptional">Признак опциональности.</param>
+        /// <param name="preparationNote">Заметка по подготовке.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/>
+        /// с ошибкой делегирующего вызова.
+        /// </returns>
+        public Result UpdateRecipeIngredient(
+            Guid recipeIngredientId,
+            Guid? ingredientId,
+            Guid? ingredientSpecId,
+            string? freeformText,
+            decimal quantity,
+            Guid measureUnitId,
+            bool isOptional,
+            string? preparationNote,
+            DateTimeOffset utcNow)
+        {
+            var result = Recipe.UpdateIngredient(
+                recipeIngredientId,
+                ingredientId,
+                ingredientSpecId,
+                freeformText,
+                quantity,
+                measureUnitId,
+                isOptional,
+                preparationNote);
+
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Удаляет ингредиент из рецепта и переупорядочивает оставшиеся.
+        /// </summary>
+        /// <param name="recipeIngredientId">Идентификатор позиции для удаления.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/>
+        /// с <see cref="DishesErrors.RecipeIngredientNotFound"/>.
+        /// </returns>
+        public Result RemoveRecipeIngredient(Guid recipeIngredientId, DateTimeOffset utcNow)
+        {
+            var result = Recipe.RemoveIngredient(recipeIngredientId);
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Переупорядочивает ингредиенты рецепта. Список должен содержать все Id
+        /// позиций без дубликатов.
+        /// </summary>
+        /// <param name="orderedIngredientIds">Список Id ингредиентов в желаемом порядке.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/>
+        /// с ошибкой делегирующего вызова.
+        /// </returns>
+        public Result ReorderRecipeIngredients(
+            IReadOnlyList<Guid> orderedIngredientIds,
+            DateTimeOffset utcNow)
+        {
+            var result = Recipe.ReorderIngredients(orderedIngredientIds);
+            if (result.IsFailure)
+            {
+                return result;
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Полностью пересобирает <see cref="AllergensMask"/> и
+        /// <see cref="HasUnverifiedAllergens"/> на основе текущего состава
+        /// <see cref="Recipe.Ingredients"/>.
+        /// </summary>
+        /// <remarks>
+        /// Логика: для каждой позиции с <c>IngredientId</c> — OR-им маску, взятую
+        /// из <paramref name="ingredientAllergens"/>; для каждой freeform-позиции —
+        /// поднимаем флаг <see cref="HasUnverifiedAllergens"/>. Старые значения
+        /// перезаписываются полностью.
+        /// <para>
+        /// Application Handler собирает словарь заранее через
+        /// <c>IIngredientRepository.GetAllergensByIdsAsync</c>, передавая список
+        /// уникальных <c>IngredientId</c> из текущего <see cref="Recipe.Ingredients"/>.
+        /// </para>
+        /// </remarks>
+        /// <param name="ingredientAllergens">
+        /// Словарь IngredientId → маска аллергенов. Ингредиенты без аллергенов попадают
+        /// в словарь со значением <see cref="AllergenType.None"/>. Если какой-то Id
+        /// отсутствует в словаре — маска для него считается <see cref="AllergenType.None"/>.
+        /// </param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        public void RecalculateAllergens(
+            IReadOnlyDictionary<Guid, AllergenType> ingredientAllergens,
+            DateTimeOffset utcNow)
+        {
+            var combined = AllergenType.None;
+            var hasUnverified = false;
+
+            foreach (var ri in Recipe.Ingredients)
+            {
+                if (ri.IngredientId.HasValue)
+                {
+                    if (ingredientAllergens.TryGetValue(ri.IngredientId.Value, out var allergens))
+                    {
+                        combined |= allergens;
+                    }
+                }
+                else
+                {
+                    hasUnverified = true;
+                }
+            }
+
+            AllergensMask = combined;
+            HasUnverifiedAllergens = hasUnverified;
+
+            MarkAsUpdated(utcNow);
+        }
+
+        /// <summary>
         /// Явный сдвиг <see cref="UpdatedAt"/> для операций, которые не меняют поля Dish
         /// напрямую, но логически модифицируют блюдо (изменение состава категорий, тегов,
         /// шагов рецепта). Поднимает событие <see cref="DishUpdatedEvent"/>.
@@ -601,10 +933,20 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
                 return Result.Failure(DishesErrors.MainImageRequiredForPublish);
             }
 
-            // TODO: после добавления Recipe/RecipeStep/RecipeIngredient — расширить проверки:
-            //   - StepsRequiredForPublish       — Recipe.Steps.Count > 0
-            //   - IngredientsRequiredForPublish — Recipe.RecipeIngredients.Count > 0
-            //   - TimingRequiredForPublish      — Recipe.Timing.TotalTimeMinutes > 0
+            if (Recipe.Steps.Count == 0)
+            {
+                return Result.Failure(DishesErrors.StepsRequiredForPublish);
+            }
+
+            if (Recipe.Ingredients.Count == 0)
+            {
+                return Result.Failure(DishesErrors.IngredientsRequiredForPublish);
+            }
+
+            if (Recipe.Timing.TotalTimeMinutes <= 0)
+            {
+                return Result.Failure(DishesErrors.TimingRequiredForPublish);
+            }
 
             Status = DishStatus.Published;
             PublishedAt = utcNow;

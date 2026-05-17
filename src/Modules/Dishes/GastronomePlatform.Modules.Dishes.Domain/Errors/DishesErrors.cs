@@ -52,5 +52,37 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
         public static readonly Error InvalidYield =
             Error.Conflict("DISHES.INVALID_YIELD",
                 "Выход блюда: количество порций должно быть не меньше 1, остальные значения — неотрицательные.");
+
+        public static readonly Error StepNotFound =
+            Error.NotFound("DISHES.STEP_NOT_FOUND", "Шаг рецепта не найден.");
+
+        public static readonly Error InvalidTemperature =
+            Error.Conflict("DISHES.INVALID_TEMPERATURE",
+                "Температура приготовления должна быть в диапазоне от −30 до 300 градусов.");
+
+        public static readonly Error InvalidTimerMinutes =
+            Error.Conflict("DISHES.INVALID_TIMER_MINUTES",
+                "Время таймера должно быть в диапазоне от 1 до 1440 минут.");
+
+        public static readonly Error InvalidStepOrder =
+            Error.Conflict("DISHES.INVALID_STEP_ORDER",
+                "Список шагов для переупорядочивания должен содержать все шаги рецепта без дубликатов.");
+
+        public static readonly Error RecipeIngredientNotFound =
+            Error.NotFound("DISHES.RECIPE_INGREDIENT_NOT_FOUND",
+                "Ингредиент рецепта не найден.");
+
+        public static readonly Error InvalidIngredientComposition =
+            Error.Conflict("DISHES.INVALID_INGREDIENT_COMPOSITION",
+                "Ингредиент рецепта должен ссылаться на справочник ИЛИ задаваться свободным текстом, " +
+                "но не оба сразу. Спецификация сорта допустима только при ссылке на справочник.");
+
+        public static readonly Error InvalidQuantity =
+            Error.Conflict("DISHES.INVALID_QUANTITY",
+                "Количество ингредиента должно быть строго положительным.");
+
+        public static readonly Error InvalidIngredientOrder =
+            Error.Conflict("DISHES.INVALID_INGREDIENT_ORDER",
+                "Список ингредиентов для переупорядочивания должен содержать все позиции рецепта без дубликатов.");
     }
 }

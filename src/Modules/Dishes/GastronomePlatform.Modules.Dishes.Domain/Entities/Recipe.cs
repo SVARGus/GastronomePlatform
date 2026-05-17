@@ -16,6 +16,11 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
     /// </remarks>
     public sealed class Recipe : Entity<Guid>
     {
+        // Вспомогательное поле для навигации по шагам. Настраивается в RecipeConfiguration
+        // через HasField("_steps") + PropertyAccessMode.Field.
+        private readonly List<RecipeStep> _steps = new();
+        private readonly List<RecipeIngredient> _ingredients = new();
+
         #region Properties
 
         /// <summary>
@@ -77,6 +82,19 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// значения через <c>Dish.UpdateNutrition(...)</c>.
         /// </summary>
         public Nutrition? Nutrition { get; private set; }
+
+        /// <summary>
+        /// Шаги приготовления рецепта (1:M). Read-only коллекция; добавление,
+        /// обновление, удаление и переупорядочивание — только через wrapper-методы
+        /// на <see cref="Dish"/>.
+        /// </summary>
+        public IReadOnlyList<RecipeStep> Steps => _steps;
+
+        /// <summary>
+        /// Ингредиенты рецепта (1:M). Read-only коллекция; добавление, обновление,
+        /// удаление и переупорядочивание — только через wrapper-методы на <see cref="Dish"/>.
+        /// </summary>
+        public IReadOnlyList<RecipeIngredient> Ingredients => _ingredients;
 
         #endregion
 
@@ -291,6 +309,319 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
                     fiber,
                     salt);
             }
+        }
+
+        /// <summary>
+        /// Добавляет новый шаг к рецепту. Порядковый номер назначается автоматически
+        /// как <c>Steps.Count + 1</c>.
+        /// </summary>
+        /// <param name="description">Основной текст шага.</param>
+        /// <param name="title">Короткий заголовок. Опционально.</param>
+        /// <param name="imageMediaId">Идентификатор иллюстрации в Media. Опционально.</param>
+        /// <param name="videoUrl">URL внешнего видео. Опционально.</param>
+        /// <param name="temperatureCelsius">Температура приготовления. Опционально.</param>
+        /// <param name="timerMinutes">Время для таймера в минутах. Опционально.</param>
+        /// <returns>Идентификатор созданного <see cref="RecipeStep"/>.</returns>
+        internal Guid AddStep(
+            string description,
+            string? title,
+            Guid? imageMediaId,
+            string? videoUrl,
+            int? temperatureCelsius,
+            int? timerMinutes)
+        {
+            var order = _steps.Count + 1;
+            var step = RecipeStep.CreateForRecipe(
+                Id,
+                order,
+                description,
+                title,
+                imageMediaId,
+                videoUrl,
+                temperatureCelsius,
+                timerMinutes);
+
+            _steps.Add(step);
+            return step.Id;
+        }
+
+        /// <summary>
+        /// Обновляет существующий шаг рецепта.
+        /// </summary>
+        /// <param name="stepId">Идентификатор шага для обновления.</param>
+        /// <param name="description">Основной текст шага.</param>
+        /// <param name="title">Короткий заголовок. <see langword="null"/> — очистить.</param>
+        /// <param name="imageMediaId">Идентификатор иллюстрации в Media. <see langword="null"/> — очистить.</param>
+        /// <param name="videoUrl">URL внешнего видео. <see langword="null"/> — очистить.</param>
+        /// <param name="temperatureCelsius">Температура приготовления. <see langword="null"/> — очистить.</param>
+        /// <param name="timerMinutes">Время для таймера в минутах. <see langword="null"/> — очистить.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/>, либо <see cref="Result.Failure(Error)"/>
+        /// с <see cref="DishesErrors.StepNotFound"/> при отсутствии шага, либо с
+        /// ошибкой валидации температуры/таймера.
+        /// </returns>
+        internal Result UpdateStep(
+            Guid stepId,
+            string description,
+            string? title,
+            Guid? imageMediaId,
+            string? videoUrl,
+            int? temperatureCelsius,
+            int? timerMinutes)
+        {
+            var step = _steps.FirstOrDefault(s => s.Id == stepId);
+            if (step is null)
+            {
+                return Result.Failure(DishesErrors.StepNotFound);
+            }
+
+            return step.Update(
+                description,
+                title,
+                imageMediaId,
+                videoUrl,
+                temperatureCelsius,
+                timerMinutes);
+        }
+
+        /// <summary>
+        /// Удаляет шаг из рецепта и переупорядочивает оставшиеся: Order пересчитывается
+        /// с 1 до N в порядке текущего размещения в коллекции.
+        /// </summary>
+        /// <param name="stepId">Идентификатор шага для удаления.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/>, либо <see cref="Result.Failure(Error)"/>
+        /// с <see cref="DishesErrors.StepNotFound"/>.
+        /// </returns>
+        internal Result RemoveStep(Guid stepId)
+        {
+            var step = _steps.FirstOrDefault(s => s.Id == stepId);
+            if (step is null)
+            {
+                return Result.Failure(DishesErrors.StepNotFound);
+            }
+
+            _steps.Remove(step);
+
+            for (var i = 0; i < _steps.Count; i++)
+            {
+                _steps[i].SetOrder(i + 1);
+            }
+
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Назначает новый порядок шагов. Принимает упорядоченный список Id шагов:
+        /// первый получает Order = 1, второй — 2, и так далее. Список должен содержать
+        /// все шаги рецепта без дубликатов.
+        /// </summary>
+        /// <param name="orderedStepIds">Список Id шагов в желаемом порядке.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/>, либо <see cref="Result.Failure(Error)"/>
+        /// с <see cref="DishesErrors.InvalidStepOrder"/> (несовпадение размера или дубликаты)
+        /// или <see cref="DishesErrors.StepNotFound"/> (Id не принадлежит рецепту).
+        /// </returns>
+        internal Result ReorderSteps(IReadOnlyList<Guid> orderedStepIds)
+        {
+            if (orderedStepIds.Count != _steps.Count
+                || orderedStepIds.Distinct().Count() != orderedStepIds.Count)
+            {
+                return Result.Failure(DishesErrors.InvalidStepOrder);
+            }
+
+            var existingIds = _steps.Select(s => s.Id).ToHashSet();
+            if (orderedStepIds.Any(id => !existingIds.Contains(id)))
+            {
+                return Result.Failure(DishesErrors.StepNotFound);
+            }
+
+            var reordered = new List<RecipeStep>(_steps.Count);
+            for (var i = 0; i < orderedStepIds.Count; i++)
+            {
+                var step = _steps.First(s => s.Id == orderedStepIds[i]);
+                step.SetOrder(i + 1);
+                reordered.Add(step);
+            }
+
+            _steps.Clear();
+            _steps.AddRange(reordered);
+
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Добавляет ингредиент из справочника к рецепту. Порядковый номер
+        /// назначается автоматически как <c>Ingredients.Count + 1</c>.
+        /// </summary>
+        /// <param name="ingredientId">Идентификатор ингредиента из справочника.</param>
+        /// <param name="ingredientSpecId">Идентификатор спецификации. Опционально.</param>
+        /// <param name="quantity">Количество.</param>
+        /// <param name="measureUnitId">Идентификатор единицы измерения.</param>
+        /// <param name="isOptional">Признак опциональности.</param>
+        /// <param name="preparationNote">Заметка по подготовке. Опционально.</param>
+        /// <returns>Идентификатор созданного <see cref="RecipeIngredient"/>.</returns>
+        internal Guid AddIngredientFromCatalog(
+            Guid ingredientId,
+            Guid? ingredientSpecId,
+            decimal quantity,
+            Guid measureUnitId,
+            bool isOptional,
+            string? preparationNote)
+        {
+            var order = _ingredients.Count + 1;
+            var ri = RecipeIngredient.CreateFromCatalog(
+                Id,
+                ingredientId,
+                ingredientSpecId,
+                quantity,
+                measureUnitId,
+                order,
+                isOptional,
+                preparationNote);
+
+            _ingredients.Add(ri);
+            return ri.Id;
+        }
+
+        /// <summary>
+        /// Добавляет ингредиент свободным текстом. Порядковый номер
+        /// назначается автоматически.
+        /// </summary>
+        /// <param name="freeformText">Свободный текст ингредиента.</param>
+        /// <param name="quantity">Количество.</param>
+        /// <param name="measureUnitId">Идентификатор единицы измерения.</param>
+        /// <param name="isOptional">Признак опциональности.</param>
+        /// <param name="preparationNote">Заметка по подготовке. Опционально.</param>
+        /// <returns>Идентификатор созданного <see cref="RecipeIngredient"/>.</returns>
+        internal Guid AddIngredientFreeform(
+            string freeformText,
+            decimal quantity,
+            Guid measureUnitId,
+            bool isOptional,
+            string? preparationNote)
+        {
+            var order = _ingredients.Count + 1;
+            var ri = RecipeIngredient.CreateFreeform(
+                Id,
+                freeformText,
+                quantity,
+                measureUnitId,
+                order,
+                isOptional,
+                preparationNote);
+
+            _ingredients.Add(ri);
+            return ri.Id;
+        }
+
+        /// <summary>
+        /// Обновляет существующий ингредиент. Допускается смена источника catalog↔freeform.
+        /// </summary>
+        /// <param name="recipeIngredientId">Идентификатор позиции для обновления.</param>
+        /// <param name="ingredientId">Новый идентификатор ингредиента или <see langword="null"/>.</param>
+        /// <param name="ingredientSpecId">Новый идентификатор спецификации или <see langword="null"/>.</param>
+        /// <param name="freeformText">Новый свободный текст или <see langword="null"/>.</param>
+        /// <param name="quantity">Новое количество.</param>
+        /// <param name="measureUnitId">Новый идентификатор единицы измерения.</param>
+        /// <param name="isOptional">Признак опциональности.</param>
+        /// <param name="preparationNote">Заметка по подготовке.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/>
+        /// с <see cref="DishesErrors.RecipeIngredientNotFound"/> при отсутствии позиции,
+        /// или с ошибкой валидации (XOR / Quantity).
+        /// </returns>
+        internal Result UpdateIngredient(
+            Guid recipeIngredientId,
+            Guid? ingredientId,
+            Guid? ingredientSpecId,
+            string? freeformText,
+            decimal quantity,
+            Guid measureUnitId,
+            bool isOptional,
+            string? preparationNote)
+        {
+            var ri = _ingredients.FirstOrDefault(i => i.Id == recipeIngredientId);
+            if (ri is null)
+            {
+                return Result.Failure(DishesErrors.RecipeIngredientNotFound);
+            }
+
+            return ri.Update(
+                ingredientId,
+                ingredientSpecId,
+                freeformText,
+                quantity,
+                measureUnitId,
+                isOptional,
+                preparationNote);
+        }
+
+        /// <summary>
+        /// Удаляет ингредиент из рецепта и переупорядочивает оставшиеся
+        /// (Order пересчитывается с 1 по N).
+        /// </summary>
+        /// <param name="recipeIngredientId">Идентификатор позиции для удаления.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/>
+        /// с <see cref="DishesErrors.RecipeIngredientNotFound"/>.
+        /// </returns>
+        internal Result RemoveIngredient(Guid recipeIngredientId)
+        {
+            var ri = _ingredients.FirstOrDefault(i => i.Id == recipeIngredientId);
+            if (ri is null)
+            {
+                return Result.Failure(DishesErrors.RecipeIngredientNotFound);
+            }
+
+            _ingredients.Remove(ri);
+
+            for (var i = 0; i < _ingredients.Count; i++)
+            {
+                _ingredients[i].SetOrder(i + 1);
+            }
+
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Назначает новый порядок ингредиентов. Принимает упорядоченный список Id:
+        /// первый получает Order = 1, второй — 2, и так далее. Список должен содержать
+        /// все позиции рецепта без дубликатов.
+        /// </summary>
+        /// <param name="orderedIngredientIds">Список Id ингредиентов в желаемом порядке.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/>
+        /// с <see cref="DishesErrors.InvalidIngredientOrder"/> (несовпадение размера
+        /// или дубликаты) или <see cref="DishesErrors.RecipeIngredientNotFound"/> (Id
+        /// не принадлежит рецепту).
+        /// </returns>
+        internal Result ReorderIngredients(IReadOnlyList<Guid> orderedIngredientIds)
+        {
+            if (orderedIngredientIds.Count != _ingredients.Count
+                || orderedIngredientIds.Distinct().Count() != orderedIngredientIds.Count)
+            {
+                return Result.Failure(DishesErrors.InvalidIngredientOrder);
+            }
+
+            var existingIds = _ingredients.Select(i => i.Id).ToHashSet();
+            if (orderedIngredientIds.Any(id => !existingIds.Contains(id)))
+            {
+                return Result.Failure(DishesErrors.RecipeIngredientNotFound);
+            }
+
+            var reordered = new List<RecipeIngredient>(_ingredients.Count);
+            for (var i = 0; i < orderedIngredientIds.Count; i++)
+            {
+                var ri = _ingredients.First(x => x.Id == orderedIngredientIds[i]);
+                ri.SetOrder(i + 1);
+                reordered.Add(ri);
+            }
+
+            _ingredients.Clear();
+            _ingredients.AddRange(reordered);
+
+            return Result.Success();
         }
 
         #endregion

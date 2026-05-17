@@ -64,6 +64,17 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Configura
 
             builder.HasIndex(r => r.NutritionId)
                 .IsUnique();
+
+            // Вспомогательные поля для навигации по коллекциям.
+            // Steps/Ingredients — read-only IReadOnlyList<T> без сеттера,
+            // EF Core пишет в _steps / _ingredients напрямую.
+            builder.Navigation(r => r.Steps)
+                .HasField("_steps")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            builder.Navigation(r => r.Ingredients)
+                .HasField("_ingredients")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
         }
     }
 }
