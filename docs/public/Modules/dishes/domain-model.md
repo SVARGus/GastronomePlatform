@@ -2,7 +2,7 @@
 
 > **Статус:** Проектирование завершено. Реализация в работе: 6 сущностей-справочников в коде (v0.8.0)
 > **Этап дорожной карты:** 2 (Контент и медиа)
-> **Дата:** 2026-04-19 (создано), 2026-04-26 (расширено), 2026-05-10 (отметки реализации)
+> **Дата:** 2026-04-19 (создано), 2026-04-26 (расширено), 2026-05-10 (отметки реализации), 2026-05-23 (синхронизация с реализацией Этапа 2)
 > **Связанные документы:** [[05_Дорожная-карта]], [[02_Архитектура]], [[13_Структура-проекта]], [[08_Разработка-(Development-Guide)]], `use-cases-dishes-draft.md`, `POL-001-dish-ownership.md`
 >
 > **Изменения от 2026-04-26:**
@@ -13,6 +13,12 @@
 > - Добавлены ссылки на `POL-001` для UC модификации блюда.
 > - В Deferred добавлены: `DishOwnership` (Этап 4+), `DishVersion`, `DishSnapshotInvalidation` (оба — Этап 8+).
 > - Добавлены TODO в коде про `MarkAsUpdated()` для UC-DSH-007/008.
+>
+> **Изменения от 2026-05-23 (синхронизация с реализацией Этапа 2):**
+> - `AllergensMask` перенесён с `Recipe` на `Dish` как корень агрегата. Добавлено новое поле `HasUnverifiedAllergens` для дисклеймера про freeform-ингредиенты. Метод `RecalculateAllergens(...)` тоже перенесён на `Dish`. Обоснование: денормализованные публичные маркеры используются каталожным фильтром UC-DSH-054 — на корне доступ дешевле, симметрия с `RatingAvg`/`FavoritesCount`/`ViewsCount`.
+> - Уточнён список исключаемых полей `Dish` в `SaveChangesInterceptor` — добавлено `UpdatedAt` (чтобы поле само себя не триггерило). Добавлены реализационные детали: skip Added/Deleted, поиск Dish через ChangeTracker без обращения к БД.
+> - Уточнены сигнатуры `Dish.Create(...)` и `Dish.Publish(...)` в соответствии с реализацией: явный `slug`, обязательные `difficultyLevel`/`costEstimate`, снепшот передаётся готовой строкой из Application.
+> - Добавлена явная заметка про DDD-принцип в разделе Recipe: методы `Recipe` помечены `internal`, внешний код взаимодействует с агрегатом только через wrapper-методы на `Dish`.
 
 ---
 
@@ -89,8 +95,8 @@
 
 | № | Русское имя | Имя в проекте | Статус | Описание | Ключевые поля | Связи |
 |---|-------------|---------------|--------|----------|---------------|-------|
-| 1 | Блюдо | `Dish` | 🟢 | Корень агрегата. Публичная карточка блюда | Id, AuthorUserId, Name, Slug, Description, MainImageId, Status, ModerationStatus, DifficultyLevel, CostEstimate, OwnerType, DietLabelsMask, HistoryText, RatingAvg, RatingCount, ViewsCount, **PublishedVersionData**, **PublishedVersionUpdatedAt**, PublishedAt, CreatedAt, UpdatedAt | `Dish → Recipe (1:1)`; `Dish ↔ Category (M:M)`; `Dish ↔ Tag (M:M)`; `Dish ↔ Category (M:M, опубликованные)` через `DishCategoryPublished`; `Dish ↔ Tag (M:M, опубликованные)` через `DishTagPublished`; `Dish → MediaFile (через MainImageId, кросс-модульно, без FK на уровне БД)` |
-| 2 | Рецепт | `Recipe` | 🟢 | Инструкция приготовления. Часть агрегата `Dish` | Id, DishId, IntroductionText, ServingsDefault, IsAlcoholic, AllergensMask, AuthorTips, ServingSuggestions, Notes | `Recipe → Dish (1:1)`; `Recipe → Timing (1:1)`; `Recipe → Yield (1:1)`; `Recipe → Nutrition (1:1)`; `Recipe ← RecipeStep (1:M)`; `Recipe ← RecipeIngredient (1:M)` |
+| 1 | Блюдо | `Dish` | 🟢 | Корень агрегата. Публичная карточка блюда | Id, AuthorUserId, Name, Slug, Description, MainImageId, Status, ModerationStatus, DifficultyLevel, CostEstimate, OwnerType, DietLabelsMask, **AllergensMask**, **HasUnverifiedAllergens**, HistoryText, RatingAvg, RatingCount, ViewsCount, FavoritesCount, **PublishedVersionData**, **PublishedVersionUpdatedAt**, PublishedAt, CreatedAt, UpdatedAt |
+| 2 | Рецепт | `Recipe` | 🟢 | Инструкция приготовления. Часть агрегата `Dish` | Id, DishId, IntroductionText, ServingsDefault, IsAlcoholic, AuthorTips, ServingSuggestions, Notes |
 | 3 | Шаг рецепта | `RecipeStep` | 🟢 | Один шаг приготовления | Id, RecipeId, Order, Title, Description, ImageMediaId, VideoUrl, TemperatureCelsius, TimerMinutes | `RecipeStep → Recipe (M:1)` |
 | 4 | Ингредиент в рецепте | `RecipeIngredient` | 🟢 | Позиция в списке ингредиентов конкретного рецепта | Id, RecipeId, IngredientId, IngredientSpecId, FreeformText, Quantity, MeasureUnitId, Order, IsOptional, PreparationNote | `RecipeIngredient → Recipe (M:1)`; `RecipeIngredient → Ingredient (M:1, nullable)`; `RecipeIngredient → IngredientSpec (M:1, nullable)`; `RecipeIngredient → MeasureUnit (M:1)` |
 | 5 | Категория | `Category` | 🟢 ✅ | Справочник каталога. Иерархия | Id, Name, Slug, ParentId, Order, IconMediaId, IsActive | `Category → Category (self, ParentId)`; `Category ↔ Dish (M:M)`; `Category → MediaFile (через IconMediaId, кросс-модульно, без FK)` |
@@ -232,11 +238,18 @@ LIMIT 20;
 
 EF Core Interceptor реагирует на изменения **семи сущностей**, которые относятся к «данным самого блюда»:
 
-- `Dish` (но без полей `PublishedVersionData`, `PublishedVersionUpdatedAt`, `RatingAvg`, `RatingCount`, `ViewsCount`, `FavoritesCount` — они меняются по другим причинам)
+- `Dish` (но без полей `PublishedVersionData`, `PublishedVersionUpdatedAt`, `RatingAvg`, `RatingCount`, `ViewsCount`, `FavoritesCount`, `UpdatedAt` — они меняются по другим причинам, плюс сам `UpdatedAt` исключён, чтобы поле не триггерило само себя)
 - `Recipe`, `RecipeStep`, `RecipeIngredient`
 - `Timing`, `Yield`, `Nutrition`
 
 Покрывает UC-DSH-002, 003, 009, 010, 020-023, 030-033, 040-042 — все они меняют поля одной из этих сущностей, и `UpdatedAt` обновится без явных усилий.
+
+**Реализационные детали (`UpdatedAtInterceptor`):**
+
+- Интерсептор пропускает состояния `EntityState.Added` (новое блюдо — `UpdatedAt` уже задан в конструкторе) и `EntityState.Deleted` (блюдо удаляется — обновлять нечего) для самой сущности `Dish`.
+- Поиск родительского `Dish` для дочерних сущностей (`Recipe`, `RecipeStep`, `RecipeIngredient`, `Timing`, `Yield`) выполняется через `ChangeTracker.Entries<Recipe>()` **без обращения к БД**. Если родительская сущность не загружена в трекер (нетипичный сценарий), обновление `UpdatedAt` не выполняется.
+- Для `Nutrition` ищется владеющий `Recipe` по совпадению `Recipe.NutritionId` — это автоматически отсеивает случай, когда `Nutrition` принадлежит другой сущности (например, `Ingredient.DefaultNutrition`).
+- Установка `UpdatedAt` выполняется напрямую через `dishEntry.Property(...).CurrentValue = utcNow`, без вызова Domain-метода `MarkAsUpdated()` — чтобы не дублировать `DishUpdatedEvent` (его поднимают wrapper-методы Dish, через которые и пришло основное изменение).
 
 **Способ 2. Явно через `MarkAsUpdated()` в Domain-методе.**
 
@@ -442,6 +455,8 @@ public enum DietLabels
 | `CostEstimate` | `CostEstimate` | int | NOT NULL | Budget / Moderate / Expensive |
 | `OwnerType` | `OwnerType` | int | NOT NULL | User / Chef / Restaurant / Brand |
 | `DietLabelsMask` | `DietLabels` | int | NOT NULL, default 0 | Битовая маска диетических меток |
+| `AllergensMask` | `AllergenType` | int | NOT NULL, default 0 | Битовая маска. **Денормализовано** на корне агрегата для каталожного фильтра UC-DSH-054. Пересчитывается из `RecipeIngredient → Ingredient.AllergenType` при изменении состава ингредиентов через `Dish.RecalculateAllergens(...)`, вручную не задаётся |
+| `HasUnverifiedAllergens` | `bool` | boolean | NOT NULL, default false | `true`, если в рецепте есть хотя бы один `RecipeIngredient` со свободным текстом (`FreeformText`, без ссылки на справочник). Сигнализирует, что `AllergensMask` может быть неполной. UI показывает дисклеймер «Может содержать и другие аллергены — уточняйте у автора» |
 | `RatingAvg` | `decimal(3,2)` | numeric(3,2) | NOT NULL, default 0 | Денормализовано. Обновляется из события `DishRatedEvent` (Этап 5) |
 | `RatingCount` | `int` | int | NOT NULL, default 0 | Количество оценок. Денормализовано |
 | `ViewsCount` | `long` | bigint | NOT NULL, default 0 | Просмотры. Денормализовано |
@@ -468,25 +483,28 @@ public enum DietLabels
 - `RatingAvg` и `RatingCount` обновляются **только** через `UpdateRating(...)`, не через публичные сеттеры.
 - **Согласованность снепшота:** `PublishedVersionData != NULL` ⇔ `PublishedAt != NULL` ⇔ `PublishedVersionUpdatedAt != NULL`. Все три либо заполнены, либо все NULL.
 - При наличии записей в `DishCategoryPublished` / `DishTagPublished` для блюда — `PublishedVersionData != NULL`. И наоборот: блюдо без снепшота не имеет записей в `*Published`-таблицах.
+- **`AllergensMask` и `HasUnverifiedAllergens` пересчитываются только** через `RecalculateAllergens(...)`, не задаются напрямую. `HasUnverifiedAllergens = true` ⇔ существует хотя бы один `Recipe.Ingredients[i].FreeformText != NULL`.
 
 #### Методы (Domain API)
 
 | Метод | Назначение |
 |-------|-----------|
-| `static Create(authorUserId, name, ownerType, clock)` | Фабричный метод. Возвращает `Result<Dish>`. Создаёт блюдо в статусе `Draft`. `CreatedAt = UpdatedAt = clock.UtcNow`. Все «published»-метки — NULL |
+| `static Create(authorUserId, name, slug, difficultyLevel, costEstimate, ownerType, utcNow)` | Фабричный метод. Создаёт блюдо в статусе `Draft`. `CreatedAt = UpdatedAt = utcNow`. Все «published»-метки — NULL. `slug` генерируется на уровне Application и передаётся параметром. Внутри также создаётся вложенный `Recipe` с пустыми `Timing` и `Yield`. Поднимает `DishCreatedEvent` |
 | `UpdateCard(name, shortDesc, desc, difficulty, cost, mainImageId)` | Обновление полей публичной карточки. `UpdatedAt` инкрементируется автоматически через `SaveChangesInterceptor` |
 | `SetDietLabels(DietLabels mask)` | Установка диетических меток |
 | `SetHistoryText(string? text)` | Обновление исторического описания |
 | `SetCategories(IReadOnlyCollection<Guid> categoryIds, IDateTimeProvider clock)` | Replace-семантика. Полная замена набора категорий. Лимит 0–3. **Явный вызов `MarkAsUpdated(clock)`** — чтобы UC-DSH-007 корректно сдвигал `UpdatedAt` (т.к. изменение `DishCategory` Interceptor-ом не отслеживается) |
 | `SetTags(IReadOnlyCollection<Guid> tagIds, IDateTimeProvider clock)` | Replace-семантика. Лимит 0–20. **Явный `MarkAsUpdated(clock)`** — для UC-DSH-008 |
-| `Publish(IDateTimeProvider clock, IPublishedSnapshotBuilder builder)` | Проверка инвариантов перехода в Published → собирает снепшот через `builder` → `PublishedVersionData = snapshot`, `PublishedAt = clock.UtcNow`, `PublishedVersionUpdatedAt = clock.UtcNow`. Для повторных публикаций — то же самое (PublishedAt всегда обновляется). См. UC-DSH-004 |
+| `Publish(utcNow, snapshot)` | Возвращает `Result`. Проверяет инварианты перехода в `Published` (`MainImageId != null`, `Recipe.Steps.Count > 0`, `Recipe.Ingredients.Count > 0`, `Recipe.Timing.TotalTimeMinutes > 0`, `Status != Archived`) → `PublishedVersionData = snapshot`, `PublishedAt = PublishedVersionUpdatedAt = utcNow`. Готовый JSON-снепшот собирается на уровне Application через `IPublishedSnapshotBuilder` (Этап 2+, Application-слой) и передаётся параметром. Поднимает `DishPublishedEvent`. См. UC-DSH-004 |
 | `Unpublish()` | `Status = Unpublished`, `PublishedVersionData = NULL`, `PublishedAt = NULL`, `PublishedVersionUpdatedAt = NULL`. Записи `*Published`-таблиц очищаются на уровне репозитория |
 | `Archive()` | `Status = Archived`. Эффект на снепшот аналогичен `Unpublish`. См. UC-DSH-006 |
 | `UpdateRating(decimal avg, int count)` | Вызывается из event handler'а |
 | `IncrementViews()` | Атомарный инкремент. Для частого использования — можно через отдельный SQL update |
 | `RegenerateSlug(string newSlug)` | Admin-only. С осторожностью — ломает SEO |
 | `RebuildPublishedSnapshot(IPublishedSnapshotBuilder builder, IDateTimeProvider clock)` | Внутренний метод для каскадных обновлений (Этап 8+): пересобирает снепшот из текущих основных таблиц, обновляет `PublishedVersionUpdatedAt`. **НЕ** трогает `UpdatedAt`, `PublishedAt`. Вызывается из фоновой задачи `RecalculatePublishedSnapshots` |
-| `MarkAsUpdated(IDateTimeProvider clock)` | Internal-метод: ставит `UpdatedAt = clock.UtcNow`. Используется в `SetCategories`/`SetTags`, где Interceptor не сработает автоматически |
+| `RecalculateAllergens(IReadOnlyDictionary<Guid, AllergenType> allergensByIngredientId, DateTimeOffset utcNow)` | Полностью пересобирает `AllergensMask` и `HasUnverifiedAllergens` из текущего состава `Recipe.Ingredients`. Application Handler заранее собирает словарь через `IIngredientRepository.GetAllergensByIdsAsync(...)`. Вызывается из UC-DSH-030, 031, 032 после изменения состава |
+| Recipe-wrapper методы: `UpdateRecipeIntroduction`, `Add/Update/Remove/ReorderRecipeStep`, `Add/Update/Remove/ReorderRecipeIngredient`, `UpdateTiming`, `UpdateYield`, `UpdateNutrition`, `SetRecipeIsAlcoholic`, `SetRecipeServingsDefault`, `UpdateRecipeAuthorTips`, `UpdateRecipeNotes`, `UpdateRecipeServingSuggestions` | Публичный API агрегата для управления рецептом. Делегируют к internal-методам `Recipe` и в конце вызывают `MarkAsUpdated(utcNow)` — поэтому `DishUpdatedEvent` поднимается единообразно |
+| `MarkAsUpdated(DateTimeOffset utcNow)` | Public-метод: ставит `UpdatedAt = utcNow` и поднимает `DishUpdatedEvent`. Используется в `SetCategories`/`SetTags`, во всех wrapper-методах для Recipe, в `RecalculateAllergens` |
 
 #### Заметки
 
@@ -512,7 +530,6 @@ public enum DietLabels
 | `IntroductionText` | `string?` | varchar(2000) | NULL | Вступительное слово автора перед шагами |
 | `ServingsDefault` | `int` | int | NOT NULL, default 4 | Количество порций по умолчанию. Используется калькулятором |
 | `IsAlcoholic` | `bool` | boolean | NOT NULL, default false | Для фильтрации |
-| `AllergensMask` | `AllergenType` | int | NOT NULL, default 0 | Битовая маска. Пересчитывается из `RecipeIngredient → Ingredient.AllergenType` при сохранении |
 | `AuthorTips` | `string?` | varchar(2000) | NULL | Советы от автора (отдельно от шагов) |
 | `ServingSuggestions` | `string?` | varchar(1000) | NULL | «С чем подавать» |
 | `Notes` | `string?` | text | NULL | Свободное поле для дополнительной информации на усмотрение автора: варианты замены, личные примечания, оговорки. До 4000 символов (валидация) |
@@ -523,10 +540,11 @@ public enum DietLabels
 #### Инварианты
 
 - `ServingsDefault > 0` и `ServingsDefault <= 100`.
-- `AllergensMask` **всегда** пересчитывается при изменении состава `RecipeIngredient`, а не устанавливается вручную.
 - При создании `Recipe` автоматически создаются `Timing` и `Yield` с дефолтными значениями.
 
 #### Методы (Domain API)
+
+> **DDD-принцип «один корень — один публичный API»:** в реализации все методы `Recipe`, изменяющие состояние, помечены `internal`. Внешний код (Application Handler'ы, контроллеры) **никогда не вызывает их напрямую** — только через wrapper-методы на корне агрегата (`Dish.UpdateRecipeIntroduction`, `Dish.AddRecipeStep`, `Dish.UpdateTiming` и др.). Wrapper делегирует к Recipe и в конце вызывает `Dish.MarkAsUpdated(utcNow)` — это даёт единообразное обновление `UpdatedAt` и поднятие `DishUpdatedEvent`.
 
 | Метод | Назначение |
 |-------|-----------|
@@ -538,7 +556,6 @@ public enum DietLabels
 | `SetAlcoholic(bool value)` | |
 | `AddStep(order, title, description, ...)` / `RemoveStep(...)` / `ReorderSteps(...)` | Управление шагами |
 | `AddIngredient(ingredientId, quantity, unitId, ...)` / `AddIngredientFreeform(text, quantity, unitId, ...)` / `RemoveIngredient(...)` | Управление ингредиентами |
-| `RecalculateAllergens(...)` | Внутренний метод, вызывается после изменения ингредиентов |
 
 ---
 
