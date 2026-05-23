@@ -84,5 +84,21 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
         public static readonly Error InvalidIngredientOrder =
             Error.Conflict("DISHES.INVALID_INGREDIENT_ORDER",
                 "Список ингредиентов для переупорядочивания должен содержать все позиции рецепта без дубликатов.");
+
+        public static readonly Error CategoryLimitExceeded =
+            Error.Conflict("DISHES.CATEGORY_LIMIT_EXCEEDED",
+                "У блюда может быть не более 3 категорий.");
+
+        public static readonly Error TagLimitExceeded =
+            Error.Conflict("DISHES.TAG_LIMIT_EXCEEDED",
+                "У блюда может быть не более 20 тегов.");
+
+        public static readonly Error DuplicateCategoryId =
+            Error.Conflict("DISHES.DUPLICATE_CATEGORY_ID",
+                "Список категорий не должен содержать дубликатов.");
+
+        public static readonly Error DuplicateTagId =
+            Error.Conflict("DISHES.DUPLICATE_TAG_ID",
+                "Список тегов не должен содержать дубликатов.");
     }
 }

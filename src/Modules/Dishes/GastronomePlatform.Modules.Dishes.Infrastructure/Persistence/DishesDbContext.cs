@@ -70,6 +70,28 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence
         public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
 
         /// <summary>
+        /// Связи блюд с категориями (рабочая версия) — M:M.
+        /// </summary>
+        public DbSet<DishCategory> DishCategories => Set<DishCategory>();
+
+        /// <summary>
+        /// Связи блюд с тегами (рабочая версия) — M:M.
+        /// </summary>
+        public DbSet<DishTag> DishTags => Set<DishTag>();
+
+        /// <summary>
+        /// Связи блюд с категориями (опубликованная версия). Заполняются при
+        /// <c>Dish.Publish(...)</c>, очищаются при <c>Unpublish</c> / <c>Archive</c>.
+        /// Используются каталожным фильтром UC-DSH-054.
+        /// </summary>
+        public DbSet<DishCategoryPublished> DishCategoriesPublished => Set<DishCategoryPublished>();
+
+        /// <summary>
+        /// Связи блюд с тегами (опубликованная версия).
+        /// </summary>
+        public DbSet<DishTagPublished> DishTagsPublished => Set<DishTagPublished>();
+
+        /// <summary>
         /// Инициализирует новый экземпляр <see cref="DishesDbContext"/>.
         /// </summary>
         /// <param name="options">Параметры конфигурации DbContext.</param>

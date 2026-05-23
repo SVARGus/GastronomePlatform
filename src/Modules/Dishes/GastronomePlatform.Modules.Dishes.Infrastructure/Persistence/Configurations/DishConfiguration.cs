@@ -135,6 +135,25 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Configura
 
             // Каталожные фильтры по статусу.
             builder.HasIndex(x => x.Status);
+
+            // Backing fields для M:M-навигаций — read-only коллекции IReadOnlyList
+            // обслуживаются приватными полями _categories / _tags / _categoriesPublished /
+            // _tagsPublished, EF Core читает и пишет напрямую в поля.
+            builder.Navigation(d => d.Categories)
+                .HasField("_categories")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            builder.Navigation(d => d.Tags)
+                .HasField("_tags")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            builder.Navigation(d => d.CategoriesPublished)
+                .HasField("_categoriesPublished")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+            builder.Navigation(d => d.TagsPublished)
+                .HasField("_tagsPublished")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
         }
     }
 }

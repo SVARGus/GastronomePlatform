@@ -19,6 +19,18 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
     /// </remarks>
     public sealed class Dish : AggregateRoot<Guid>
     {
+        // Domain-инварианты ограничения на размер M:M-коллекций (см. дизайн-документ).
+        private const int MAX_CATEGORIES = 3;
+        private const int MAX_TAGS = 20;
+
+        // Backing fields для M:M-навигаций. Настраиваются в DishConfiguration
+        // через HasField("_categories") + PropertyAccessMode.Field (аналогично _tags
+        // и обеим *Published-коллекциям).
+        private readonly List<DishCategory> _categories = new();
+        private readonly List<DishTag> _tags = new();
+        private readonly List<DishCategoryPublished> _categoriesPublished = new();
+        private readonly List<DishTagPublished> _tagsPublished = new();
+
         #region Properties
 
         /// <summary>
@@ -187,6 +199,32 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// внешний код не вызывает методы <see cref="Recipe"/> напрямую.
         /// </summary>
         public Recipe Recipe { get; private set; } = null!;
+
+        /// <summary>
+        /// Категории блюда (рабочая версия, M:M). Read-only коллекция; полная замена
+        /// через <see cref="SetCategories"/>. Изменения этой коллекции синхронизируются
+        /// с <see cref="CategoriesPublished"/> только при <see cref="Publish"/>.
+        /// </summary>
+        public IReadOnlyList<DishCategory> Categories => _categories;
+
+        /// <summary>
+        /// Теги блюда (рабочая версия, M:M). Read-only коллекция; полная замена
+        /// через <see cref="SetTags"/>.
+        /// </summary>
+        public IReadOnlyList<DishTag> Tags => _tags;
+
+        /// <summary>
+        /// Категории блюда (опубликованная версия). Заполняется при <see cref="Publish"/>
+        /// из текущего набора <see cref="Categories"/>, очищается при
+        /// <see cref="Unpublish"/> / <see cref="Archive"/>. Используется каталожным
+        /// фильтром (UC-DSH-054).
+        /// </summary>
+        public IReadOnlyList<DishCategoryPublished> CategoriesPublished => _categoriesPublished;
+
+        /// <summary>
+        /// Теги блюда (опубликованная версия). Семантика аналогична <see cref="CategoriesPublished"/>.
+        /// </summary>
+        public IReadOnlyList<DishTagPublished> TagsPublished => _tagsPublished;
 
         #endregion
 
@@ -870,6 +908,89 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         }
 
         /// <summary>
+        /// Заменяет набор категорий блюда (replace-семантика). Проверяет лимит
+        /// в <c>MAX_CATEGORIES</c> категорий и отсутствие дубликатов. Существование
+        /// <c>CategoryId</c> в справочнике <see cref="Category"/> Domain не проверяет —
+        /// это задача Application Handler перед вызовом.
+        /// </summary>
+        /// <remarks>
+        /// Изменения связующей таблицы не отслеживаются <c>SaveChangesInterceptor</c>,
+        /// поэтому метод явно вызывает <see cref="MarkAsUpdated"/> в конце, чтобы
+        /// индикатор «есть несохранённые правки» (<see cref="UpdatedAt"/> &gt;
+        /// <see cref="PublishedAt"/>) работал корректно. <see cref="CategoriesPublished"/>
+        /// при этом не трогается — связи опубликованной версии обновятся только
+        /// при следующем <see cref="Publish"/>.
+        /// </remarks>
+        /// <param name="categoryIds">Новый набор идентификаторов категорий.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/> с
+        /// <see cref="DishesErrors.CategoryLimitExceeded"/> при превышении лимита
+        /// или <see cref="DishesErrors.DuplicateCategoryId"/> при наличии дубликатов.
+        /// </returns>
+        public Result SetCategories(IReadOnlyCollection<Guid> categoryIds, DateTimeOffset utcNow)
+        {
+            if (categoryIds.Count > MAX_CATEGORIES)
+            {
+                return Result.Failure(DishesErrors.CategoryLimitExceeded);
+            }
+
+            if (categoryIds.Distinct().Count() != categoryIds.Count)
+            {
+                return Result.Failure(DishesErrors.DuplicateCategoryId);
+            }
+
+            _categories.Clear();
+            foreach (var categoryId in categoryIds)
+            {
+                _categories.Add(new DishCategory(Id, categoryId));
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Заменяет набор тегов блюда (replace-семантика). Проверяет лимит
+        /// в <c>MAX_TAGS</c> тегов и отсутствие дубликатов.
+        /// </summary>
+        /// <remarks>
+        /// Существование <c>TagId</c> и пересчёт <see cref="Tag.UsageCount"/> — забота
+        /// Application Handler (через <c>ITagRepository.FindOrCreateByNormalizedName</c>
+        /// и явный <c>IncrementUsageCount</c>/<c>DecrementUsageCount</c>).
+        /// Семантика обновления <see cref="UpdatedAt"/> и <see cref="TagsPublished"/>
+        /// аналогична <see cref="SetCategories"/>.
+        /// </remarks>
+        /// <param name="tagIds">Новый набор идентификаторов тегов.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/> с
+        /// <see cref="DishesErrors.TagLimitExceeded"/> или
+        /// <see cref="DishesErrors.DuplicateTagId"/>.
+        /// </returns>
+        public Result SetTags(IReadOnlyCollection<Guid> tagIds, DateTimeOffset utcNow)
+        {
+            if (tagIds.Count > MAX_TAGS)
+            {
+                return Result.Failure(DishesErrors.TagLimitExceeded);
+            }
+
+            if (tagIds.Distinct().Count() != tagIds.Count)
+            {
+                return Result.Failure(DishesErrors.DuplicateTagId);
+            }
+
+            _tags.Clear();
+            foreach (var tagId in tagIds)
+            {
+                _tags.Add(new DishTag(Id, tagId));
+            }
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
         /// Явный сдвиг <see cref="UpdatedAt"/> для операций, которые не меняют поля Dish
         /// напрямую, но логически модифицируют блюдо (изменение состава категорий, тегов,
         /// шагов рецепта). Поднимает событие <see cref="DishUpdatedEvent"/>.
@@ -895,31 +1016,21 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// <summary>
         /// Публикует блюдо: устанавливает <see cref="Status"/> в
         /// <see cref="DishStatus.Published"/>, сохраняет JSON-снепшот публичной версии,
-        /// фиксирует <see cref="PublishedAt"/> и <see cref="PublishedVersionUpdatedAt"/>.
+        /// фиксирует <see cref="PublishedAt"/> и <see cref="PublishedVersionUpdatedAt"/>,
+        /// синхронизирует <see cref="CategoriesPublished"/> и <see cref="TagsPublished"/>
+        /// с рабочими коллекциями <see cref="Categories"/> и <see cref="Tags"/>.
         /// Поднимает событие <see cref="DishPublishedEvent"/>.
         /// </summary>
-        /// <remarks>
-        /// <para>
-        /// Допустимы переходы: <see cref="DishStatus.Draft"/> → <see cref="DishStatus.Published"/>,
-        /// <see cref="DishStatus.Unpublished"/> → <see cref="DishStatus.Published"/>,
-        /// <see cref="DishStatus.Published"/> → <see cref="DishStatus.Published"/> (перепубликация).
-        /// Из <see cref="DishStatus.Archived"/> публикация запрещена.
-        /// </para>
-        /// <para>
-        /// Сравнение «есть ли изменения с момента последней публикации» (для ошибки
-        /// <see cref="DishesErrors.DishAlreadyPublished"/>) выполняется на уровне Application
-        /// Handler через сравнение <see cref="UpdatedAt"/> и <see cref="PublishedAt"/>.
-        /// </para>
-        /// </remarks>
         /// <param name="utcNow">Текущее время UTC.</param>
-        /// <param name="snapshot">
-        /// Готовый JSON-снепшот, собранный Application-слоем перед вызовом метода.
-        /// </param>
+        /// <param name="snapshot">JSON-снепшот, собранный Application-слоем.</param>
         /// <returns>
-        /// <see cref="Result.Success()"/> при успешной публикации;
-        /// <see cref="Result.Failure(Error)"/> с ошибкой
-        /// <see cref="DishesErrors.CannotPublishArchivedDish"/> или
-        /// <see cref="DishesErrors.MainImageRequiredForPublish"/>, если инварианты нарушены.
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/> с одной из
+        /// ошибок инвариантов публикации:
+        /// <see cref="DishesErrors.CannotPublishArchivedDish"/>,
+        /// <see cref="DishesErrors.MainImageRequiredForPublish"/>,
+        /// <see cref="DishesErrors.StepsRequiredForPublish"/>,
+        /// <see cref="DishesErrors.IngredientsRequiredForPublish"/>,
+        /// <see cref="DishesErrors.TimingRequiredForPublish"/>.
         /// </returns>
         public Result Publish(DateTimeOffset utcNow, string snapshot)
         {
@@ -954,20 +1065,34 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             PublishedVersionUpdatedAt = utcNow;
             UpdatedAt = utcNow;
 
+            // Снепшот связующих таблиц: полная замена *Published из текущих рабочих.
+            _categoriesPublished.Clear();
+            foreach (var dc in _categories)
+            {
+                _categoriesPublished.Add(new DishCategoryPublished(dc.DishId, dc.CategoryId));
+            }
+
+            _tagsPublished.Clear();
+            foreach (var dt in _tags)
+            {
+                _tagsPublished.Add(new DishTagPublished(dt.DishId, dt.TagId));
+            }
+
             RaiseDomainEvent(new DishPublishedEvent(Id, AuthorUserId));
             return Result.Success();
         }
 
         /// <summary>
-        /// Снимает блюдо с публикации: устанавливает <see cref="Status"/> в
-        /// <see cref="DishStatus.Unpublished"/>, обнуляет снепшот и связанные временные метки.
+        /// Снимает блюдо с публикации: переводит в <see cref="DishStatus.Unpublished"/>,
+        /// обнуляет снепшот, временные метки публикации и очищает
+        /// <see cref="CategoriesPublished"/> / <see cref="TagsPublished"/>.
         /// Поднимает событие <see cref="DishUnpublishedEvent"/>.
         /// </summary>
         /// <param name="utcNow">Текущее время UTC.</param>
         /// <returns>
-        /// <see cref="Result.Success()"/> при успешном переходе;
-        /// <see cref="Result.Failure(Error)"/> с ошибкой <see cref="DishesErrors.DishNotPublished"/>,
-        /// если блюдо не в статусе <see cref="DishStatus.Published"/>.
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/> с
+        /// <see cref="DishesErrors.DishNotPublished"/>, если блюдо не находится
+        /// в статусе <see cref="DishStatus.Published"/>.
         /// </returns>
         public Result Unpublish(DateTimeOffset utcNow)
         {
@@ -982,21 +1107,23 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             PublishedVersionUpdatedAt = null;
             UpdatedAt = utcNow;
 
+            _categoriesPublished.Clear();
+            _tagsPublished.Clear();
+
             RaiseDomainEvent(new DishUnpublishedEvent(Id, AuthorUserId));
             return Result.Success();
         }
 
         /// <summary>
-        /// Архивирует блюдо (мягкое удаление): устанавливает <see cref="Status"/> в
-        /// <see cref="DishStatus.Archived"/>, обнуляет снепшот и связанные временные метки.
-        /// Поднимает событие <see cref="DishArchivedEvent"/>. Из <see cref="DishStatus.Archived"/>
-        /// блюдо опубликовать обратно нельзя.
+        /// Архивирует блюдо (мягкое удаление): переводит в <see cref="DishStatus.Archived"/>,
+        /// обнуляет снепшот и временные метки публикации, очищает <see cref="CategoriesPublished"/>
+        /// и <see cref="TagsPublished"/>. Из <see cref="DishStatus.Archived"/> блюдо
+        /// опубликовать обратно нельзя. Поднимает событие <see cref="DishArchivedEvent"/>.
         /// </summary>
         /// <param name="utcNow">Текущее время UTC.</param>
         /// <returns>
-        /// <see cref="Result.Success()"/> при успешной архивации;
-        /// <see cref="Result.Failure(Error)"/> с ошибкой <see cref="DishesErrors.DishAlreadyArchived"/>,
-        /// если блюдо уже архивировано.
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/> с
+        /// <see cref="DishesErrors.DishAlreadyArchived"/>, если блюдо уже архивировано.
         /// </returns>
         public Result Archive(DateTimeOffset utcNow)
         {
@@ -1010,6 +1137,9 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             PublishedVersionData = null;
             PublishedVersionUpdatedAt = null;
             UpdatedAt = utcNow;
+
+            _categoriesPublished.Clear();
+            _tagsPublished.Clear();
 
             RaiseDomainEvent(new DishArchivedEvent(Id, AuthorUserId));
             return Result.Success();

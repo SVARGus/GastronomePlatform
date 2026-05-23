@@ -1,5 +1,6 @@
 using FluentValidation;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Persistence;
+using GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,8 +28,16 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Extensions
             // Регистрация Валидаторов
             services.AddValidatorsFromAssembly(typeof(GastronomePlatform.Modules.Dishes.Application.AssemblyReference).Assembly);
 
-            // Регистрация DbContext
-            services.AddDbContext<DishesDbContext>(options => options.UseNpgsql(configuration.GetConnectionString("Database")));
+            // SaveChanges-интерсептор автообновления Dish.UpdatedAt. Singleton —
+            // без per-request состояния, зависит только от IDateTimeProvider (тоже Singleton).
+            services.AddSingleton<UpdatedAtInterceptor>();
+
+            // Регистрация DbContext с подключением интерсептора
+            services.AddDbContext<DishesDbContext>((sp, options) =>
+            {
+                options.UseNpgsql(configuration.GetConnectionString("Database"));
+                options.AddInterceptors(sp.GetRequiredService<UpdatedAtInterceptor>());
+            });
 
             // TODO: services.AddScoped<IDishRepository, DishRepository>() и другие репозитории — по мере появления сущностей
             // TODO: специфичные сервисы модуля (например, для проверки POL-001 Dish Ownership)
