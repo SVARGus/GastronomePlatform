@@ -39,12 +39,15 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Identity
             // Алгоритм подписи
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            // Claims - данные внутри токена
+            // Claims - данные внутри токена.
+            // Все имена claim-ов — короткие, стандартные OIDC ("sub", "email", "role", "jti").
+            // Раньше "role" клали через ClaimTypes.Role (long Microsoft URI) — это создавало
+            // несогласованность с другими claim-ами и ломало чтение в CurrentUserService.
             Claim[] claims =
             [
                 new(JwtRegisteredClaimNames.Sub, userId.ToString()),
                 new(JwtRegisteredClaimNames.Email, email),
-                new(ClaimTypes.Role, role),
+                new("role", role),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             ];
 
@@ -83,6 +86,11 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Identity
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
+
+            // Отключаем inbound mapping (sub → ClaimTypes.NameIdentifier и т.п.),
+            // чтобы читать claim-ы по тем же коротким именам, под которыми они кладутся
+            // в GenerateAccessToken. Иначе principal.FindFirst("sub") вернёт null.
+            tokenHandler.InboundClaimTypeMap.Clear();
 
             try
             {

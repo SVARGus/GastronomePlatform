@@ -6,6 +6,7 @@ using GastronomePlatform.Modules.Users.Infrastructure.Extensions;
 using MediatR.NotificationPublishers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Events;
 
@@ -37,9 +38,54 @@ try
     builder.Host.UseSerilog();
 
     // === 3. Регистрация сервисов ===
-    builder.Services.AddControllers();
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
+        {
+            // Enum-ы сериализуются и десериализуются как строки ("Medium" вместо 1).
+            // Это удобнее для клиентов, читаемее в логах, и стабильно к рефакторингу enum-ов
+            // (добавление значения в середину enum не сдвигает индексы существующих значений).
+            // Swagger автоматически подхватит конвертер и отрисует enum как dropdown со строками.
+            options.JsonSerializerOptions.Converters.Add(
+                new System.Text.Json.Serialization.JsonStringEnumConverter());
+        });
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    builder.Services.AddSwaggerGen(options =>
+    {
+        // Описание схемы безопасности — JWT Bearer.
+        OpenApiSecurityScheme bearerScheme = new()
+        {
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description =
+                "Введите JWT access token БЕЗ префикса \"Bearer \" — Swagger UI добавит его автоматически. " +
+                "Получить токен можно через POST /api/auth/login."
+        };
+
+        options.AddSecurityDefinition("Bearer", bearerScheme);
+
+        // Глобальное требование безопасности — применяется ко всем эндпоинтам.
+        // Эндпоинты без [Authorize] остаются публичными (Swagger UI показывает замок,
+        // но фактическая проверка JWT происходит только на [Authorize]-эндпоинтах).
+        OpenApiSecurityRequirement securityRequirement = new()
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+                Array.Empty<string>()
+            }
+        };
+
+        options.AddSecurityRequirement(securityRequirement);
+    });
     builder.Services.AddCommonInfrastructure();
     builder.Services.AddHealthChecks();
     builder.Services.AddMediatR(cfg =>
@@ -63,6 +109,11 @@ try
     {
         IConfiguration config = builder.Configuration;
 
+        // Отключаем легаси-маппинг входящих claim-ов: "sub" остаётся "sub",
+        // не превращается в ClaimTypes.NameIdentifier (long Microsoft URI).
+        // Это синхронизирует чтение claim-ов с тем, как они кладутся в JwtService.
+        options.MapInboundClaims = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -73,7 +124,13 @@ try
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(config["JwtSettings:Secret"]!)),
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero  // без допуска на расхождение времени
+            ClockSkew = TimeSpan.Zero,  // без допуска на расхождение времени
+
+            // Согласовано с короткими именами claim-ов из JwtService:
+            // "sub" — идентификатор пользователя (User.Identity.Name),
+            // "role" — роли (User.IsInRole(...)).
+            NameClaimType = "sub",
+            RoleClaimType = "role"
         };
     });
 
