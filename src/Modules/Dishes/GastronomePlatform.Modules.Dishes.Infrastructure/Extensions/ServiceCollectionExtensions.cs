@@ -1,6 +1,8 @@
 using FluentValidation;
+using GastronomePlatform.Modules.Dishes.Domain.Repositories;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Persistence;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Interceptors;
+using GastronomePlatform.Modules.Dishes.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,7 +41,11 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Extensions
                 options.AddInterceptors(sp.GetRequiredService<UpdatedAtInterceptor>());
             });
 
-            // TODO: services.AddScoped<IDishRepository, DishRepository>() и другие репозитории — по мере появления сущностей
+            // Регистрация Repositories — добавляются по мере появления UC-потребителей
+            services.AddScoped<IDishRepository, DishRepository>();
+
+            // TODO: остальные репозитории (ICategoryRepository, ITagRepository, IIngredientRepository,
+            // IIngredientSpecRepository, IMeasureUnitRepository, INutritionRepository) — по мере появления UC
             // TODO: специфичные сервисы модуля (например, для проверки POL-001 Dish Ownership)
 
             return services;

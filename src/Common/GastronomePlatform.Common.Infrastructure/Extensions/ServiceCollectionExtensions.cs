@@ -14,6 +14,7 @@ namespace GastronomePlatform.Common.Infrastructure.Extensions
         public static IServiceCollection AddCommonInfrastructure(this IServiceCollection services)
         {
             services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+            services.AddSingleton<ISlugGenerator, SlugGenerator>();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
             services.AddHttpContextAccessor();
 

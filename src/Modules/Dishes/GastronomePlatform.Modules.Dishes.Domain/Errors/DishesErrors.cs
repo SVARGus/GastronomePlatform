@@ -100,5 +100,9 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
         public static readonly Error DuplicateTagId =
             Error.Conflict("DISHES.DUPLICATE_TAG_ID",
                 "Список тегов не должен содержать дубликатов.");
+
+        public static readonly Error SlugGenerationExhausted =
+            Error.Failure("DISHES.SLUG_GENERATION_EXHAUSTED",
+                "Не удалось подобрать уникальный slug — превышен лимит попыток.");
     }
 }

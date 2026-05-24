@@ -1027,6 +1027,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/> с одной из
         /// ошибок инвариантов публикации:
         /// <see cref="DishesErrors.CannotPublishArchivedDish"/>,
+        /// <see cref="DishesErrors.DishAlreadyPublished"/>,
         /// <see cref="DishesErrors.MainImageRequiredForPublish"/>,
         /// <see cref="DishesErrors.StepsRequiredForPublish"/>,
         /// <see cref="DishesErrors.IngredientsRequiredForPublish"/>,
@@ -1037,6 +1038,18 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             if (Status == DishStatus.Archived)
             {
                 return Result.Failure(DishesErrors.CannotPublishArchivedDish);
+            }
+
+            // Защита от спама DishPublishedEvent: если блюдо уже опубликовано
+            // и в нём нет несохранённых правок относительно публичной версии,
+            // повторная публикация не имеет смысла. Принудительная пересборка
+            // снепшота (для каскадных операций админа) — отдельный механизм
+            // через RebuildPublishedSnapshot (Этап 8+).
+            if (Status == DishStatus.Published
+                && PublishedAt.HasValue
+                && UpdatedAt <= PublishedAt.Value)
+            {
+                return Result.Failure(DishesErrors.DishAlreadyPublished);
             }
 
             if (MainImageId is null)

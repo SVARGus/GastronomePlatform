@@ -229,7 +229,7 @@ public async Task<Result> Handle(UpdateDishCardCommand cmd, CancellationToken ct
 ## 9. Связанные документы
 
 - `domain-model.md` модуля Dishes — определения сущностей, на которые ссылается политика
-- `use-cases-dishes-draft.md` — Use Cases, использующие политику
+- `../modules/dishes/use-cases/README.md` — индекс Use Cases модуля Dishes, использующих политику
 - Wiki: `08_Разработка-(Development-Guide)`, раздел «Соглашения по документации» — общие правила работы с POL-N и другими типами артефактов
 
 ---
