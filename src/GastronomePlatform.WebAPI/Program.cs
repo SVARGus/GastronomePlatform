@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using System.Text;
+using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Auth.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Extensions;
@@ -132,6 +134,24 @@ try
             NameClaimType = "sub",
             RoleClaimType = "role"
         };
+    });
+
+    // === 3.3. Регистрация политик авторизации ===
+    builder.Services.AddAuthorization(options =>
+    {
+        // Политика ValidActor — требует, чтобы JWT содержал claim "sub",
+        // парсящийся как Guid. Эндпоинты с [Authorize(Policy = VALID_ACTOR)]
+        // получают гарантию валидного идентификатора пользователя на уровне
+        // инфраструктуры, без defense-in-depth проверок в Handler-ах.
+        options.AddPolicy(AuthorizationPolicies.VALID_ACTOR, policy =>
+        {
+            policy.RequireAuthenticatedUser();
+            policy.RequireAssertion(context =>
+            {
+                string? sub = context.User.FindFirstValue("sub");
+                return Guid.TryParse(sub, out _);
+            });
+        });
     });
 
     WebApplication app = builder.Build();

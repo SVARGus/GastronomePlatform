@@ -1,5 +1,7 @@
+using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft;
+using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -36,6 +38,26 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             DietLabels? DietLabelsMask,
             string? HistoryText);
 
+        /// <summary>
+        /// Данные для обновления публичной карточки блюда (UC-DSH-002).
+        /// </summary>
+        /// <remarks>
+        /// Не включает <c>DietLabelsMask</c>, <c>MainImageId</c> и <c>HistoryText</c> —
+        /// эти поля редактируются отдельными эндпоинтами с другой семантикой.
+        /// <c>OwnerType</c> резолвится сервером из ролей пользователя.
+        /// </remarks>
+        /// <param name="Name">Новое название блюда (3–200 символов).</param>
+        /// <param name="DifficultyLevel">Уровень сложности приготовления.</param>
+        /// <param name="CostEstimate">Грубая оценка стоимости блюда.</param>
+        /// <param name="ShortDescription">Краткая подводка. <see langword="null"/> — очистить.</param>
+        /// <param name="Description">Полное описание (markdown). <see langword="null"/> — очистить.</param>
+        public sealed record UpdateDishCardRequest(
+            string Name,
+            DifficultyLevel DifficultyLevel,
+            CostEstimate CostEstimate,
+            string? ShortDescription,
+            string? Description);
+
         #endregion
 
         /// <summary>
@@ -52,6 +74,43 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
 
         #endregion
 
+        #region PATCH Endpoints
+
+        /// <summary>
+        /// Обновляет публичную карточку блюда (UC-DSH-002).
+        /// Доступно только автору блюда (POL-001 DishOwnership).
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Новые значения полей карточки.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном обновлении;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> если пользователь не является автором блюда;
+        /// <c>404 Not Found</c> если блюдо с указанным идентификатором не существует.
+        /// </returns>
+        [HttpPatch("{id:guid}")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> UpdateCardAsync(
+            Guid id,
+            [FromBody] UpdateDishCardRequest request,
+            CancellationToken ct)
+        {
+            var command = new UpdateDishCardCommand(
+                DishId: id,
+                Name: request.Name,
+                ShortDescription: request.ShortDescription,
+                Description: request.Description,
+                DifficultyLevel: request.DifficultyLevel,
+                CostEstimate: request.CostEstimate);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        #endregion
+
         #region POST Endpoints
 
         /// <summary>
@@ -65,7 +124,7 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// <c>401 Unauthorized</c> если запрос не аутентифицирован.
         /// </returns>
         [HttpPost]
-        [Authorize]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
         public async Task<IActionResult> CreateDraftAsync(
             [FromBody] CreateDishDraftRequest request,
             CancellationToken ct)

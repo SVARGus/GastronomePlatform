@@ -193,10 +193,18 @@ UI-страница — это **оркестратор**, который выз
 
 ##### UC-DSH-002 — Обновить публичную карточку блюда
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** Core. **Этап:** 2 (реализовано).
 **Authorization:** POL-001.
 
-Поля: Name, ShortDescription, Description, DifficultyLevel, CostEstimate, OwnerType. Slug **не** меняется автоматически даже при смене Name. Смена главного фото — отдельный сценарий **UC-DSH-011 ChangeDishMainImage** (отдельный endpoint, отдельная транзакционная семантика из-за attach/detach в Media).
+Подробное описание: [UC-DSH-002-UpdateDishCard.md](UC-DSH-002-UpdateDishCard.md).
+
+Поля карточки: `Name`, `ShortDescription`, `Description`, `DifficultyLevel`, `CostEstimate`. `OwnerType` резолвится сервером из ролей текущего пользователя — клиент его не передаёт. Не входят в карточку (отдельные UC):
+
+- `DietLabelsMask` → **UC-DSH-009 SetDietLabels** (constrained declaration с будущей валидацией по составу).
+- `MainImageId` → **UC-DSH-011 ChangeDishMainImage** (отдельная транзакционная семантика из-за attach/detach в Media).
+- `HistoryText` → **UC-DSH-010 SetHistory** (длинный текст, отдельный экран UI).
+
+Slug **не** меняется автоматически даже при смене Name.
 
 **Правка не трогает `PublishedVersionData`:** изменения сохраняются в основной таблице `Dish`, но публичная версия (если блюдо опубликовано) не обновляется. Чтобы изменения стали видны посетителям — нужен явный `UC-DSH-004 PublishDish`. Поле `Dish.UpdatedAt` обновляется явно из параметра `utcNow` Domain-метода `Dish.UpdateCard(...)`.
 

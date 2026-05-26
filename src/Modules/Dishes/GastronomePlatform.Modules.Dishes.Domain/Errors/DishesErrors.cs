@@ -10,6 +10,10 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
         public static readonly Error DishNotFound =
             Error.NotFound("DISHES.DISH_NOT_FOUND", "Блюдо не найдено.");
 
+        public static readonly Error NotDishOwner =
+            Error.Forbidden("DISHES.NOT_DISH_OWNER",
+                "Эту операцию может выполнить только автор блюда.");
+
         public static readonly Error DishAlreadyPublished =
             Error.Conflict("DISHES.DISH_ALREADY_PUBLISHED",
                 "Блюдо уже опубликовано, и в нём нет несохранённых изменений.");

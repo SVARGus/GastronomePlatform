@@ -314,10 +314,19 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// Обновляет основные поля карточки блюда. Поднимает событие <see cref="DishUpdatedEvent"/>.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// Изменение опубликованного блюда НЕ обновляет автоматически
         /// <see cref="PublishedVersionData"/> — требуется явный вызов <see cref="Publish"/>
         /// для перепубликации. Это позволяет автору готовить правки в основной таблице,
         /// не затрагивая публичную версию.
+        /// </para>
+        /// <para>
+        /// <see cref="DietLabelsMask"/> и <see cref="MainImageId"/> НЕ являются частью
+        /// карточки и редактируются отдельными методами: <see cref="SetDietLabels"/>
+        /// (декларация автора с будущей валидацией по составу ингредиентов) и
+        /// <see cref="ChangeMainImage"/> (отдельная транзакционная семантика с модулем
+        /// Media). Это намеренное разделение операций с разной семантикой инвариантов.
+        /// </para>
         /// </remarks>
         /// <param name="name">Новое название.</param>
         /// <param name="shortDescription">Краткая подводка. <see langword="null"/> — очистить.</param>
@@ -325,7 +334,6 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// <param name="difficultyLevel">Новый уровень сложности.</param>
         /// <param name="costEstimate">Новая оценка стоимости.</param>
         /// <param name="ownerType">Новый тип владельца.</param>
-        /// <param name="dietLabelsMask">Новая маска диетических меток.</param>
         /// <param name="utcNow">Текущее время UTC.</param>
         public void UpdateCard(
             string name,
@@ -334,7 +342,6 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             DifficultyLevel difficultyLevel,
             CostEstimate costEstimate,
             OwnerType ownerType,
-            DietLabels dietLabelsMask,
             DateTimeOffset utcNow)
         {
             Name = name;
@@ -343,7 +350,6 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             DifficultyLevel = difficultyLevel;
             CostEstimate = costEstimate;
             OwnerType = ownerType;
-            DietLabelsMask = dietLabelsMask;
             UpdatedAt = utcNow;
 
             RaiseDomainEvent(new DishUpdatedEvent(Id, AuthorUserId));
@@ -361,6 +367,37 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         public void ChangeMainImage(Guid? mainImageId, DateTimeOffset utcNow)
         {
             MainImageId = mainImageId;
+            UpdatedAt = utcNow;
+
+            RaiseDomainEvent(new DishUpdatedEvent(Id, AuthorUserId));
+        }
+
+        /// <summary>
+        /// Устанавливает битовую маску диетических меток блюда (например,
+        /// <c>Vegan | GlutenFree</c>). Поднимает событие <see cref="DishUpdatedEvent"/>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Сейчас метод работает как простая запись значения — присваивает маску
+        /// и фиксирует <see cref="UpdatedAt"/>, без проверок на согласованность
+        /// с составом ингредиентов рецепта.
+        /// </para>
+        /// <para>
+        /// <b>TODO (после реализации справочника совместимости):</b> добавить
+        /// валидацию входной маски по текущему составу <see cref="Recipe"/>.
+        /// Например, попытка установить <c>DietLabels.Vegan</c> при наличии
+        /// в рецепте ингредиента, конфликтующего с этой меткой (мясо, рыба,
+        /// молочное и т.п.), должна возвращать ошибку. Справочник конфликтов
+        /// (<c>Ingredient.DietConflictsMask</c>) и автокоррекция
+        /// <see cref="DietLabelsMask"/> при изменении состава ингредиентов
+        /// (<c>Recipe.*Ingredient*</c> методы) — кандидат на отдельный ADR.
+        /// </para>
+        /// </remarks>
+        /// <param name="dietLabelsMask">Новая битовая маска диетических меток.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        public void SetDietLabels(DietLabels dietLabelsMask, DateTimeOffset utcNow)
+        {
+            DietLabelsMask = dietLabelsMask;
             UpdatedAt = utcNow;
 
             RaiseDomainEvent(new DishUpdatedEvent(Id, AuthorUserId));

@@ -1,8 +1,7 @@
 using GastronomePlatform.Common.Application.Abstractions;
 using GastronomePlatform.Common.Application.Messaging;
-using GastronomePlatform.Common.Domain.Constants;
-using GastronomePlatform.Common.Domain.Errors;
 using GastronomePlatform.Common.Domain.Results;
+using GastronomePlatform.Modules.Dishes.Application.Helpers;
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using GastronomePlatform.Modules.Dishes.Domain.Errors;
@@ -69,17 +68,12 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
             CreateDishDraftCommand request,
             CancellationToken cancellationToken)
         {
-            // Defense-in-depth: если middleware пропустил запрос, но claim sub
-            // не парсится — повторно проверяем здесь. См. EC-2 в UC-DSH-001.
-            // TODO 4.6: централизовать проверку на уровне инфраструктуры (Filter/middleware/Policy),
-            // убрать из Handler — см. private_TODO-будущие-этапы.md §4.6.
-            if (_currentUser.UserId is null)
-            {
-                return CommonErrors.UnauthenticatedRequest;
-            }
-
-            var actorUserId = _currentUser.UserId.Value;
-            var ownerType = ResolveOwnerType(_currentUser.Roles);
+            // Гарантия валидного UserId — на уровне политики ValidActor
+            // (AuthorizationPolicies.VALID_ACTOR), применённой на эндпоинте.
+            // Защита от теоретического сценария «middleware пропустил, sub отсутствует»
+            // отнесена в инфраструктуру, в Handler-е её больше нет.
+            var actorUserId = _currentUser.UserId!.Value;
+            var ownerType = OwnerTypeResolver.ResolveFromRoles(_currentUser.Roles);
 
             var slugResult = await ResolveUniqueSlugAsync(request.Name, cancellationToken);
             if (slugResult.IsFailure)
@@ -99,6 +93,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
                 utcNow: utcNow);
 
             ApplyOptionalCardFields(dish, request, ownerType, utcNow);
+            ApplyOptionalDietLabels(dish, request, utcNow);
             ApplyOptionalHistory(dish, request, utcNow);
 
             await _dishRepository.AddAsync(dish, cancellationToken);
@@ -107,23 +102,6 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
             await PublishDomainEventsAsync(dish, cancellationToken);
 
             return new CreateDishDraftResult(dish.Id, dish.Slug);
-        }
-
-        // Производное поле OwnerType — денормализуется из ролей пользователя на
-        // момент создания/обновления. Приоритет: Restaurant > Chef > User.
-        private static OwnerType ResolveOwnerType(IReadOnlyCollection<string> roles)
-        {
-            if (roles.Contains(PlatformRoles.RESTAURANT))
-            {
-                return OwnerType.Restaurant;
-            }
-
-            if (roles.Contains(PlatformRoles.CHEF))
-            {
-                return OwnerType.Chef;
-            }
-
-            return OwnerType.User;
         }
 
         // AF-1 + AF-2: генерация уникального slug. При пустом результате генератора —
@@ -164,8 +142,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
         {
             var hasOptionalCardFields =
                 request.ShortDescription is not null
-                || request.Description is not null
-                || request.DietLabelsMask is not null;
+                || request.Description is not null;
 
             if (!hasOptionalCardFields)
             {
@@ -179,8 +156,22 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
                 difficultyLevel: request.DifficultyLevel,
                 costEstimate: request.CostEstimate,
                 ownerType: ownerType,
-                dietLabelsMask: request.DietLabelsMask ?? DietLabels.None,
                 utcNow: utcNow);
+        }
+
+        // DietLabelsMask редактируется отдельным Domain-методом Dish.SetDietLabels:
+        // декларация автора с будущей валидацией по составу ингредиентов имеет
+        // другую семантику, чем прочие поля карточки, и намеренно вынесена из UpdateCard.
+        // На draft-этапе рецепт пустой — валидации по составу нет; полноценная
+        // проверка появится вместе со справочником Ingredient.DietConflictsMask.
+        private static void ApplyOptionalDietLabels(Dish dish, CreateDishDraftCommand request, DateTimeOffset utcNow)
+        {
+            if (request.DietLabelsMask is null)
+            {
+                return;
+            }
+
+            dish.SetDietLabels(request.DietLabelsMask.Value, utcNow);
         }
 
         private static void ApplyOptionalHistory(Dish dish, CreateDishDraftCommand request, DateTimeOffset utcNow)

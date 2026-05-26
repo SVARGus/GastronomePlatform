@@ -15,8 +15,8 @@
 | **Статус** | Active |
 | **Версия** | 1.0 |
 | **Дата создания** | 2026-04-20 |
-| **Последнее изменение** | 2026-04-20 |
-| **Этапы реализации** | Этап 2 (базовая), Этап 4+ (PlatformOwnership), Этап 8+ (Moderator, Support) |
+| **Последнее изменение** | 2026-05-24 |
+| **Этапы реализации** | Этап 2 (базовая, реализовано в UC-DSH-002), Этап 4+ (PlatformOwnership), Этап 8+ (Moderator, Support) |
 
 ---
 
@@ -148,55 +148,59 @@ if (await IsPlatformOwned(dishId)) → допускать только роль 
 
 ## 6. Реализация в коде
 
-### 6.1. Структура
+### 6.1. Подход
 
-Политика реализуется в `Dishes.Application/Authorization/DishOwnershipPolicy.cs`
-как отдельный сервис, инжектируемый в Command Handler'ы.
+На Этапе 2 политика реализована **прямой проверкой в Command Handler-ах модуля Dishes**, без выделения в отдельный сервис или ASP.NET `AuthorizationHandler<>`. Обоснование выбора:
+
+- **Изоляция Application от ASP.NET.** Стандартный `IAuthorizationService.AuthorizeAsync` требует `ClaimsPrincipal` как параметр — это бы протекало в Application слой типом из `System.Security.Claims`. Прямая проверка через `ICurrentUserService.UserId` сохраняет Application абстрагированным от транспорта.
+- **YAGNI.** Отдельный сервис вида `IDishOwnershipPolicy.AuthorizeModificationAsync(...)` пока не оправдывается объёмом логики — Этап 2 проверяет одно условие (`AuthorUserId == ActorUserId`). Введение сервиса целесообразно, когда добавятся PlatformOwnership (Этап 4+), статусные ограничения с разной логикой по статусу, проверка ролей `Admin`/`Moderator`.
+- **ASP.NET-механизм `AuthorizationHandler<>`** появится при первом read-only UC, где fetch ресурса выполняется в контроллере и `ClaimsPrincipal` естественно доступен через `User` (например, UC-DSH-053 GetMyDrafts с фильтрацией по владельцу).
+
+### 6.2. Структура реализации (Этап 2)
+
+В каждом Command Handler-е, который модифицирует существующее блюдо:
 
 ```csharp
-namespace GastronomePlatform.Modules.Dishes.Application.Authorization;
-
-public interface IDishOwnershipPolicy
+public async Task<Result> Handle(UpdateDishCardCommand request, CancellationToken ct)
 {
-    Task<Result> AuthorizeModificationAsync(
-        Guid dishId,
-        Guid actorUserId,
-        IReadOnlyCollection<string> actorRoles,
-        CancellationToken ct = default);
+    Dish? dish = await _dishRepository.GetByIdAsync(request.DishId, ct);
+    if (dish is null)
+    {
+        return DishesErrors.DishNotFound;
+    }
+
+    var actorUserId = _currentUser.UserId!.Value;
+    if (dish.AuthorUserId != actorUserId)
+    {
+        return DishesErrors.NotDishOwner;
+    }
+
+    // ... применение изменений ...
 }
 ```
 
-### 6.2. Использование в Handler'е
+`_currentUser.UserId!.Value` корректно: на эндпоинтах с модификацией применяется политика `AuthorizationPolicies.VALID_ACTOR` (`[Authorize(Policy = VALID_ACTOR)]`), которая гарантирует наличие claim `sub`, парсящегося в `Guid`.
 
-```csharp
-public async Task<Result> Handle(UpdateDishCardCommand cmd, CancellationToken ct)
-{
-    // 1. Проверка политики POL-001
-    var authResult = await _ownershipPolicy.AuthorizeModificationAsync(
-        cmd.DishId,
-        _currentUser.UserId,
-        _currentUser.Roles,
-        ct);
+### 6.3. Эволюция в отдельный сервис
 
-    if (authResult.IsFailure)
-        return authResult;
+При появлении любого из следующих условий — выделяем `IDishOwnershipService` (или `IDishAuthorizationService`) в `Dishes.Application/Authorization/`:
 
-    // 2. Загрузка агрегата и применение изменений
-    var dish = await _dishRepository.GetByIdAsync(cmd.DishId, ct);
-    // ...
-}
-```
+- Появляется PlatformOwnership (Этап 4+) — таблица `DishOwnership` с типом владения, проверка через БД-запрос.
+- Появляется `Admin` / `Moderator` / `Support` (Этап 8+) — несколько источников разрешения с приоритетом.
+- Появляются статусные ограничения, которые нужно проверять отдельно от ownership (например, `Archived` нельзя редактировать никому, кроме `Admin`).
 
-### 6.3. Ошибки
+Сервис будет инжектироваться в Handler-ы. Текущая прямая проверка заменяется на вызов `_ownership.AuthorizeModificationAsync(dish, _currentUser, ct)`.
+
+### 6.4. Ошибки
 
 | Код | HTTP | Условие |
 |-----|------|---------|
-| `DISH.NOT_FOUND` | 404 | Блюдо не существует |
-| `DISH.FORBIDDEN_NOT_OWNER` | 403 | ActorUserId ≠ AuthorUserId и нет роли Admin |
-| `DISH.FORBIDDEN_ARCHIVED` | 403 | Блюдо архивировано, изменять может только Admin |
-| `DISH.FORBIDDEN_PLATFORM_OWNED` | 403 | Этап 4+, блюдо принадлежит платформе |
+| `DISHES.DISH_NOT_FOUND` | 404 | Блюдо не существует |
+| `DISHES.NOT_DISH_OWNER` | 403 | `ActorUserId ≠ AuthorUserId` (на Этапе 8+ — и не `Admin`, не `Moderator`) |
+| `DISHES.DISH_ALREADY_ARCHIVED` | 403/409 (TBD) | Этап 8+ — блюдо архивировано, изменять может только `Admin` |
+| `DISHES.PLATFORM_OWNED` | 403 | Этап 4+ — блюдо принадлежит платформе |
 
-Коды ошибок — в `DishesErrors.cs` модуля Dishes.
+Коды ошибок — в `Dishes.Domain/Errors/DishesErrors.cs`.
 
 ---
 
@@ -223,6 +227,7 @@ public async Task<Result> Handle(UpdateDishCardCommand cmd, CancellationToken ct
 | Версия | Дата | Изменение |
 |--------|------|-----------|
 | 1.0 | 2026-04-20 | Первая версия политики (Этап 2) |
+| 1.1 | 2026-05-24 | Раздел §6 «Реализация» переписан под фактический упрощённый подход (прямая проверка в Handler-е через `ICurrentUserService`). Зафиксированы условия эволюции в отдельный сервис. Первое применение политики — в UC-DSH-002 UpdateDishCard |
 
 ---
 

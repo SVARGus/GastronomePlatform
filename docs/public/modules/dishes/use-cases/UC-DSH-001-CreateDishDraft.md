@@ -1,6 +1,6 @@
 # UC-DSH-001: Создать черновик блюда
 
-**Version:** 1.0 | **Date:** 2026-05-24
+**Version:** 1.1 | **Date:** 2026-05-24
 
 ---
 
@@ -27,7 +27,8 @@ Required (JWT Bearer в заголовке `Authorization`).
 
 ### Authorization (Авторизация)
 
-- Policy: **не применяется** — `POL-001 Dish Ownership Policy` явно исключает создание из своей области действия (см. `POL-001-dish-ownership.md` §2.2). Любой авторизованный пользователь может создать своё блюдо.
+- Policy: **`AuthorizationPolicies.VALID_ACTOR`** — требует, чтобы JWT содержал claim `sub`, парсящийся как `Guid`. Применяется атрибутом `[Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]` на эндпоинте. Гарантирует валидный идентификатор пользователя на уровне инфраструктуры, без дублирования defense-in-depth проверок в Handler-е.
+- `POL-001 Dish Ownership Policy` **не применяется** к созданию — она явно исключает Create из своей области (см. `POL-001-dish-ownership.md` §2.2). Любой пользователь с валидным актором может создать своё блюдо.
 - Roles: любой `Authenticated`. Роль пользователя влияет на производное поле `Dish.OwnerType` (см. Main Flow §5.2), но не блокирует создание.
 - Ownership: создаваемый ресурс автоматически становится собственностью автора — `Dish.AuthorUserId = ActorUserId`. Поле иммутабельно после создания.
 
@@ -99,9 +100,9 @@ POST /api/dishes
 | HTTP Status | Код ошибки домена | Условие |
 |-------------|-------------------|---------|
 | 400 | `VALIDATION.ERROR` | Провал FluentValidation: `Name` вне диапазона 3–200, неизвестный enum, `DietLabelsMask` содержит неподдерживаемые биты, `Description`/`HistoryText` > 4000, `ShortDescription` > 500 |
-| 400 | `COMMON.UNAUTHENTICATED` | EC-2 — JWT прошёл валидацию подписи, но `UserId` claim не парсится. Defense-in-depth, на практике маловероятно. Семантически правильнее было бы 401, но `ApiController.MapError` маппит `Failure → 400` — см. TODO 4.6 |
 | 400 | `DISHES.SLUG_GENERATION_EXHAUSTED` | AF-1 — превышен лимит в 30 попыток подобрать уникальный slug. Семантически серверная ошибка (500), но `ApiController.MapError` маппит `Failure → 400` |
 | 401 | — | JWT отсутствует, просрочен или невалиден (отдаёт ASP.NET Core Authentication middleware до Handler) |
+| 403 | — | Политика `VALID_ACTOR` не пропустила запрос — claim `sub` отсутствует или не парсится как `Guid`. Эту проверку выполняет инфраструктура авторизации до Handler-а |
 | 500 | — | Конкурентная коллизия по `Slug` UNIQUE-индексу — на Этапе 2 принимаем как известное ограничение, см. EC-1 |
 
 Domain-ошибок при `Dish.Create(...)` не возникает — фабрика не проверяет инвариантов, валидация полностью на уровне Application через FluentValidation.
@@ -149,8 +150,8 @@ Domain-ошибок при `Dish.Create(...)` не возникает — фаб
    - `HistoryText`: `MaximumLength(4000)` (если задано).
    - `DietLabelsMask`: `Must(mask => (mask & ~ValidFlags) == 0)` — все биты в пределах enum `DietLabels`.
 5. **Handler — `CreateDishDraftCommandHandler.Handle(...)`:**
-   1. **ActorUserId.** Получает `actorUserId = _currentUser.UserId.Value`. Если `null` → `Result.Failure(CommonErrors.UnauthenticatedRequest)` (EC-2).
-   2. **OwnerType.** Определяет через `_currentUser.Roles`:
+   1. **ActorUserId.** `actorUserId = _currentUser.UserId!.Value`. Гарантирован валидным политикой `VALID_ACTOR` на эндпоинте — Handler не выполняет дополнительной defense-in-depth проверки.
+   2. **OwnerType.** Определяет через `OwnerTypeResolver.ResolveFromRoles(_currentUser.Roles)`. Приоритет:
       - содержит `PlatformRoles.RESTAURANT` → `OwnerType.Restaurant`;
       - иначе содержит `PlatformRoles.CHEF` → `OwnerType.Chef`;
       - иначе → `OwnerType.User`.
@@ -161,10 +162,12 @@ Domain-ошибок при `Dish.Create(...)` не возникает — фаб
       - Если итераций > 30 → `Result.Failure(DishesErrors.SlugGenerationExhausted)` — теоретическая защита.
    5. **utcNow.** `var utcNow = _clock.UtcNow`.
    6. **Создание агрегата.** `var dish = Dish.Create(actorUserId, command.Name, slug, command.DifficultyLevel, command.CostEstimate, ownerType, utcNow)`. Поднимается `DishCreatedEvent`.
-   7. **Опциональные поля карточки.** Если задано хотя бы одно из `ShortDescription` / `Description` / `DietLabelsMask` — единый вызов `dish.UpdateCard(name: command.Name, shortDescription: command.ShortDescription, description: command.Description, difficultyLevel: command.DifficultyLevel, costEstimate: command.CostEstimate, ownerType: ownerType, dietLabelsMask: command.DietLabelsMask ?? DietLabels.None, utcNow: utcNow)`. Поднимается `DishUpdatedEvent`.
-   8. **Опциональная история.** Если `HistoryText` задано — `dish.UpdateHistory(command.HistoryText, utcNow)`. Поднимается `DishUpdatedEvent`.
-   9. **Сохранение.** `await _dishRepository.AddAsync(dish, ct); await _dishRepository.SaveChangesAsync(ct);` — один транзакционный коммит (Unit of Work).
-   10. **Результат.** `return Result.Success(new CreateDishDraftResult(dish.Id, dish.Slug))`.
+   7. **Опциональные поля карточки.** Если задано хотя бы одно из `ShortDescription` / `Description` — вызов `dish.UpdateCard(name, shortDescription, description, difficultyLevel, costEstimate, ownerType, utcNow)`. Поднимается `DishUpdatedEvent`.
+   8. **Опциональные диетические метки.** Если `DietLabelsMask` задана — отдельный вызов `dish.SetDietLabels(command.DietLabelsMask.Value, utcNow)`. `DietLabelsMask` намеренно не часть `UpdateCard` — это constrained declaration с будущей валидацией по составу ингредиентов (см. `domain-model.md`). Поднимается `DishUpdatedEvent`.
+   9. **Опциональная история.** Если `HistoryText` задано — `dish.UpdateHistory(command.HistoryText, utcNow)`. Поднимается `DishUpdatedEvent`.
+   10. **Сохранение.** `await _dishRepository.AddAsync(dish, ct); await _dishRepository.SaveChangesAsync(ct);` — один транзакционный коммит (Unit of Work).
+   11. **Доменные события.** После сохранения собранные `dish.DomainEvents` публикуются вручную через `IPublisher`, затем `dish.ClearDomainEvents()`.
+   12. **Результат.** `return Result.Success(new CreateDishDraftResult(dish.Id, dish.Slug))`.
 6. **Маппинг ответа.** `ApiController` (базовый класс):
    - `Result.Success(value)` для Create → `201 Created` + `Location: /api/dishes/{value.Id}` + JSON-body `value`.
    - `Result.Failure(error)` → `ErrorType → HTTP Status` по правилам ApiController (`Validation → 400`, `Failure → 500`, и т.д.).
@@ -181,7 +184,7 @@ Domain-ошибок при `Dish.Create(...)` не возникает — фаб
 ## Edge Cases (Граничные случаи)
 
 - **EC-1. Конкурентные запросы с одинаковым `Name`.** Два запроса A и B с одинаковым `Name`, выполняются параллельно. Оба генерируют один базовый slug → оба видят `SlugExistsAsync == false` → оба пытаются `INSERT` с одинаковым slug → второй получит `DbUpdateException` от UNIQUE-constraint на `dishes.Dishes.Slug`. **Ожидаемое поведение Этапа 2:** ошибка пробрасывается, `GlobalExceptionHandlingMiddleware` отдаёт `500 Internal Server Error`. На Этапе 4+ — отдельная обработка `DbUpdateException → 409 Conflict + retry на уровне Handler`. Сейчас принимаем как известное ограничение (вероятность сценария низкая при одиночном пользователе и небольшой нагрузке).
-- **EC-2. JWT валиден, но `UserId` claim отсутствует или невалиден.** `ICurrentUserService.UserId == null` (теоретический сценарий — токен прошёл валидацию подписи на уровне middleware, но `sub` claim имеет невалидный формат). → Handler возвращает `Result.Failure(CommonErrors.UnauthenticatedRequest)`. `ApiController` маппит `Failure → 400 BadRequest` (по текущему `MapError`). На практике этот сценарий крайне редок при корректной валидации JWT — это **defense-in-depth**. Используется общая ошибка из `Common.Domain.Errors` (не из `AuthErrors`), чтобы избежать межмодульной зависимости `Dishes.Application → Auth.Domain` — см. TODO 4.6 «Централизованная валидация UserId».
+- **EC-2. JWT валиден, но `UserId` claim отсутствует или невалиден.** Сценарий: токен прошёл валидацию подписи в Authentication middleware, но claim `sub` отсутствует / имеет невалидный формат. → Политика `AuthorizationPolicies.VALID_ACTOR` на эндпоинте не пропускает запрос, инфраструктура авторизации отдаёт `403 Forbidden` до Handler-а. В самом Handler-е defense-in-depth проверка не нужна — `_currentUser.UserId!.Value` гарантированно валиден.
 - **EC-3. `Name` содержит только пробелы или управляющие символы.** → `Validator` провалит правило `NotEmpty().Length(3, 200)` (после `Trim`-проверки в FluentValidation). 400 `VALIDATION.ERROR`.
 - **EC-4. `DietLabelsMask` имеет неподдерживаемые биты.** Например, передан `999999` — не соответствует определённым в enum `DietLabels` флагам. → `Validator` проверяет: `(mask & ~ValidDietLabelsMask) == 0`. При нарушении — 400 `VALIDATION.ERROR`.
 - **EC-5. Слишком длинный `Name` (например, 10000 символов).** → ASP.NET Core отклонит запрос на стадии model binding (если превышены лимиты `MaxRequestBodySize`) или `Validator` отдаст 400. В обычной ситуации `Length(3, 200)` ловит первым.
@@ -225,15 +228,18 @@ Domain-ошибок при `Dish.Create(...)` не возникает — фаб
 
 ```
 src/Modules/Dishes/GastronomePlatform.Modules.Dishes.Application/
-└── Commands/
-    └── CreateDishDraft/
-        ├── CreateDishDraftCommand.cs           # ICommand<Result<CreateDishDraftResult>> — record-параметры
-        ├── CreateDishDraftCommandHandler.cs    # ICommandHandler<CreateDishDraftCommand, Result<CreateDishDraftResult>>
-        ├── CreateDishDraftCommandValidator.cs  # AbstractValidator<CreateDishDraftCommand>
-        └── CreateDishDraftResult.cs            # record (Guid Id, string Slug) — рядом с командой, не в DTOs/, так как используется только этим UC
+├── Commands/
+│   └── CreateDishDraft/
+│       ├── CreateDishDraftCommand.cs           # ICommand<CreateDishDraftResult> — record-параметры
+│       ├── CreateDishDraftCommandHandler.cs    # ICommandHandler<CreateDishDraftCommand, CreateDishDraftResult>
+│       ├── CreateDishDraftCommandValidator.cs  # AbstractValidator<CreateDishDraftCommand>
+│       └── CreateDishDraftResult.cs            # record (Guid Id, string Slug)
+│
+└── Helpers/
+    └── OwnerTypeResolver.cs                    # internal static — ResolveFromRoles(IReadOnlyCollection<string>) → OwnerType. Общий для UC-DSH-001, UC-DSH-002 и будущих UC, меняющих OwnerType
 ```
 
-> Следуем эталонной структуре модулей (см. `08_Разработка-(Development-Guide).md` §1): папка `Commands/` (не `UseCases/`), внутри — папка по имени UC с тремя файлами. `DTOs/` зарезервированы под переиспользуемые DTO (как `UserProfileDto` в Users).
+> Следуем эталонной структуре модулей (см. `08_Разработка-(Development-Guide).md` §1): папка `Commands/` (не `UseCases/`), внутри — папка по имени UC с тремя файлами + опциональный `Result`. `DTOs/` зарезервированы под переиспользуемые DTO (как `UserProfileDto` в Users). `Helpers/` — для статических утилит уровня Application, не подходящих под Command/Query/Behavior.
 
 ### Infrastructure (новые файлы)
 
