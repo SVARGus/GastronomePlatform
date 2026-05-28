@@ -244,7 +244,7 @@ namespace GastronomePlatform.Auth.UnitTests.Application
             using (new AssertionScope())
             {
                 result.IsFailure.Should().BeTrue();
-                result.Error.Should().Be(AuthErrors.PhonelAlreadyTaken);
+                result.Error.Should().Be(AuthErrors.PhoneAlreadyTaken);
 
                 _userRepositoryMock.Verify(
                     r => r.CreateAsync(

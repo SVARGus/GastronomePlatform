@@ -87,6 +87,16 @@ try
         };
 
         options.AddSecurityRequirement(securityRequirement);
+
+        // Подключение XML-документации всех модулей.
+        // <GenerateDocumentationFile>true</GenerateDocumentationFile> включён в Directory.Build.props,
+        // поэтому после сборки рядом с DLL лежат XML-файлы. Фильтр "GastronomePlatform.*.xml"
+        // отсекает XML-файлы сторонних пакетов и берёт только наши сборки (WebAPI, Common.*,
+        // Modules.<Module>.{Domain,Application,Infrastructure}).
+        foreach (string xmlFile in Directory.EnumerateFiles(AppContext.BaseDirectory, "GastronomePlatform.*.xml"))
+        {
+            options.IncludeXmlComments(xmlFile, includeControllerXmlComments: true);
+        }
     });
     builder.Services.AddCommonInfrastructure();
     builder.Services.AddHealthChecks();

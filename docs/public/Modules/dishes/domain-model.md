@@ -549,19 +549,70 @@ public enum DietLabels
 
 #### Методы (Domain API)
 
-> **DDD-принцип «один корень — один публичный API»:** в реализации все методы `Recipe`, изменяющие состояние, помечены `internal`. Внешний код (Application Handler'ы, контроллеры) **никогда не вызывает их напрямую** — только через wrapper-методы на корне агрегата (`Dish.UpdateRecipeIntroduction`, `Dish.AddRecipeStep`, `Dish.UpdateTiming` и др.). Wrapper делегирует к Recipe и в конце вызывает `Dish.MarkAsUpdated(utcNow)` — это даёт единообразное обновление `UpdatedAt` и поднятие `DishUpdatedEvent`.
+> **DDD-принцип «один корень — один публичный API».** Все методы `Recipe`, изменяющие состояние, помечены `internal`. Внешний код (Application Handler-ы, контроллеры) **никогда не вызывает их напрямую** — только через wrapper-методы на корне агрегата `Dish`. Wrapper делегирует к `Recipe` (или дочерним `Timing` / `Yield` / `Nutrition`) и в конце вызывает `Dish.MarkAsUpdated(utcNow)` — это даёт единообразное обновление `UpdatedAt` и поднятие `DishUpdatedEvent`.
+>
+> В таблицах ниже параметры опущены для краткости — точные сигнатуры в XML-doc методов.
 
-| Метод | Назначение |
-|-------|-----------|
-| `internal static CreateForDish(dishId)` | Создаёт рецепт вместе с `Timing` и `Yield`. Вызывается только из `Dish.Create(...)` — `Recipe` не существует отдельно от агрегата `Dish`, поэтому фабрика помечена `internal` и не принимает `servingsDefault` (значение по умолчанию задаётся в приватном конструкторе) |
-| `UpdateIntroduction(string? text)` | |
-| `SetServingsDefault(int count)` | Задаёт дефолтное число порций при отображении рецепта. Имя `SetServingsDefault` точнее, чем `UpdateServings` — последнее зарезервировано под потенциальный калькулятор порций (пересчёт ингредиентов под выбранное число) |
-| `UpdateAuthorTips(string? authorTips)` | Советы по приготовлению |
-| `UpdateServingSuggestions(string? servingSuggestions)` | Рекомендации по сервировке. Раздельные методы для разной семантики — «как готовить» и «как подавать»; смешивать в один метод архитектурно неаккуратно |
-| `UpdateNotes(string? notes)` | Обновление свободного поля комментариев |
-| `SetIsAlcoholic(bool value)` | `Is`-префикс по стандарту C# для булевых свойств |
-| `AddStep(order, title, description, ...)` / `RemoveStep(...)` / `ReorderSteps(...)` | Управление шагами |
-| `AddIngredient(ingredientId, quantity, unitId, ...)` / `AddIngredientFreeform(text, quantity, unitId, ...)` / `RemoveIngredient(...)` | Управление ингредиентами |
+##### Фабрика
+
+| Internal-метод `Recipe` | Wrapper на `Dish` | Назначение |
+|-------------------------|-------------------|-----------|
+| `internal static CreateForDish(Guid dishId)` | `Dish.Create(...)` (внутренний вызов) | Создаёт рецепт вместе с `Timing` и `Yield` (с дефолтными значениями). Не принимает `servingsDefault` — устанавливается в приватном конструкторе в `1`. `Recipe` не существует отдельно от агрегата, поэтому фабрика `internal`. |
+
+##### Текстовые поля и атрибуты рецепта
+
+| Internal-метод `Recipe` | Wrapper на `Dish` | Назначение |
+|-------------------------|-------------------|-----------|
+| `internal void UpdateIntroduction(string?)` | `Dish.UpdateRecipeIntroduction` | Обновляет вводный текст рецепта. |
+| `internal void SetIsAlcoholic(bool)` | `Dish.SetRecipeIsAlcoholic` | Устанавливает признак содержания алкоголя. `Is`-префикс по стандарту C# для bool-свойств. |
+| `internal void UpdateAuthorTips(string?)` | `Dish.UpdateRecipeAuthorTips` | Советы автора по приготовлению. |
+| `internal void UpdateServingSuggestions(string?)` | `Dish.UpdateRecipeServingSuggestions` | Рекомендации по сервировке («с чем подавать»). Раздельные методы для семантики «как готовить» vs «как подавать» — смешивать в один метод архитектурно неаккуратно. |
+| `internal void UpdateNotes(string?)` | `Dish.UpdateRecipeNotes` | Свободное поле дополнительных заметок. |
+| `internal Result SetServingsDefault(int)` | `Dish.SetRecipeServingsDefault` | Задаёт дефолтное число порций при отображении рецепта. Имя `SetServingsDefault` точнее, чем `UpdateServings` — последнее зарезервировано под потенциальный калькулятор порций (пересчёт ингредиентов под выбранное число). Валидирует `>= 1` через `DishesErrors.InvalidServingsDefault`. |
+
+##### Делегаты в дочерние сущности
+
+| Internal-метод `Recipe` | Wrapper на `Dish` | Что делает |
+|-------------------------|-------------------|-----------|
+| `internal Result UpdateTiming(...)` | `Dish.UpdateTiming` | Делегирует к `Timing.UpdateTimes`. |
+| `internal Result UpdateYield(...)` | `Dish.UpdateYield` | Делегирует к `Yield.Update`. |
+| `internal void UpdateNutrition(...)` | `Dish.UpdateNutrition` | Создаёт `Nutrition`, если ещё нет, либо обновляет существующую. Валидация значений (неотрицательность, согласованность Sugar/Carbs и SaturatedFats/Fats) — на уровне FluentValidation. |
+
+##### Управление шагами рецепта (1:M `RecipeStep`)
+
+| Internal-метод `Recipe` | Wrapper на `Dish` | Что делает |
+|-------------------------|-------------------|-----------|
+| `internal Guid AddStep(...)` | `Dish.AddRecipeStep` | Добавляет новый шаг. `Order` назначается автоматически как `Steps.Count + 1`. Возвращает `Id` созданного шага. |
+| `internal Result UpdateStep(Guid stepId, ...)` | `Dish.UpdateRecipeStep` | Обновляет существующий шаг. `DishesErrors.StepNotFound` при отсутствии. |
+| `internal Result RemoveStep(Guid stepId)` | `Dish.RemoveRecipeStep` | Удаляет шаг и переупорядочивает оставшиеся (Order пересчитывается с 1 по N). |
+| `internal Result ReorderSteps(IReadOnlyList<Guid>)` | `Dish.ReorderRecipeSteps` | Назначает новый порядок шагов по упорядоченному списку Id. Валидирует совпадение размера и отсутствие дубликатов (`InvalidStepOrder`), принадлежность Id рецепту (`StepNotFound`). |
+
+##### Управление ингредиентами рецепта (1:M `RecipeIngredient`)
+
+`RecipeIngredient` — гибрид: одна позиция либо ссылается на справочный `Ingredient` (catalog), либо содержит свободный текст (freeform). Ключевой инвариант — **XOR**: заполнено **ровно одно** из двух (см. §7.4).
+
+**Архитектурное решение: две раздельные фабрики вместо одного метода с двумя nullable-параметрами.** В Application-слое и контроллерах вызывается **отдельный** метод для каждого источника:
+
+- `Dish.AddRecipeIngredientFromCatalog(ingredientId, ingredientSpecId, ...)` — для позиции из справочника.
+- `Dish.AddRecipeIngredientFreeform(freeformText, ...)` — для свободного текста.
+
+Альтернатива «один метод `AddIngredient(Guid? ingredientId, string? freeformText, ...)` с runtime-проверкой XOR» отвергнута: она допускает невалидные комбинации параметров на этапе компиляции и сваливает проверку в runtime. Две раздельные фабрики дают **структурную гарантию через систему типов** — невозможно вызвать `AddIngredientFromCatalog` без `ingredientId` или передать `freeformText` в catalog-вариант. *Решение — кандидат на отдельный ADR.*
+
+Обратите внимание: для **обновления** существующей позиции метод `UpdateIngredient` единый, потому что допустима смена источника catalog↔freeform для уже созданного `RecipeIngredient` — runtime-проверка XOR делается в `RecipeIngredient.Update`.
+
+| Internal-метод `Recipe` | Wrapper на `Dish` | Что делает |
+|-------------------------|-------------------|-----------|
+| `internal Guid AddIngredientFromCatalog(...)` | `Dish.AddRecipeIngredientFromCatalog` | Добавляет позицию из справочника. `Order` = `Ingredients.Count + 1`. Возвращает `Id`. |
+| `internal Guid AddIngredientFreeform(...)` | `Dish.AddRecipeIngredientFreeform` | Добавляет позицию свободным текстом. `Order` назначается автоматически. Возвращает `Id`. |
+| `internal Result UpdateIngredient(Guid recipeIngredientId, ...)` | `Dish.UpdateRecipeIngredient` | Обновляет существующую позицию. Допускает смену источника catalog↔freeform (XOR проверяется в `RecipeIngredient.Update`). `DishesErrors.RecipeIngredientNotFound` при отсутствии. |
+| `internal Result RemoveIngredient(Guid recipeIngredientId)` | `Dish.RemoveRecipeIngredient` | Удаляет позицию и переупорядочивает оставшиеся (Order пересчитывается с 1 по N). |
+| `internal Result ReorderIngredients(IReadOnlyList<Guid>)` | `Dish.ReorderRecipeIngredients` | Назначает новый порядок по упорядоченному списку Id. Валидирует размер, отсутствие дубликатов (`InvalidIngredientOrder`) и принадлежность Id рецепту (`RecipeIngredientNotFound`). |
+
+#### Заметки
+
+- **Двухслойная инкапсуляция доступа.** Read-only коллекции `Steps` / `Ingredients` доступны публично для чтения, но изменяются только через wrapper-методы `Dish` → internal-методы `Recipe`. EF Core настроен на backing fields `_steps` / `_ingredients` (см. `RecipeConfiguration`).
+- **Автоматический re-order при удалении.** И `RemoveStep`, и `RemoveIngredient` пересчитывают `Order` для оставшихся элементов с 1 до N — клиенту не нужно отдельно вызывать `Reorder*`.
+- **Связь с `Dish.MarkAsUpdated`.** Wrapper-методы `Dish` после делегата всегда вызывают `MarkAsUpdated(utcNow)`. Это обновляет `UpdatedAt` агрегата и поднимает `DishUpdatedEvent` — `SaveChangesInterceptor` исключает `UpdatedAt` из автообновления у `Dish` (см. §10.1.1).
 
 ---
 

@@ -2,6 +2,7 @@ using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
+using GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -67,6 +68,32 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         public DishesController(ISender sender) : base(sender) { }
 
         #region GET Endpoints
+
+        /// <summary>
+        /// Возвращает постраничный список черновиков текущего пользователя (UC-DSH-053).
+        /// Отсортировано по дате последнего изменения (свежие сверху).
+        /// </summary>
+        /// <param name="page">Номер страницы, начиная с 1. По умолчанию 1.</param>
+        /// <param name="pageSize">Количество элементов на странице (1–25). По умолчанию 5.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>200 OK</c> с <see cref="GetMyDraftsResult"/> при успешном запросе
+        /// (пустой список <c>Items</c> — допустимый ответ);
+        /// <c>400 Bad Request</c> при ошибке валидации параметров пагинации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован.
+        /// </returns>
+        [HttpGet("my-drafts")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> GetMyDraftsAsync(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 5,
+            CancellationToken ct = default)
+        {
+            GetMyDraftsQuery query = new(Page: page, PageSize: pageSize);
+
+            Result<GetMyDraftsResult> result = await Sender.Send(query, ct);
+            return MapResult(result);
+        }
 
         #endregion
 

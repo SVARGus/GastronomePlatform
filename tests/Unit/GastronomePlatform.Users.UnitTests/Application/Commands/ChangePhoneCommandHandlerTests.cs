@@ -159,7 +159,7 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
                 .ReturnsAsync(profile);
             _authUserServiceMock
                 .Setup(s => s.ChangePhoneAsync(_userId, NEW_PHONE, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(Result.Failure(AuthErrors.PhonelAlreadyTaken));
+                .ReturnsAsync(Result.Failure(AuthErrors.PhoneAlreadyTaken));
 
             // Act
             Result result = await _handler.Handle(CreateCommand(), CancellationToken.None);
@@ -168,7 +168,7 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
             using (new AssertionScope())
             {
                 result.IsFailure.Should().BeTrue();
-                result.Error.Should().Be(AuthErrors.PhonelAlreadyTaken);
+                result.Error.Should().Be(AuthErrors.PhoneAlreadyTaken);
 
                 profile.Phone.Should().Be(OLD_PHONE);
 

@@ -13,7 +13,7 @@ namespace GastronomePlatform.Modules.Auth.Domain.Errors
         public static readonly Error EmailAlreadyTaken =
             Error.Conflict("AUTH.EMAIL_TAKEN", "Этот email уже используется.");
 
-        public static readonly Error PhonelAlreadyTaken =
+        public static readonly Error PhoneAlreadyTaken =
             Error.Conflict("AUTH.PHONE_TAKEN", "Этот телефон уже используется.");
 
         public static readonly Error UserNameAlreadyTaken =

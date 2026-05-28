@@ -61,6 +61,26 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         Task<Dish?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Возвращает постраничный список черновиков (<c>Status = Draft</c>) указанного автора,
+        /// отсортированный по <see cref="Dish.UpdatedAt"/> по убыванию. Подколлекции
+        /// <c>Recipe</c>, <c>Categories</c>, <c>Tags</c> не загружаются. Используется
+        /// в UC-DSH-053 (GetMyDrafts).
+        /// </summary>
+        /// <param name="authorUserId">Идентификатор автора (текущий пользователь).</param>
+        /// <param name="page">Номер страницы, начиная с 1.</param>
+        /// <param name="pageSize">Количество элементов на странице.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// Кортеж: <c>Items</c> — элементы запрошенной страницы (может быть пустым),
+        /// <c>TotalCount</c> — общее количество черновиков автора без учёта пагинации.
+        /// </returns>
+        Task<(IReadOnlyList<Dish> Items, int TotalCount)> ListDraftsByAuthorAsync(
+            Guid authorUserId,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Проверяет, существует ли блюдо с указанным <see cref="Dish.Slug"/>.
         /// Используется при создании черновика (UC-DSH-001) для разрешения коллизий
         /// автоматически сгенерированного slug — Application Handler добавляет суффикс

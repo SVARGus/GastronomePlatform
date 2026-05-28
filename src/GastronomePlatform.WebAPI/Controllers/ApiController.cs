@@ -61,6 +61,11 @@ namespace GastronomePlatform.WebAPI.Controllers
         /// Единственное место в проекте где <see cref="ErrorType"/> переводится в HTTP Status Code.
         /// </summary>
         /// <param name="error">Доменная ошибка.</param>
+        /// <remarks>
+        /// Для <see cref="ErrorType.Forbidden"/> используется <see cref="ControllerBase.StatusCode(int, object?)"/>
+        /// вместо <see cref="ControllerBase.Forbid()"/> — стандартный <c>Forbid()</c> не сериализует тело,
+        /// а клиенту нужен доменный код ошибки (например, <c>DISHES.NOT_DISH_OWNER</c>) для UX и диагностики.
+        /// </remarks>
         private IActionResult MapError(Error error)
         {
             return error.Type switch
@@ -68,7 +73,7 @@ namespace GastronomePlatform.WebAPI.Controllers
                 ErrorType.NotFound      => NotFound(error),
                 ErrorType.Validation    => BadRequest(error),
                 ErrorType.Conflict      => Conflict(error),
-                ErrorType.Forbidden     => Forbid(),
+                ErrorType.Forbidden     => StatusCode(StatusCodes.Status403Forbidden, error),
                 _                       => BadRequest(error)
             };
         }

@@ -89,7 +89,7 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Services
 
             if (phoneTaken)
             {
-                return AuthErrors.PhonelAlreadyTaken;
+                return AuthErrors.PhoneAlreadyTaken;
             }
 
             await _userManager.SetPhoneNumberAsync(user, newPhone);

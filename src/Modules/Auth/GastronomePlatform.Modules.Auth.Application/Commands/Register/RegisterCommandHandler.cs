@@ -42,7 +42,7 @@ namespace GastronomePlatform.Modules.Auth.Application.Commands.Register
 
             if (request.Phone is not null && await _userRepository.ExistsByPhoneAsync(request.Phone, cancellationToken))
             {
-                return AuthErrors.PhonelAlreadyTaken;
+                return AuthErrors.PhoneAlreadyTaken;
             }
 
             // Создание пользователя

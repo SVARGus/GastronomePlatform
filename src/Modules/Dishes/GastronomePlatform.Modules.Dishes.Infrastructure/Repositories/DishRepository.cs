@@ -1,4 +1,5 @@
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
+using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using GastronomePlatform.Modules.Dishes.Domain.Repositories;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -53,6 +54,30 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
         /// <inheritdoc/>
         public async Task<Dish?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default)
             => await _context.Dishes.FirstOrDefaultAsync(d => d.Slug == slug, cancellationToken);
+
+        /// <inheritdoc/>
+        public async Task<(IReadOnlyList<Dish> Items, int TotalCount)> ListDraftsByAuthorAsync(
+            Guid authorUserId,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            // Базовый фильтр для двух запросов (Count + Items). Не материализуется
+            // — это IQueryable.
+            IQueryable<Dish> query = _context.Dishes
+                .AsNoTracking()
+                .Where(d => d.AuthorUserId == authorUserId && d.Status == DishStatus.Draft);
+
+            int totalCount = await query.CountAsync(cancellationToken);
+
+            List<Dish> items = await query
+                .OrderByDescending(d => d.UpdatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return (items, totalCount);
+        }
 
         /// <inheritdoc/>
         public async Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default)
