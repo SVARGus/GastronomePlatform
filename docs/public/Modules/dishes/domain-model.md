@@ -596,7 +596,7 @@ public enum DietLabels
 - `Dish.AddRecipeIngredientFromCatalog(ingredientId, ingredientSpecId, ...)` — для позиции из справочника.
 - `Dish.AddRecipeIngredientFreeform(freeformText, ...)` — для свободного текста.
 
-Альтернатива «один метод `AddIngredient(Guid? ingredientId, string? freeformText, ...)` с runtime-проверкой XOR» отвергнута: она допускает невалидные комбинации параметров на этапе компиляции и сваливает проверку в runtime. Две раздельные фабрики дают **структурную гарантию через систему типов** — невозможно вызвать `AddIngredientFromCatalog` без `ingredientId` или передать `freeformText` в catalog-вариант. *Решение — кандидат на отдельный ADR.*
+Альтернатива «один метод `AddIngredient(Guid? ingredientId, string? freeformText, ...)` с runtime-проверкой XOR» отвергнута: она допускает невалидные комбинации параметров на этапе компиляции и сваливает проверку в runtime. Две раздельные фабрики дают **структурную гарантию через систему типов** — невозможно вызвать `AddIngredientFromCatalog` без `ingredientId` или передать `freeformText` в catalog-вариант. Решение зафиксировано в [ADR-0012](../../../adr/ADR-0012-recipe-ingredient-discriminated-union.md) как первое применение общего принципа [ADR-0014 «Discriminated Unions в CQRS»](../../../adr/ADR-0014-discriminated-unions-in-cqrs.md).
 
 Обратите внимание: для **обновления** существующей позиции метод `UpdateIngredient` единый, потому что допустима смена источника catalog↔freeform для уже созданного `RecipeIngredient` — runtime-проверка XOR делается в `RecipeIngredient.Update`.
 
@@ -672,7 +672,8 @@ public enum DietLabels
 
 **Заполнено ровно одно из двух:** `IngredientId IS NOT NULL` ИЛИ `FreeformText IS NOT NULL` (но не оба, и не ни одного).
 
-Проверяется в Domain-конструкторе и в CHECK-constraint БД:
+Защита XOR-инварианта реализована на трёх уровнях — две Domain-фабрики (`CreateFromCatalog` / `CreateFreeform`) дают гарантию на этапе компиляции, runtime-проверка в `RecipeIngredient.Update` обрабатывает смену источника catalog ↔ freeform, CHECK-constraint в БД — последняя линия защиты:
+
 ```sql
 CHECK (
     (ingredient_id IS NOT NULL AND freeform_text IS NULL)
@@ -680,6 +681,8 @@ CHECK (
     (ingredient_id IS NULL AND freeform_text IS NOT NULL)
 )
 ```
+
+Подробная аргументация — в [ADR-0012](../../../adr/ADR-0012-recipe-ingredient-discriminated-union.md) (применение принципа к этой сущности) и [ADR-0014](../../../adr/ADR-0014-discriminated-unions-in-cqrs.md) (общий принцип).
 
 - `IngredientSpecId` — только при заполненном `IngredientId` (не работает со свободным текстом).
 - `Quantity > 0`.

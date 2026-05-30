@@ -403,6 +403,12 @@ Domain-метод: `Dish.ChangeMainImage(mainImageId, utcNow)`. Параметр
 
 Два режима: из справочника (передаётся `IngredientId`, опционально `IngredientSpecId`) или свободным текстом (`FreeformText`). `Quantity`, `MeasureUnitId` обязательны. `Order = max+1`. После добавления Application Handler вызывает `Dish.RecalculateAllergens(...)` — пересчитываются `AllergensMask` и `HasUnverifiedAllergens` (последний поднимается, если добавлена freeform-позиция).
 
+> **Реализация — два эндпоинта по природе ингредиента** (см. ADR-0012 и общий принцип ADR-0014). Функционально это **один** UC — одна операция автора «добавить позицию в список ингредиентов», — но из-за структурного различия входных данных (`IngredientId` обязателен в catalog-режиме; `FreeformText` обязателен в freeform-режиме) разделение на уровне API даёт типобезопасность и устраняет nullable-капканы:
+> - `POST /api/dishes/{id}/recipe/ingredients/catalog` — для позиции из справочника. Запрос: `IngredientId`, `IngredientSpecId?`, `Quantity`, `MeasureUnitId`, `IsOptional`, `PreparationNote?`.
+> - `POST /api/dishes/{id}/recipe/ingredients/freeform` — для свободного текста. Запрос: `FreeformText`, `Quantity`, `MeasureUnitId`, `IsOptional`, `PreparationNote?`.
+>
+> Соответственно, на Application-слое — две команды `AddCatalogIngredientToRecipeCommand` и `AddFreeformIngredientToRecipeCommand`. Update / Remove / Reorder (UC-DSH-031..033) — без разделения по природе (одна команда, один эндпоинт).
+
 > **Сценарий «найти ингредиент перед добавлением»:** UI сначала вызывает `UC-DSH-062 SearchIngredients` (отдельный Query) для автокомплита по справочнику. Когда пользователь выбирает значение из выпадающего списка — вызывается этот UC. Если в справочнике подходящего ингредиента нет — UI отправляет режим со свободным текстом. Это пример того, как одна UI-страница использует два UC последовательно (см. концептуальный раздел).
 
 Правка не трогает `PublishedVersionData`.
