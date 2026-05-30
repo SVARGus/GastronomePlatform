@@ -418,6 +418,67 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         }
 
         /// <summary>
+        /// Атомарно обновляет простые поля <see cref="Recipe"/> (UC-DSH-003): вводный текст,
+        /// количество порций по умолчанию, признак алкоголя, советы автора, рекомендации
+        /// по сервировке, заметки. Поднимает одно событие <see cref="DishUpdatedEvent"/>
+        /// независимо от количества фактически изменённых полей.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Шаги, ингредиенты, тайминг, выход и КБЖУ — это отдельные UC и отдельные методы
+        /// (<see cref="AddRecipeStep"/>, <see cref="UpdateTiming"/>, <see cref="UpdateYield"/>,
+        /// <see cref="UpdateNutrition"/> и т.п.).
+        /// </para>
+        /// <para>
+        /// Правка не трогает <see cref="PublishedVersionData"/>. Для отражения изменений
+        /// в публичной версии необходим явный <see cref="Publish"/>.
+        /// </para>
+        /// <para>
+        /// Узкие методы (<see cref="UpdateRecipeIntroduction"/>, <see cref="SetRecipeIsAlcoholic"/>
+        /// и аналоги) остаются доступны и могут использоваться, когда нужно изменить ровно одно
+        /// поле без бандла.
+        /// </para>
+        /// </remarks>
+        /// <param name="introductionText">Новый вводный текст. <see langword="null"/> — очистить.</param>
+        /// <param name="servingsDefault">Новое количество порций по умолчанию (не меньше 1).</param>
+        /// <param name="isAlcoholic">Признак содержания алкоголя.</param>
+        /// <param name="authorTips">Советы автора. <see langword="null"/> — очистить.</param>
+        /// <param name="servingSuggestions">Рекомендации по сервировке. <see langword="null"/> — очистить.</param>
+        /// <param name="notes">Дополнительные заметки. <see langword="null"/> — очистить.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/> с
+        /// <see cref="DishesErrors.InvalidServingsDefault"/>, если
+        /// <paramref name="servingsDefault"/> меньше 1.
+        /// </returns>
+        public Result UpdateRecipe(
+            string? introductionText,
+            int servingsDefault,
+            bool isAlcoholic,
+            string? authorTips,
+            string? servingSuggestions,
+            string? notes,
+            DateTimeOffset utcNow)
+        {
+            // Проверяем servings первым делом — он единственный с инвариантом. При неуспехе
+            // ни одно поле не должно быть применено (атомарность).
+            var servingsResult = Recipe.SetServingsDefault(servingsDefault);
+            if (servingsResult.IsFailure)
+            {
+                return servingsResult;
+            }
+
+            Recipe.UpdateIntroduction(introductionText);
+            Recipe.SetIsAlcoholic(isAlcoholic);
+            Recipe.UpdateAuthorTips(authorTips);
+            Recipe.UpdateServingSuggestions(servingSuggestions);
+            Recipe.UpdateNotes(notes);
+
+            MarkAsUpdated(utcNow);
+            return Result.Success();
+        }
+
+        /// <summary>
         /// Обновляет вводный текст рецепта.
         /// </summary>
         /// <param name="introductionText">Новый вводный текст. <see langword="null"/> — очистить.</param>

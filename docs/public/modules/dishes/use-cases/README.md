@@ -107,7 +107,7 @@ UI-страница — это **оркестратор**, который выз
 |----|----------|-----|--------|------|----------|
 | UC-DSH-001 | Создать черновик блюда | Cmd | Core | 2 | Автор создаёт `Dish` в статусе `Draft` |
 | UC-DSH-002 | Обновить публичную карточку блюда | Cmd | Core | 2 | Изменение Name, Description, Difficulty, Cost, MainImage и т.п. |
-| UC-DSH-003 | Обновить рецепт | Cmd | Core | 2 | Изменение Recipe (intro, servings, tips, notes, alcoholic) |
+| UC-DSH-003 | Обновить рецепт | Cmd | Core (реализовано) | 2 | Изменение Recipe (intro, servings, tips, notes, alcoholic) |
 | UC-DSH-004 | Опубликовать блюдо | Cmd | Core | 2 | Draft → Published с проверкой инвариантов |
 | UC-DSH-005 | Снять блюдо с публикации | Cmd | Core | 2 | Published → Unpublished |
 | UC-DSH-006 | Архивировать блюдо | Cmd | Core | 2 | Мягкое удаление (Status = Archived) |
@@ -127,7 +127,7 @@ UI-страница — это **оркестратор**, который выз
 | UC-DSH-040 | Установить тайминг рецепта | Cmd | Core | 2 | Prep / Cook / Rest / Active / Total |
 | UC-DSH-041 | Установить выход рецепта | Cmd | Core | 2 | QuantityTotal, YieldUnit, ServingsCount, GramsPerServing |
 | UC-DSH-042 | Установить КБЖУ рецепта | Cmd | Core | 2 | Nutrition: метод, ккал, БЖУ |
-| UC-DSH-050 | Получить публичную карточку блюда по ID | Qry | Core | 2 | Без рецепта; для гостей и пользователей |
+| UC-DSH-050 | Получить публичную карточку блюда по ID | Qry | Core (MVP — без snapshot-ветки) | 2 | Без рецепта; анонимный, видимость по `Status` + ownership |
 | UC-DSH-051 | Получить публичную карточку блюда по slug | Qry | Core | 2 | SEO-friendly URL |
 | UC-DSH-052 | Получить рецепт блюда | Qry | Core | 2 | Только Premium+; проверка через `ISubscriptionService` появится на Этапе 3 |
 | UC-DSH-053 | Получить мои черновики | Qry | Core (реализовано) | 2 | Список Draft-блюд автора с пагинацией |
@@ -210,10 +210,16 @@ Slug **не** меняется автоматически даже при сме
 
 ##### UC-DSH-003 — Обновить рецепт
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** Core (реализовано). **Этап:** 2.
 **Authorization:** POL-001.
 
-Изменение полей Recipe целиком: IntroductionText, ServingsDefault, IsAlcoholic, AuthorTips, ServingSuggestions, Notes. Не затрагивает шаги и ингредиенты — для них отдельные UC (UC-DSH-020..023 и UC-DSH-030..033).
+Подробное описание: [UC-DSH-003-UpdateRecipe.md](UC-DSH-003-UpdateRecipe.md).
+
+Изменение простых полей Recipe атомарным бандлом: `IntroductionText`, `ServingsDefault` (≥ 1), `IsAlcoholic`, `AuthorTips`, `ServingSuggestions`, `Notes`. Не затрагивает шаги, ингредиенты, тайминг, выход и КБЖУ — для них отдельные UC (UC-DSH-020..023, UC-DSH-030..033, UC-DSH-040..042).
+
+**Domain.** Атомарный wrapper `Dish.UpdateRecipe(...)` обновляет все поля и поднимает одно событие `DishUpdatedEvent`. Инвариант `ServingsDefault ≥ 1` проверяется первым; при неуспехе ни одно поле не применяется. Узкие методы (`Dish.UpdateRecipeIntroduction`, `SetRecipeIsAlcoholic` и т.п.) оставлены для будущих UC, которым понадобится изменить ровно одно поле без бандла.
+
+**Endpoint:** `PUT /api/dishes/{id}/recipe`. Ответ: `204 No Content` / `400` / `401` / `403` / `404`.
 
 **Правка не трогает `PublishedVersionData`** — аналогично UC-DSH-002.
 
@@ -449,15 +455,36 @@ Domain-метод: `Dish.ChangeMainImage(mainImageId, utcNow)`. Параметр
 
 ##### UC-DSH-050 — Получить публичную карточку блюда по ID
 
-**Тип:** Query. **Статус:** Core. **Этап:** 2.
+**Тип:** Query. **Статус:** Core (MVP — без snapshot-ветки; ожидает UC-DSH-004 PublishDish). **Этап:** 2.
+**Authorization:** анонимный — допускаются и гости, и аутентифицированные пользователи; решение о видимости принимается в Handler-е по комбинации `Status`, `PublishedVersionData` и принадлежности текущего пользователя к автору / admin.
 
-Возвращает данные блюда без Recipe. Поведение зависит от контекста:
+Подробное описание: [UC-DSH-050-GetDishById.md](UC-DSH-050-GetDishById.md).
 
-- **Гости / посетители / неавторы:** возвращается **снепшот** из `Dish.PublishedVersionData`. Если снепшота нет (`Status` ∈ {Draft, Unpublished, Archived}) — 404.
-- **Автор блюда:** может выбрать через query-параметр `?version=working` (рабочая версия из основных таблиц) или `?version=public` (снепшот, как видят посетители). По умолчанию — `working` для своего блюда, `public` для чужого.
-- **Admin:** доступ к обеим версиям.
+Возвращает данные блюда **без Recipe** (для рецепта — UC-DSH-052).
 
-Параллельно вызывается `UC-DSH-070 IncrementDishViews` (атомарный инкремент счётчика просмотров).
+**Семантика выбора слоя данных** (без query-параметра `?version=`; API сам решает, какой слой отдать):
+
+- **Если есть `PublishedVersionData`** — всем (включая автора и admin) возвращается публичная версия. Для автора/admin при наличии правок в рабочем слое (`UpdatedAt > PublishedAt`) к ответу добавляется флаг `HasUnsavedChanges = true` — UI рисует кнопку «Открыть черновик» для перехода к редактированию рабочей версии (отдельный будущий UC).
+- **Если `PublishedVersionData IS NULL`** (статус `Draft` или `Unpublished`):
+  - Автор/admin — получают рабочую версию из основных таблиц с флагом `IsPublishedVersion = false`.
+  - Гость или другой пользователь — `404`.
+- **`Status = Archived`** — `404` всем. Доступ admin к архивированным блюдам появится на Этапе 8+.
+
+**Флаги в DTO** (для будущей совместимости с UC-DSH-004 Publish):
+
+- `IsPublishedVersion: bool` — `true`, если данные из снепшота; `false`, если из основных таблиц.
+- `HasUnsavedChanges: bool?` — для автора/admin: `true`, если `UpdatedAt > PublishedAt`; для остальных — `null` (приватная информация о состоянии редактирования не утекает).
+- `Status: DishStatus` — возвращается всем (не приватная мета).
+
+**Что реализовано сейчас** (MVP без UC-DSH-004 PublishDish):
+- Полностью работает ветка «автор/admin читает свой блюдо без публикации» (`PublishedVersionData IS NULL`) — с корректным мапингом полей и флагами.
+- Поведение 404 для гостей и чужих пользователей при отсутствии снепшота.
+- 404 для `Archived` всем.
+- Контракт DTO (`DishDetailDto`) уже полный — рассчитан под полную семантику.
+
+**Что не реализовано** (зависит от UC-DSH-004):
+- Парсинг `PublishedVersionData` (jsonb-снепшота) — ветка с непустым снепшотом в Handler-е помечена `TODO` и в текущей реализации мапит из основных полей агрегата. На Этапе 2 эта ветка недостижима (ни у одного блюда нет снепшота), но при появлении UC-DSH-004 её источник данных должен быть переключён на парсинг JSON.
+- Параллельный вызов `UC-DSH-070 IncrementDishViews` — пока не реализован.
 
 ##### UC-DSH-051 — Получить публичную карточку блюда по slug
 

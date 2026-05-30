@@ -2,6 +2,8 @@ using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
+using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipe;
+using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using MediatR;
@@ -59,6 +61,27 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             string? ShortDescription,
             string? Description);
 
+        /// <summary>
+        /// Данные для обновления простых полей рецепта блюда (UC-DSH-003).
+        /// </summary>
+        /// <remarks>
+        /// Содержит только поля рецепта верхнего уровня. Шаги, ингредиенты, тайминг,
+        /// выход и КБЖУ имеют отдельные эндпоинты.
+        /// </remarks>
+        /// <param name="IntroductionText">Вводный текст. <see langword="null"/> — очистить.</param>
+        /// <param name="ServingsDefault">Количество порций по умолчанию (не меньше 1).</param>
+        /// <param name="IsAlcoholic">Признак содержания алкоголя в рецепте.</param>
+        /// <param name="AuthorTips">Советы автора. <see langword="null"/> — очистить.</param>
+        /// <param name="ServingSuggestions">Рекомендации по сервировке. <see langword="null"/> — очистить.</param>
+        /// <param name="Notes">Дополнительные заметки. <see langword="null"/> — очистить.</param>
+        public sealed record UpdateRecipeRequest(
+            string? IntroductionText,
+            int ServingsDefault,
+            bool IsAlcoholic,
+            string? AuthorTips,
+            string? ServingSuggestions,
+            string? Notes);
+
         #endregion
 
         /// <summary>
@@ -68,6 +91,47 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         public DishesController(ISender sender) : base(sender) { }
 
         #region GET Endpoints
+
+        /// <summary>
+        /// Возвращает публичную карточку блюда по идентификатору (UC-DSH-050).
+        /// Эндпоинт анонимный: видимость зависит от <c>Dish.Status</c>,
+        /// наличия публичного снепшота и принадлежности текущего пользователя
+        /// к автору / администратору.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// По умолчанию возвращается публичная версия (<c>PublishedVersionData</c>).
+        /// Для автора и администратора при наличии правок в рабочем слое в ответе
+        /// поднимается флаг <c>HasUnsavedChanges = true</c>.
+        /// </para>
+        /// <para>
+        /// Если у блюда нет публичного снепшота (статус <c>Draft</c> / <c>Unpublished</c>),
+        /// доступ имеют только автор и admin — они получают рабочую версию
+        /// с <c>IsPublishedVersion = false</c>. Остальным запрос отдаёт <c>404</c>.
+        /// </para>
+        /// <para>
+        /// Статус <c>Archived</c> всегда возвращает <c>404</c> на Этапе 2.
+        /// Доступ admin к архивированным блюдам появится на Этапе 8+.
+        /// </para>
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>200 OK</c> с <see cref="DishDetailDto"/> при успехе;
+        /// <c>400 Bad Request</c> при пустом идентификаторе;
+        /// <c>404 Not Found</c>, если блюдо отсутствует, архивировано
+        /// или недоступно текущему пользователю.
+        /// </returns>
+        [HttpGet("{id:guid}")]
+        public async Task<IActionResult> GetByIdAsync(
+            Guid id,
+            CancellationToken ct)
+        {
+            GetDishByIdQuery query = new(DishId: id);
+
+            Result<DishDetailDto> result = await Sender.Send(query, ct);
+            return MapResult(result);
+        }
 
         /// <summary>
         /// Возвращает постраничный список черновиков текущего пользователя (UC-DSH-053).
@@ -98,6 +162,40 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         #endregion
 
         #region PUT Endpoints
+
+        /// <summary>
+        /// Обновляет простые поля рецепта блюда (UC-DSH-003).
+        /// Доступно только автору блюда (POL-001 DishOwnership).
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Новые значения полей рецепта.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном обновлении;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> если пользователь не является автором блюда;
+        /// <c>404 Not Found</c> если блюдо с указанным идентификатором не существует.
+        /// </returns>
+        [HttpPut("{id:guid}/recipe")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> UpdateRecipeAsync(
+            Guid id,
+            [FromBody] UpdateRecipeRequest request,
+            CancellationToken ct)
+        {
+            var command = new UpdateRecipeCommand(
+                DishId: id,
+                IntroductionText: request.IntroductionText,
+                ServingsDefault: request.ServingsDefault,
+                IsAlcoholic: request.IsAlcoholic,
+                AuthorTips: request.AuthorTips,
+                ServingSuggestions: request.ServingSuggestions,
+                Notes: request.Notes);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
 
         #endregion
 
