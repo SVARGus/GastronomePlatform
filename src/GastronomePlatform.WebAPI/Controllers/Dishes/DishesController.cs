@@ -1,6 +1,7 @@
 using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft;
+using GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById;
@@ -273,6 +274,49 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             // 201 Created с заголовком Location. Базовый MapResult<T> возвращает 200 OK,
             // но для семантики REST Create явно используем CreatedAtAction.
             return Created($"/api/dishes/{result.Value.Id}", result.Value);
+        }
+
+        /// <summary>
+        /// Публикует блюдо (UC-DSH-004). Покрывает три ветки: первую публикацию
+        /// (<c>Draft → Published</c>), повторную (<c>Published</c> с несохранёнными
+        /// правками) и возврат с <c>Unpublished → Published</c>. Доступно только автору
+        /// блюда (POL-001 DishOwnership).
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Тело запроса не требуется: публикация — переход состояния на основе уже
+        /// сохранённого содержимого блюда. Все данные для jsonb-снепшота
+        /// (<c>PublishedVersionData</c>) собираются сервером из текущего агрегата.
+        /// </para>
+        /// <para>
+        /// Доменные инварианты публикации (главное фото обязательно, рецепт содержит
+        /// ≥ 1 шаг и ≥ 1 ингредиент, общее время приготовления &gt; 0, блюдо не архивировано,
+        /// нет повторной публикации без правок) проверяются <c>Dish.Publish</c> и при
+        /// нарушении возвращаются как <c>409 Conflict</c> с конкретным доменным кодом.
+        /// </para>
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешной публикации;
+        /// <c>400 Bad Request</c> при ошибке валидации (<c>DishId = Guid.Empty</c>);
+        /// <c>401 Unauthorized</c>, если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>), если пользователь не является автором;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>), если блюдо не существует;
+        /// <c>409 Conflict</c> с одним из доменных кодов
+        /// (<c>DISHES.CANNOT_PUBLISH_ARCHIVED_DISH</c>, <c>DISHES.DISH_ALREADY_PUBLISHED</c>,
+        /// <c>DISHES.MAIN_IMAGE_REQUIRED_FOR_PUBLISH</c>, <c>DISHES.STEPS_REQUIRED_FOR_PUBLISH</c>,
+        /// <c>DISHES.INGREDIENTS_REQUIRED_FOR_PUBLISH</c>, <c>DISHES.TIMING_REQUIRED_FOR_PUBLISH</c>),
+        /// если нарушен один из инвариантов публикации.
+        /// </returns>
+        [HttpPost("{id:guid}/publish")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> PublishAsync(
+            Guid id,
+            CancellationToken ct)
+        {
+            Result result = await Sender.Send(new PublishDishCommand(id), ct);
+            return MapResult(result);
         }
 
         #endregion

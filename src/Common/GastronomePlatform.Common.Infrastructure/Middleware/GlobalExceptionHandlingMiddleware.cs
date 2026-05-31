@@ -15,7 +15,7 @@ namespace GastronomePlatform.Common.Infrastructure.Middleware
         private readonly ILogger<GlobalExceptionHandlingMiddleware> _logger;
         private readonly RequestDelegate _next;
 
-        private static readonly JsonSerializerOptions JsonOptions = new()
+        private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
@@ -68,7 +68,7 @@ namespace GastronomePlatform.Common.Infrastructure.Middleware
             context.Response.ContentType = "application/problem+json";
 
             // 5. Записываем JSON в тело ответа
-            await context.Response.WriteAsJsonAsync(problemDetails, JsonOptions);
+            await context.Response.WriteAsJsonAsync(problemDetails, _jsonOptions);
         }
     }
 }

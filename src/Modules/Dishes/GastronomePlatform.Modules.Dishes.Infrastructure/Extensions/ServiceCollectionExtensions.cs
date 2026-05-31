@@ -1,4 +1,5 @@
 using FluentValidation;
+using GastronomePlatform.Modules.Dishes.Application.Snapshots;
 using GastronomePlatform.Modules.Dishes.Domain.Repositories;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Persistence;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Interceptors;
@@ -47,6 +48,9 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Extensions
             // TODO: остальные репозитории (ICategoryRepository, ITagRepository, IIngredientRepository,
             // IIngredientSpecRepository, IMeasureUnitRepository, INutritionRepository) — по мере появления UC
             // TODO: специфичные сервисы модуля (например, для проверки POL-001 Dish Ownership)
+
+            // Сборщик jsonb-снепшота для UC-DSH-004 Publish. Stateless, без I/O — Singleton.
+            services.AddSingleton<IPublishedDishSnapshotBuilder, PublishedDishSnapshotBuilder>();
 
             return services;
         }

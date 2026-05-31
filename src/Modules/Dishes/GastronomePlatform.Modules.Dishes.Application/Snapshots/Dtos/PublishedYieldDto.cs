@@ -1,0 +1,18 @@
+using GastronomePlatform.Modules.Dishes.Domain.Enums;
+
+namespace GastronomePlatform.Modules.Dishes.Application.Snapshots.Dtos
+{
+    /// <summary>
+    /// Снепшот <c>Yield</c> рецепта — выход готового продукта и размер порции
+    /// на момент публикации.
+    /// </summary>
+    /// <param name="QuantityTotal">Общее количество готового продукта в единицах <paramref name="YieldUnit"/>.</param>
+    /// <param name="YieldUnit">Единица выхода.</param>
+    /// <param name="ServingsCount">Количество порций (≥ 1).</param>
+    /// <param name="GramsPerServing">Вес одной порции в граммах. <see langword="null"/>, если не задан.</param>
+    public sealed record PublishedYieldDto(
+        decimal QuantityTotal,
+        YieldUnit YieldUnit,
+        int ServingsCount,
+        decimal? GramsPerServing);
+}

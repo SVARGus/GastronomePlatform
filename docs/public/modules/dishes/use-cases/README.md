@@ -108,7 +108,7 @@ UI-страница — это **оркестратор**, который выз
 | UC-DSH-001 | Создать черновик блюда | Cmd | Core | 2 | Автор создаёт `Dish` в статусе `Draft` |
 | UC-DSH-002 | Обновить публичную карточку блюда | Cmd | Core | 2 | Изменение Name, Description, Difficulty, Cost, MainImage и т.п. |
 | UC-DSH-003 | Обновить рецепт | Cmd | Core (реализовано) | 2 | Изменение Recipe (intro, servings, tips, notes, alcoholic) |
-| UC-DSH-004 | Опубликовать блюдо | Cmd | Core | 2 | Draft → Published с проверкой инвариантов |
+| UC-DSH-004 | Опубликовать блюдо | Cmd | Core (реализовано) | 2 | Draft → Published с проверкой инвариантов |
 | UC-DSH-005 | Снять блюдо с публикации | Cmd | Core | 2 | Published → Unpublished |
 | UC-DSH-006 | Архивировать блюдо | Cmd | Core | 2 | Мягкое удаление (Status = Archived) |
 | UC-DSH-007 | Изменить категории блюда | Cmd | Core | 2 | Установка списка из 0–3 категорий |
@@ -227,10 +227,12 @@ Slug **не** меняется автоматически даже при сме
 
 ##### UC-DSH-004 — Опубликовать блюдо
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** Core (реализовано). **Этап:** 2.
 **Authorization:** POL-001 (с дополнительным правилом: только автор может **инициировать** публикацию своего Draft; Admin может публиковать любое блюдо).
 
-Двойная семантика:
+Подробное описание: [UC-DSH-004-PublishDish.md](UC-DSH-004-PublishDish.md).
+
+Тройная семантика, реализуемая единым Domain-методом `Dish.Publish(...)` и единой Application-командой `PublishDishCommand`:
 
 1. **Первая публикация** (`Status: Draft → Published`):
    - Проверки инвариантов: MainImageId заполнен; Recipe содержит ≥ 1 RecipeStep; Recipe содержит ≥ 1 RecipeIngredient; Timing.TotalTimeMinutes > 0.
@@ -238,21 +240,26 @@ Slug **не** меняется автоматически даже при сме
    - **Заполняются `*Published`-таблицы** (`DishCategoryPublished`, `DishTagPublished`) из текущих `DishCategory`/`DishTag` — для использования в каталожном фильтре.
    - `PublishedAt = now()`.
    - `PublishedVersionUpdatedAt = now()`.
-   - Публикация доменного события `DishPublishedEvent` (Этап 5+).
+   - Публикация доменного события `DishPublishedEvent` (подписчики появятся на Этапе 5+).
 
-2. **Повторная публикация** (`Status: Published`, есть несохранённые правки):
+2. **Повторная публикация** (`Status: Published`, есть несохранённые правки `UpdatedAt > PublishedAt`):
    - Те же проверки инвариантов (на случай если правки нарушили целостность).
    - Пересборка снепшота → `PublishedVersionData` обновляется.
    - **Перезапись `*Published`-таблиц** для блюда: старые записи удаляются, новые копируются из текущих `DishCategory`/`DishTag`.
    - `Status` остаётся `Published`. **`PublishedAt = now()`** — фиксирует время последней публикации (для индикатора несохранённых правок).
    - `PublishedVersionUpdatedAt = now()`.
-   - Доменное событие `DishUpdatedEvent` (Этап 5+, для подписчиков на автора).
+   - Доменное событие `DishPublishedEvent` (по [ADR-0013](../../../adr/ADR-0013-publish-spam-protection.md) событие соответствует реальной публикации; тип ветки не различается).
 
 3. **Возврат с Unpublished** (`Status: Unpublished → Published`):
    - Те же проверки инвариантов.
    - Сборка нового снепшота.
    - Заполнение `*Published`-таблиц.
    - `Status = Published`, `PublishedAt = now()`, `PublishedVersionUpdatedAt = now()`.
+   - Доменное событие `DishPublishedEvent`.
+
+Защита от спама `DishPublishedEvent` (повторный вызов на уже опубликованном блюде без правок) — Domain-инвариант `UpdatedAt > PublishedAt`; см. [ADR-0013](../../../adr/ADR-0013-publish-spam-protection.md). При нарушении возвращается `409 DISHES.DISH_ALREADY_PUBLISHED`.
+
+Формат jsonb-снепшота — MVP без денормализации имён справочников; полиморфно по природе ингредиентов согласно [ADR-0012](../../../adr/ADR-0012-recipe-ingredient-discriminated-union.md). Подробности — в UC-DSH-004-PublishDish.md (раздел «Формат jsonb-снепшота»).
 
 Все эти операции выполняются **в одной транзакции** — либо всё успешно, либо ничего.
 
