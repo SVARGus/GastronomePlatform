@@ -53,6 +53,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Dishes.Infrastructure", "src\Modules\Dishes\GastronomePlatform.Modules.Dishes.Infrastructure\GastronomePlatform.Modules.Dishes.Infrastructure.csproj", "{83657F60-DC4C-4337-9678-8C04B663A086}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Media", "Media", "{79BAD461-696C-48E6-9128-8577E84E0EE8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Media.Domain", "src\Modules\Media\GastronomePlatform.Modules.Media.Domain\GastronomePlatform.Modules.Media.Domain.csproj", "{41653FEE-E0FA-44FA-BD88-155847B49D11}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Media.Application", "src\Modules\Media\GastronomePlatform.Modules.Media.Application\GastronomePlatform.Modules.Media.Application.csproj", "{804BEFFB-3FAA-4F2F-B5EF-9BAAEDA7AA38}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Media.Infrastructure", "src\Modules\Media\GastronomePlatform.Modules.Media.Infrastructure\GastronomePlatform.Modules.Media.Infrastructure.csproj", "{6270A76F-16B0-4ED3-897E-C3BBB4221779}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -123,6 +131,18 @@ Global
 		{83657F60-DC4C-4337-9678-8C04B663A086}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{83657F60-DC4C-4337-9678-8C04B663A086}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{83657F60-DC4C-4337-9678-8C04B663A086}.Release|Any CPU.Build.0 = Release|Any CPU
+		{41653FEE-E0FA-44FA-BD88-155847B49D11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41653FEE-E0FA-44FA-BD88-155847B49D11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41653FEE-E0FA-44FA-BD88-155847B49D11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41653FEE-E0FA-44FA-BD88-155847B49D11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{804BEFFB-3FAA-4F2F-B5EF-9BAAEDA7AA38}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{804BEFFB-3FAA-4F2F-B5EF-9BAAEDA7AA38}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{804BEFFB-3FAA-4F2F-B5EF-9BAAEDA7AA38}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{804BEFFB-3FAA-4F2F-B5EF-9BAAEDA7AA38}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6270A76F-16B0-4ED3-897E-C3BBB4221779}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6270A76F-16B0-4ED3-897E-C3BBB4221779}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6270A76F-16B0-4ED3-897E-C3BBB4221779}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6270A76F-16B0-4ED3-897E-C3BBB4221779}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -150,6 +170,10 @@ Global
 		{09989721-7C74-48D5-82BB-3DB25D96975B} = {F418165D-1E28-4CA6-A76B-626DE9C33F3C}
 		{CEA32551-CD1B-43CF-95C0-1428A43BC51D} = {F418165D-1E28-4CA6-A76B-626DE9C33F3C}
 		{83657F60-DC4C-4337-9678-8C04B663A086} = {F418165D-1E28-4CA6-A76B-626DE9C33F3C}
+		{79BAD461-696C-48E6-9128-8577E84E0EE8} = {00711347-4A39-4E92-801B-F2B91A6AD02B}
+		{41653FEE-E0FA-44FA-BD88-155847B49D11} = {79BAD461-696C-48E6-9128-8577E84E0EE8}
+		{804BEFFB-3FAA-4F2F-B5EF-9BAAEDA7AA38} = {79BAD461-696C-48E6-9128-8577E84E0EE8}
+		{6270A76F-16B0-4ED3-897E-C3BBB4221779} = {79BAD461-696C-48E6-9128-8577E84E0EE8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0F038E81-ECD2-4406-A5D1-FF6E377DF99A}

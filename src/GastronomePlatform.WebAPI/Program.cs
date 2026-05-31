@@ -4,6 +4,7 @@ using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Auth.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Extensions;
+using GastronomePlatform.Modules.Media.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Users.Infrastructure.Extensions;
 using MediatR.NotificationPublishers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -110,6 +111,7 @@ try
     builder.Services.AddAuthModule(builder.Configuration);
     builder.Services.AddUsersModule(builder.Configuration);
     builder.Services.AddDishesModule(builder.Configuration);
+    builder.Services.AddMediaModule(builder.Configuration);
 
     // === 3.2. Настройка JWT Authentication pipeline ===
     builder.Services.AddAuthentication(options =>
