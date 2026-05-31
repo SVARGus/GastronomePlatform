@@ -17,9 +17,13 @@ namespace GastronomePlatform.Modules.Dishes.Application.Snapshots
     /// настройки, доступные Application-слою без зависимости от ASP.NET.
     /// </para>
     /// <para>
-    /// Свойство <see cref="Default"/> возвращает иммутабельный экземпляр опций
-    /// (<see cref="JsonSerializerOptions.MakeReadOnly()"/> применяется при первом
-    /// обращении) — безопасно использовать как singleton.
+    /// Свойство <see cref="Default"/> возвращает иммутабельный экземпляр опций:
+    /// при инициализации вызывается <see cref="JsonSerializerOptions.MakeReadOnly(bool)"/>
+    /// с <c>populateMissingResolver: true</c>, чтобы System.Text.Json подставил
+    /// дефолтный рефлексионный <see cref="System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver"/>
+    /// (без него безпараметровая перегрузка <c>MakeReadOnly()</c> бросает
+    /// <see cref="InvalidOperationException"/>). Опции stateless — безопасно
+    /// использовать как singleton.
     /// </para>
     /// </remarks>
     public static class SnapshotJsonOptions
@@ -42,7 +46,14 @@ namespace GastronomePlatform.Modules.Dishes.Application.Snapshots
             };
 
             options.Converters.Add(new JsonStringEnumConverter());
-            options.MakeReadOnly();
+
+            // В .NET 8 безпараметровая JsonSerializerOptions.MakeReadOnly() требует
+            // уже установленного TypeInfoResolver, иначе бросает InvalidOperationException.
+            // Перегрузка с populateMissingResolver: true подставит DefaultJsonTypeInfoResolver
+            // (рефлексионный) при отсутствии явного — это ровно то поведение, которое
+            // у нас и подразумевалось «по умолчанию» (нет ни Source-Gen JsonContext,
+            // ни кастомного резолвера).
+            options.MakeReadOnly(populateMissingResolver: true);
 
             return options;
         }
