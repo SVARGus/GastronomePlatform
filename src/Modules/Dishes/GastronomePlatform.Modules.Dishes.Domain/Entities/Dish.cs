@@ -1131,6 +1131,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// <see cref="DishesErrors.IngredientsRequiredForPublish"/>,
         /// <see cref="DishesErrors.TimingRequiredForPublish"/>.
         /// </returns>
+        /// <seealso href="../../../docs/public/adr/ADR-0013-publish-spam-protection.md">ADR-0013 — защита Dish.Publish от спама DishPublishedEvent</seealso>
         public Result Publish(DateTimeOffset utcNow, string snapshot)
         {
             if (Status == DishStatus.Archived)

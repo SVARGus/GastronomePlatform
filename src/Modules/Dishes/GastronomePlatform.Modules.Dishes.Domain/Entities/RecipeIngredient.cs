@@ -22,6 +22,8 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
     /// <c>ReorderRecipeIngredients</c>.
     /// </para>
     /// </remarks>
+    /// <seealso href="../../../docs/public/adr/ADR-0012-recipe-ingredient-discriminated-union.md">ADR-0012 — RecipeIngredient как discriminated union (write-side фабрики + read-side полиморфные DTO)</seealso>
+    /// <seealso href="../../../docs/public/adr/ADR-0014-discriminated-unions-in-cqrs.md">ADR-0014 — общий принцип discriminated unions в CQRS-архитектуре</seealso>
     public sealed class RecipeIngredient : Entity<Guid>
     {
         #region Properties

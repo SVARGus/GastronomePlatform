@@ -25,6 +25,7 @@
 8. [Deferred-сущности](#8-deferred-сущности)
 9. [Константы `MediaEntityTypes`](#9-константы-mediaentitytypes)
 10. [Абстракция хранилища `IFileStorage`](#10-абстракция-хранилища-ifilestorage)
+10.bis. [Внутренние Application-контракты обработки (`IImageProcessor`, `ISvgSanitizer`)](#10bis-внутренние-application-контракты-обработки)
 11. [Межмодульный контракт `IMediaService`](#11-межмодульный-контракт-imediaservice)
 12. [Авторизация: ссылки на политики](#12-авторизация-ссылки-на-политики)
 13. [Валидации](#13-валидации)
@@ -168,10 +169,12 @@
 
 | Поле | Назначение |
 |------|------------|
-| `UploadedAt` | Момент загрузки. Иммутабельно после установки |
+| `CreatedAt` | Момент создания записи (= момент загрузки). Иммутабельно после установки |
 | `AttachedAt` | Момент привязки к сущности (через `EntityType + EntityId`). NULL пока файл orphan |
 | `DeletedAt` | Момент soft delete. NULL пока файл активен. Используется фоновой задачей UC-MED-211 для физического удаления через 7 дней |
-| `ExpiresAt` | Срок жизни orphan-файла. Устанавливается в `now + 24h` при создании файла без `EntityType`. Обнуляется при `AttachToEntityAsync` |
+| `ExpiresAt` | Срок жизни orphan-файла. Устанавливается в `now + orphanTimeout` при создании файла без `EntityType` (значение `orphanTimeout` — из конфигурации `Media:Orphan:ExpirationHours`, по умолчанию 24 часа). Обнуляется при `AttachToEntityAsync`, переустанавливается при `DetachFromEntity` |
+
+> **Примечание о реализации.** В ранних редакциях документа момент загрузки назывался `UploadedAt`. В реализации унифицировано на `CreatedAt` — поле служит и моментом создания записи в БД, и моментом загрузки файла (они совпадают). Отдельное поле `UploadedAt` не вводится: если в будущем появится разница между «момент принятия файла в систему» и «момент завершения обработки», добавим как отдельное поле миграцией.
 
 ### 5.4. Логика «orphan vs attached»
 
@@ -316,14 +319,20 @@
 
 | Метод | Назначение |
 |---|---|
-| `static Upload(ownerUserId, mediaType, contentType, originalFileName, storageProvider, storageKey, sizeBytes, width, height, dataCategory, expiresAt)` | Фабричный метод. Создаёт запись в статусе `Uploaded`. Возвращает `Result<MediaFile>` |
-| `MarkAsProcessing()` | `Uploaded → Processing`. Вызывается перед генерацией thumbnails |
-| `MarkAsReady()` | `Processing → Ready` |
-| `MarkAsFailed(string reason)` | Любой статус (кроме Deleted) → `Failed` |
-| `AttachToEntity(entityType, entityId, clock)` | Привязка к сущности. Обнуляет `ExpiresAt`, проставляет `AttachedAt` |
-| `DetachFromEntity(clock)` | Отвязка. Проставляет `ExpiresAt = clock.UtcNow + orphanTimeout` |
-| `SoftDelete(clock)` | `Ready → Deleted`. Проставляет `DeletedAt` |
-| `AddThumbnail(size, format, storageKey, w, h, sizeBytes)` | Добавление миниатюры в агрегат |
+| `static Upload(id, ownerUserId, mediaType, contentType, originalFileName, storageProvider, storageKey, sizeBytes, width, height, durationSeconds, dataCategory, orphanTimeout, utcNow)` | Фабричный метод. Создаёт запись в статусе `Uploaded`, `ExpiresAt = utcNow + orphanTimeout`. Возвращает `Result<MediaFile>` (см. примечание ниже про инварианты) |
+| `MarkAsProcessing(utcNow)` | `Uploaded → Processing`. Вызывается перед генерацией thumbnails (на Этапе 2 не используется — генерация синхронная). Возвращает `Result` |
+| `MarkAsReady(utcNow)` | `{Uploaded, Processing} → Ready`. Возвращает `Result` |
+| `MarkAsFailed(utcNow)` | Любой статус (кроме `Deleted`, `Failed`) → `Failed`. Возвращает `Result` |
+| `AttachToEntity(entityType, entityId, utcNow)` | Привязка к сущности. Требует `Status = Ready`. Обнуляет `ExpiresAt`, проставляет `AttachedAt`. Возвращает `Result` |
+| `DetachFromEntity(orphanTimeout, utcNow)` | Отвязка. Проставляет `ExpiresAt = utcNow + orphanTimeout`. Возвращает `Result` |
+| `SoftDelete(utcNow)` | Soft-удаление. Требует `EntityType IS NULL` (иначе `MEDIA.STILL_ATTACHED`). Проставляет `DeletedAt`. Возвращает `Result` |
+| `AddThumbnail(size, format, storageKey, w, h, sizeBytes, utcNow)` | Добавление миниатюры в агрегат. Возвращает `Result` |
+
+> **Примечание о реализации фабрики.** В реализации `MediaFile.Upload` принимает `TimeSpan orphanTimeout` и `DateTimeOffset utcNow` (вместо предварительно рассчитанного `expiresAt`) — стиль согласован с другими Domain-методами проекта (время передаётся явным параметром). Появился также явный `id` (Application-слой генерирует Guid заранее, чтобы использовать его в `IStorageKeyGenerator` до вызова `IFileStorage.SaveAsync`) и `durationSeconds` для видео.
+>
+> Фабрика возвращает `Result<MediaFile>`, потому что содержит **межполевой инвариант**: `DataCategory = Personal` требует `OwnerUserId != null` (иначе `MEDIA.PERSONAL_REQUIRES_OWNER`). Инвариант «парность `EntityType` и `EntityId`» в фабрике выполнен автоматически — файл всегда создаётся orphan-ом (оба поля NULL). Дальнейшая парная установка происходит в `AttachToEntity` (оба заполняются вместе) и сброс — в `DetachFromEntity` (оба обнуляются вместе).
+
+> **Примечание о проверке владения (`AttachToEntity`).** Сам Domain-метод НЕ проверяет, что `actorUserId` совпадает с `OwnerUserId` — он отвечает только за внутренние инварианты состояния (`Status = Ready`, отсутствие уже существующей привязки, известность `entityType`). Проверка владения вынесена на Application-уровень в `IMediaService.AttachToEntityAsync` (см. §11 и §6 — Развилки): сервис сверяет `actorUserId == OwnerUserId` либо роль Admin для системных файлов через `ICurrentUserService`, и только потом вызывает Domain-метод.
 
 #### Кросс-модульные ссылки
 
@@ -532,6 +541,75 @@ public interface IStorageKeyGenerator
 - Та же сигнатура, другая реализация через `AWSSDK.S3`.
 - `ProviderName => "s3"`.
 - Presigned URL для прямой отдачи клиенту (обходя контроллер) — отдельная возможность через расширенный интерфейс `ISignedUrlStorage : IFileStorage`.
+
+### Расширение `IStorageKeyGenerator` — генерация ключа миниатюр
+
+Помимо генерации ключа оригинала (`Generate(category, entityType, mediaId, extension)`), генератор отвечает и за ключи миниатюр — чтобы вся схема путей жила в одном месте:
+
+```csharp
+public interface IStorageKeyGenerator
+{
+    string Generate(MediaDataCategory category, string entityType, Guid mediaId, string extension);
+
+    string GenerateThumbnail(
+        MediaDataCategory category,
+        string entityType,
+        Guid mediaId,
+        ThumbnailSize size,
+        ThumbnailFormat format);
+}
+```
+
+Схема путей миниатюр: `thumbnails/{category}/{folder}/{mediaId}_{size}.{format}` (см. реализацию `StorageKeyGenerator`).
+
+> **Примечание.** `ThumbnailFormat` содержит только растровые форматы (`Jpeg`, `WebP`, `Avif`) — SVG не входит в перечень, потому что SVG-файлы не получают растровых миниатюр (масштабируются браузером без потери качества).
+
+---
+
+## 10.bis. Внутренние Application-контракты обработки
+
+Помимо `IFileStorage` и `IStorageKeyGenerator` (см. §10), Application-слой модуля Media использует ещё два контракта обработки содержимого. Они **не межмодульные** (не вызываются из других модулей), но критичны для UC-MED-001 / 101.
+
+### IImageProcessor
+
+**Расположение:** `Media.Application/Abstractions/IImageProcessor.cs`.
+**Реализация:** `Media.Infrastructure/Processing/ImageProcessor.cs` (на основе SkiaSharp 3.119.4 — MIT/BSD-3).
+
+```csharp
+public interface IImageProcessor
+{
+    /// <summary>Декод изображения, чтение Width/Height.</summary>
+    Result<ImageInfo> GetImageInfo(byte[] content, string contentType);
+
+    /// <summary>Синхронная генерация Medium-миниатюры (Этап 2). Async для освобождения потока ASP.NET Core.</summary>
+    Task<Result<ThumbnailData>> GenerateMediumThumbnailAsync(
+        byte[] content,
+        string contentType,
+        int targetSize,
+        int jpegQuality,
+        CancellationToken ct = default);
+}
+
+public sealed record ImageInfo(int Width, int Height);
+public sealed record ThumbnailData(byte[] Content, int Width, int Height);
+```
+
+CPU-bound операции (`SKBitmap.Decode`, `Resize`, `Encode`) выполняются через `Task.Run` — чтобы не держать поток ASP.NET Core. На Этапе 8+ заменяется на асинхронный pipeline `MediaProcessingJob` (UC-MED-213).
+
+### ISvgSanitizer
+
+**Расположение:** `Media.Application/Abstractions/ISvgSanitizer.cs`.
+**Реализация:** `Media.Infrastructure/Processing/SvgSanitizer.cs` (на основе HtmlSanitizer / Ganss.Xss 9.0.892 — MIT).
+
+```csharp
+public interface ISvgSanitizer
+{
+    /// <summary>Санирует SVG-разметку: удаляет script, обработчики on*, внешние href, foreignObject.</summary>
+    Result<string> Sanitize(string svgContent);
+}
+```
+
+Применяется только в UC-MED-101 (UploadSystemFile) для системных SVG-иконок категорий и ингредиентов — пользовательский upload SVG не принимает.
 
 ---
 
@@ -876,7 +954,24 @@ volumes:
 }
 ```
 
-Типизируется как `MediaOptions` через `IOptions<T>` в `Media.Infrastructure`.
+Типизируется как `MediaOptions` в `Media.Application/Configuration/MediaOptions.cs` (через `IOptions<MediaOptions>`). Класс размещён в Application-слое, потому что используется Handler-ами; Infrastructure только регистрирует биндинг секции — `services.Configure<MediaOptions>(config.GetSection(MediaOptions.SectionName))`.
+
+Структура класса (укорочённо):
+
+```csharp
+public sealed class MediaOptions
+{
+    public const string SectionName = "Media";
+
+    public StorageOptions Storage { get; set; } = new();
+    public ValidationOptions Validation { get; set; } = new();
+    public ThumbnailOptions Thumbnails { get; set; } = new();
+    public OrphanOptions Orphan { get; set; } = new();
+    public LimitsOptions Limits { get; set; } = new();
+}
+```
+
+Сам upload-Handler (`UploadFileCommandHandler`) использует `Orphan.ExpirationHours` (для `orphanTimeout`) и `Thumbnails.MediumSize` / `Thumbnails.JpegQuality`. Лимиты валидации (`Validation.User.*`) на Этапе 2 продублированы константами в FluentValidation-валидаторах — сознательное упрощение MVP.
 
 ---
 

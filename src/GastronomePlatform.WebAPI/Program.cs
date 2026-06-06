@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Auth.Infrastructure.Extensions;
@@ -44,6 +45,12 @@ try
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {
+            // camelCase — отраслевой стандарт REST/JSON и согласован с
+            // GlobalExceptionHandlingMiddleware (ответы 500 уже camelCase).
+            // SnapshotJsonOptions для jsonb-снепшота Dish.PublishedVersionData
+            // оставлен на PascalCase — это внутренний формат БД, не виден клиенту.
+            options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+
             // Enum-ы сериализуются и десериализуются как строки ("Medium" вместо 1).
             // Это удобнее для клиентов, читаемее в логах, и стабильно к рефакторингу enum-ов
             // (добавление значения в середину enum не сдвигает индексы существующих значений).
