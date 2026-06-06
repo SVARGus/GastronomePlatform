@@ -1112,27 +1112,36 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         #region Lifecycle Methods
 
         /// <summary>
-        /// Публикует блюдо: устанавливает <see cref="Status"/> в
-        /// <see cref="DishStatus.Published"/>, сохраняет JSON-снепшот публичной версии,
-        /// фиксирует <see cref="PublishedAt"/> и <see cref="PublishedVersionUpdatedAt"/>,
-        /// синхронизирует <see cref="CategoriesPublished"/> и <see cref="TagsPublished"/>
-        /// с рабочими коллекциями <see cref="Categories"/> и <see cref="Tags"/>.
-        /// Поднимает событие <see cref="DishPublishedEvent"/>.
+        /// Pure-проверка готовности блюда к публикации. Не имеет побочных эффектов:
+        /// не меняет состояние агрегата, не поднимает доменные события. Возвращает
+        /// тот же набор ошибок, что и <see cref="Publish"/>, и в том же порядке —
+        /// что позволяет Application-слою сначала отказать клиенту 409-м кодом и
+        /// только потом выполнять дорогую работу (например, сборку jsonb-снепшота).
         /// </summary>
-        /// <param name="utcNow">Текущее время UTC.</param>
-        /// <param name="snapshot">JSON-снепшот, собранный Application-слоем.</param>
         /// <returns>
-        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/> с одной из
-        /// ошибок инвариантов публикации:
-        /// <see cref="DishesErrors.CannotPublishArchivedDish"/>,
-        /// <see cref="DishesErrors.DishAlreadyPublished"/>,
-        /// <see cref="DishesErrors.MainImageRequiredForPublish"/>,
-        /// <see cref="DishesErrors.StepsRequiredForPublish"/>,
-        /// <see cref="DishesErrors.IngredientsRequiredForPublish"/>,
-        /// <see cref="DishesErrors.TimingRequiredForPublish"/>.
+        /// <see cref="Result.Success()"/>, если публикация в текущем состоянии возможна,
+        /// либо <see cref="Result.Failure(Error)"/> с конкретной доменной ошибкой
+        /// (см. <see cref="Publish"/>).
         /// </returns>
-        /// <seealso href="../../../docs/public/adr/ADR-0013-publish-spam-protection.md">ADR-0013 — защита Dish.Publish от спама DishPublishedEvent</seealso>
-        public Result Publish(DateTimeOffset utcNow, string snapshot)
+        /// <remarks>
+        /// Метод не заменяет проверки внутри <see cref="Publish"/>: тот вызывает тот же
+        /// набор инвариантов как defense-in-depth и не доверяет порядку вызовов извне.
+        /// См. ADR-0015.
+        /// </remarks>
+        /// <seealso href="../../../docs/public/adr/ADR-0015-publish-precheck-before-snapshot-build.md">ADR-0015 — pre-check инвариантов до сборки jsonb-снепшота</seealso>
+        public Result CheckCanPublish() => CheckPublishInvariants();
+
+        /// <summary>
+        /// Общий источник истины инвариантов публикации, переиспользуемый из
+        /// <see cref="CheckCanPublish"/> и <see cref="Publish"/>. Порядок проверок
+        /// зафиксирован в ADR-0013 (Areas of Caution): статусные проверки идут
+        /// до контентных.
+        /// </summary>
+        /// <returns>
+        /// <see cref="Result.Success()"/>, если все инварианты выполнены, либо
+        /// <see cref="Result.Failure(Error)"/> с первой нарушенной ошибкой.
+        /// </returns>
+        private Result CheckPublishInvariants()
         {
             if (Status == DishStatus.Archived)
             {
@@ -1143,7 +1152,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             // и в нём нет несохранённых правок относительно публичной версии,
             // повторная публикация не имеет смысла. Принудительная пересборка
             // снепшота (для каскадных операций админа) — отдельный механизм
-            // через RebuildPublishedSnapshot (Этап 8+).
+            // через RebuildPublishedSnapshot (Этап 8+). См. ADR-0013.
             if (Status == DishStatus.Published
                 && PublishedAt.HasValue
                 && UpdatedAt <= PublishedAt.Value)
@@ -1169,6 +1178,43 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             if (Recipe.Timing.TotalTimeMinutes <= 0)
             {
                 return Result.Failure(DishesErrors.TimingRequiredForPublish);
+            }
+
+            return Result.Success();
+        }
+
+        /// <summary>
+        /// Публикует блюдо: устанавливает <see cref="Status"/> в
+        /// <see cref="DishStatus.Published"/>, сохраняет JSON-снепшот публичной версии,
+        /// фиксирует <see cref="PublishedAt"/> и <see cref="PublishedVersionUpdatedAt"/>,
+        /// синхронизирует <see cref="CategoriesPublished"/> и <see cref="TagsPublished"/>
+        /// с рабочими коллекциями <see cref="Categories"/> и <see cref="Tags"/>.
+        /// Поднимает событие <see cref="DishPublishedEvent"/>.
+        /// </summary>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <param name="snapshot">JSON-снепшот, собранный Application-слоем.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> или <see cref="Result.Failure(Error)"/> с одной из
+        /// ошибок инвариантов публикации:
+        /// <see cref="DishesErrors.CannotPublishArchivedDish"/>,
+        /// <see cref="DishesErrors.DishAlreadyPublished"/>,
+        /// <see cref="DishesErrors.MainImageRequiredForPublish"/>,
+        /// <see cref="DishesErrors.StepsRequiredForPublish"/>,
+        /// <see cref="DishesErrors.IngredientsRequiredForPublish"/>,
+        /// <see cref="DishesErrors.TimingRequiredForPublish"/>.
+        /// </returns>
+        /// <seealso href="../../../docs/public/adr/ADR-0013-publish-spam-protection.md">ADR-0013 — защита Dish.Publish от спама DishPublishedEvent</seealso>
+        /// <seealso href="../../../docs/public/adr/ADR-0015-publish-precheck-before-snapshot-build.md">ADR-0015 — pre-check инвариантов до сборки jsonb-снепшота</seealso>
+        public Result Publish(DateTimeOffset utcNow, string snapshot)
+        {
+            // Defense-in-depth: те же инварианты, которые Application проверяет
+            // через CheckCanPublish() до сборки снепшота, повторяются здесь.
+            // Это гарантирует, что Domain нельзя обойти, если кто-то вызовет
+            // Publish напрямую, минуя pre-check. См. ADR-0015 §5.
+            Result invariants = CheckPublishInvariants();
+            if (invariants.IsFailure)
+            {
+                return invariants;
             }
 
             Status = DishStatus.Published;

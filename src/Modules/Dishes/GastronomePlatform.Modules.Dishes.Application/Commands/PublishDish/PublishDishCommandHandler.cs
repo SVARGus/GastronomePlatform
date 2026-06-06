@@ -20,12 +20,15 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish
     ///         <c>Ingredients</c>, <c>Categories</c>, <c>Tags</c>.</item>
     ///   <item>Проверка владения (POL-001 DishOwnership): автор блюда совпадает
     ///         с идентификатором текущего пользователя.</item>
+    ///   <item>Pre-check инвариантов публикации через <see cref="Dish.CheckCanPublish"/>:
+    ///         если блюдо не готово к публикации (Archived, AlreadyPublished, отсутствие
+    ///         главного фото, шагов, ингредиентов или ненулевого общего времени) —
+    ///         возврат 409 до сборки снепшота. См. ADR-0015.</item>
     ///   <item>Сборка jsonb-снепшота через <see cref="IPublishedDishSnapshotBuilder"/>
     ///         (по ADR-0012 — полиморфно для массива ингредиентов).</item>
-    ///   <item>Делегирование Domain: <c>dish.Publish(utcNow, snapshot)</c> — там же
-    ///         проверки всех инвариантов публикации (Archived, AlreadyPublished, наличие
-    ///         главного фото, шагов, ингредиентов, ненулевого общего времени) и заполнение
-    ///         <c>PublishedVersionData</c>, <c>PublishedAt</c>, <c>*Published</c>-таблиц.</item>
+    ///   <item>Делегирование Domain: <c>dish.Publish(utcNow, snapshot)</c> — повторяет
+    ///         те же инварианты как defense-in-depth и заполняет <c>PublishedVersionData</c>,
+    ///         <c>PublishedAt</c>, <c>*Published</c>-таблицы.</item>
     ///   <item>Сохранение (один транзакционный коммит) и публикация доменных событий
     ///         через <see cref="IPublisher"/>. На Этапе 2 подписчиков нет; на Этапе 5+
     ///         появятся EventHandler-ы.</item>
@@ -77,6 +80,17 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish
             if (dish.AuthorUserId != actorUserId)
             {
                 return DishesErrors.NotDishOwner;
+            }
+
+            // Pre-check инвариантов до сборки снепшота: возвращает 409 раньше,
+            // чем тратится работа на сериализацию агрегата, и исключает риск
+            // маскировки доменной ошибки потенциальным исключением из Builder.
+            // Defense-in-depth внутри Dish.Publish повторяет тот же набор проверок.
+            // См. ADR-0015.
+            Result canPublish = dish.CheckCanPublish();
+            if (canPublish.IsFailure)
+            {
+                return canPublish;
             }
 
             string snapshot = _snapshotBuilder.Build(dish);
