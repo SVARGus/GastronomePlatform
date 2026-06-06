@@ -164,6 +164,7 @@ namespace GastronomePlatform.Modules.Media.Domain.Entities
         /// Приватный конструктор, используется только из <see cref="Upload"/>.
         /// </summary>
         private MediaFile(
+            Guid id,
             Guid? ownerUserId,
             MediaType mediaType,
             string contentType,
@@ -177,7 +178,7 @@ namespace GastronomePlatform.Modules.Media.Domain.Entities
             MediaDataCategory dataCategory,
             TimeSpan orphanTimeout,
             DateTimeOffset utcNow)
-            : base(Guid.NewGuid())
+            : base(id)
         {
             OwnerUserId = ownerUserId;
             MediaType = mediaType;
@@ -217,6 +218,11 @@ namespace GastronomePlatform.Modules.Media.Domain.Entities
         /// Eager attach — отдельный шаг через <see cref="AttachToEntity"/>, вызываемый
         /// тем же хендлером при наличии целевой сущности.
         /// </remarks>
+        /// <param name="id">
+        /// Заранее сгенерированный идентификатор файла. Application-слой создаёт его до вызова
+        /// <c>IFileStorage.SaveAsync</c>, чтобы использовать в пути хранилища через
+        /// <c>IStorageKeyGenerator.Generate</c>, а затем передаёт сюда для согласованности.
+        /// </param>
         /// <param name="ownerUserId">
         /// Идентификатор пользователя-загрузчика. <see langword="null"/> для системных файлов
         /// (UC-MED-101). Для <paramref name="dataCategory"/> = <see cref="MediaDataCategory.Personal"/>
@@ -245,6 +251,7 @@ namespace GastronomePlatform.Modules.Media.Domain.Entities
         /// не передан <paramref name="ownerUserId"/>.
         /// </returns>
         public static Result<MediaFile> Upload(
+            Guid id,
             Guid? ownerUserId,
             MediaType mediaType,
             string contentType,
@@ -265,6 +272,7 @@ namespace GastronomePlatform.Modules.Media.Domain.Entities
             }
 
             var media = new MediaFile(
+                id,
                 ownerUserId,
                 mediaType,
                 contentType,

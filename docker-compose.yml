@@ -67,3 +67,13 @@ volumes:
   postgres-data:                       # Docker управляет расположением на диске
   rabbitmq-data:
   seq-data:
+  # media-data используется только при контейнеризации API (Этап 8+).
+  # Bind mount вместо named volume — удобнее инспектировать файлы при разработке:
+  #
+  #   services:
+  #     api:
+  #       volumes:
+  #         - ./media-data:/data/media
+  #
+  # При наличии этой записи раскомментировать и убрать комментарий ниже:
+  # media-data:

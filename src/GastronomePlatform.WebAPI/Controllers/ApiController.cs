@@ -66,7 +66,7 @@ namespace GastronomePlatform.WebAPI.Controllers
         /// вместо <see cref="ControllerBase.Forbid()"/> — стандартный <c>Forbid()</c> не сериализует тело,
         /// а клиенту нужен доменный код ошибки (например, <c>DISHES.NOT_DISH_OWNER</c>) для UX и диагностики.
         /// </remarks>
-        private IActionResult MapError(Error error)
+        protected IActionResult MapError(Error error)
         {
             return error.Type switch
             {

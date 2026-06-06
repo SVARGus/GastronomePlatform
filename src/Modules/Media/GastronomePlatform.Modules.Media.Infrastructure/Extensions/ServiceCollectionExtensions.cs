@@ -1,7 +1,13 @@
 using FluentValidation;
+using GastronomePlatform.Modules.Media.Application.Abstractions;
+using GastronomePlatform.Modules.Media.Application.Configuration;
+using GastronomePlatform.Modules.Media.Application.Contracts;
+using GastronomePlatform.Modules.Media.Application.Services;
 using GastronomePlatform.Modules.Media.Domain.Repositories;
 using GastronomePlatform.Modules.Media.Infrastructure.Persistence;
+using GastronomePlatform.Modules.Media.Infrastructure.Processing;
 using GastronomePlatform.Modules.Media.Infrastructure.Repositories;
+using GastronomePlatform.Modules.Media.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,15 +41,28 @@ namespace GastronomePlatform.Modules.Media.Infrastructure.Extensions
             services.AddDbContext<MediaDbContext>(options =>
                 options.UseNpgsql(configuration.GetConnectionString("Database")));
 
+            // Конфигурация модуля.
+            services.Configure<MediaOptions>(
+                configuration.GetSection(MediaOptions.SECTION_NAME));
+
             // Репозитории.
             services.AddScoped<IMediaFileRepository, MediaFileRepository>();
 
-            // TODO: специфичные сервисы модуля — добавятся при реализации UC-MED:
-            //   IFileStorage / LocalFileStorage (UC-MED-001),
-            //   IStorageKeyGenerator (UC-MED-001),
-            //   IMediaService / MediaService (UC-MED-200..204),
-            //   IMediaAccessPolicy (POL-002, для UC-MED-002/003/004),
-            //   IMediaOwnershipPolicy (POL-003, для UC-MED-005).
+            // Хранилище файлов: LocalFileStorage на Этапе 2.
+            // На Этапе 8+ заменяется на S3FileStorage через условную регистрацию по Media:Storage:Provider.
+            services.AddSingleton<IFileStorage, LocalFileStorage>();
+
+            // Генератор ключей хранилища (без состояния — Singleton).
+            services.AddSingleton<IStorageKeyGenerator, StorageKeyGenerator>();
+
+            // Обработчик изображений на базе SixLabors.ImageSharp v2.1.x (Singleton, thread-safe).
+            services.AddSingleton<IImageProcessor, ImageProcessor>();
+
+            // Санитайзер SVG на базе HtmlSanitizer (Singleton, thread-safe через static поле).
+            services.AddSingleton<ISvgSanitizer, SvgSanitizer>();
+
+            // Межмодульный контракт IMediaService (Scoped: зависит от ICurrentUserService и IMediaFileRepository).
+            services.AddScoped<IMediaService, MediaService>();
 
             return services;
         }
