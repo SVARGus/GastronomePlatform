@@ -1,6 +1,7 @@
 using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft;
+using GastronomePlatform.Modules.Dishes.Application.Commands.IncrementDishViews;
 using GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
@@ -411,6 +412,42 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             CancellationToken ct)
         {
             Result result = await Sender.Send(new PublishDishCommand(id), ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Регистрирует факт просмотра карточки блюда — атомарно увеличивает
+        /// <c>Dish.ViewsCount</c> на 1 (UC-DSH-070). Эндпоинт публичный
+        /// (<see cref="AllowAnonymousAttribute"/>): пинг шлёт клиент после успешного
+        /// рендера карточки (UC-DSH-050 / UC-DSH-051), момент вызова определяется фронтом.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Условие «блюдо опубликовано» зашито в SQL-запрос инкремента. Для черновика,
+        /// снятого с публикации или архивного блюда возвращается <c>404</c> — без раскрытия
+        /// существования записи. Идентификатор передаётся через route; тело запроса
+        /// и параметры не требуются.
+        /// </para>
+        /// <para>
+        /// TODO: при появлении бизнес-причины — добавить фильтр самопросмотров автора
+        /// (не инкрементировать, если <c>CurrentUserId == Dish.AuthorUserId</c>).
+        /// Сейчас считаем все просмотры, включая просмотры автора и анонимных гостей.
+        /// </para>
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном инкременте;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>), если блюда нет
+        /// либо оно не находится в статусе <c>Published</c>.
+        /// </returns>
+        [HttpPost("{id:guid}/views")]
+        [AllowAnonymous]
+        public async Task<IActionResult> IncrementViewsAsync(
+            Guid id,
+            CancellationToken ct)
+        {
+            Result result = await Sender.Send(new IncrementDishViewsCommand(id), ct);
             return MapResult(result);
         }
 

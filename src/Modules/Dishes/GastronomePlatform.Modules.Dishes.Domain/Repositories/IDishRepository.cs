@@ -104,6 +104,23 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         Task AddAsync(Dish dish, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Атомарно увеличивает счётчик просмотров <see cref="Dish.ViewsCount"/> на 1
+        /// у блюда со статусом <see cref="Domain.Enums.DishStatus.Published"/>. Используется
+        /// в UC-DSH-070 IncrementDishViews. Реализация — один <c>UPDATE</c> без загрузки
+        /// агрегата (EF Core 8 <c>ExecuteUpdateAsync</c>). Условие
+        /// <c>Status = Published</c> зашито в <c>WHERE</c>: 0 затронутых строк означает
+        /// «блюда нет» или «блюдо не опубликовано» — обе ситуации интерпретируются как 404,
+        /// чтобы публичный эндпоинт не раскрывал существование черновиков.
+        /// </summary>
+        /// <param name="dishId">Идентификатор блюда.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// Количество затронутых строк: 1 при успешном инкременте опубликованного блюда,
+        /// 0 если блюдо отсутствует или не находится в <c>Published</c>.
+        /// </returns>
+        Task<int> IncrementViewsAsync(Guid dishId, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Сохраняет изменения в хранилище (Unit of Work).
         /// </summary>
         /// <param name="cancellationToken">Токен отмены операции.</param>

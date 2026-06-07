@@ -92,6 +92,14 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
         }
 
         /// <inheritdoc/>
+        public async Task<int> IncrementViewsAsync(Guid dishId, CancellationToken cancellationToken = default)
+            => await _context.Dishes
+                .Where(d => d.Id == dishId && d.Status == DishStatus.Published)
+                .ExecuteUpdateAsync(
+                    s => s.SetProperty(d => d.ViewsCount, d => d.ViewsCount + 1),
+                    cancellationToken);
+
+        /// <inheritdoc/>
         public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
             => await _context.SaveChangesAsync(cancellationToken);
     }
