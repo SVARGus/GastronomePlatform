@@ -73,6 +73,22 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         public AllergenType? AllergenType { get; private set; }
 
         /// <summary>
+        /// Битовая маска диетических меток, с которыми продукт конфликтует.
+        /// Если бит установлен, блюдо, содержащее этот ингредиент, не может нести
+        /// соответствующую метку <see cref="DietLabels"/>. По умолчанию —
+        /// <see cref="DietLabels.None"/> (ингредиент ни с какой меткой не конфликтует).
+        /// </summary>
+        /// <remarks>
+        /// Заполняется модератором/админом через UC-DSH-110/111.
+        /// Используется агрегатом <see cref="Dish"/> при автокоррекции
+        /// <c>DietLabelsMask</c> и при валидации UC-DSH-009 SetDietLabels.
+        /// Источник правды для конфликтов, не выводимых из <see cref="AllergenType"/>
+        /// (например, мясо ↔ <see cref="DietLabels.Vegan"/>, алкоголь ↔
+        /// <see cref="DietLabels.Halal"/>).
+        /// </remarks>
+        public DietLabels DietConflictsMask { get; private set; }
+
+        /// <summary>
         /// Идентификатор базовой единицы хранения для этого продукта.
         /// Обычно «г» для твёрдых и «мл» для жидких.
         /// Используется для нормализации количества при расчёте КБЖУ рецепта.
@@ -121,6 +137,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             decimal? densityApprox,
             bool isAllergen,
             AllergenType? allergenType,
+            DietLabels dietConflictsMask,
             Guid baseMeasureUnitId,
             Guid? defaultNutritionId,
             DateTimeOffset createdAt)
@@ -134,6 +151,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             DensityApprox = densityApprox;
             IsAllergen = isAllergen;
             AllergenType = allergenType;
+            DietConflictsMask = dietConflictsMask;
             BaseMeasureUnitId = baseMeasureUnitId;
             DefaultNutritionId = defaultNutritionId;
             CreatedAt = createdAt;
@@ -157,6 +175,8 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// <param name="densityApprox">Плотность, г/мл. Обязательно при <paramref name="isLiquid"/> = <see langword="true"/>.</param>
         /// <param name="isAllergen">Флаг «продукт-аллерген». Требует заполнения <paramref name="allergenType"/>.</param>
         /// <param name="allergenType">Тип аллергена. Обязательно при <paramref name="isAllergen"/> = <see langword="true"/>.</param>
+        /// <param name="dietConflictsMask">Маска диетических меток, с которыми продукт конфликтует.
+        /// <see cref="DietLabels.None"/> для нейтральных по составу ингредиентов.</param>
         /// <param name="baseMeasureUnitId">Идентификатор базовой единицы хранения.</param>
         /// <param name="defaultNutritionId">Идентификатор КБЖУ по умолчанию. Опционально.</param>
         /// <param name="createdAt">Дата и время создания (UTC).</param>
@@ -170,6 +190,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             decimal? densityApprox,
             bool isAllergen,
             AllergenType? allergenType,
+            DietLabels dietConflictsMask,
             Guid baseMeasureUnitId,
             Guid? defaultNutritionId,
             DateTimeOffset createdAt)
@@ -183,6 +204,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
                 densityApprox,
                 isAllergen,
                 allergenType,
+                dietConflictsMask,
                 baseMeasureUnitId,
                 defaultNutritionId,
                 createdAt);

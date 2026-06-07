@@ -45,6 +45,35 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         Task AddAsync(Ingredient ingredient, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Возвращает словарь маркеров (аллергены + конфликтующие диет-метки) для
+        /// набора ингредиентов справочника. Используется агрегатом <see cref="Dish"/>
+        /// при перерасчёте денормализованных полей <c>AllergensMask</c> и
+        /// <c>DietLabelsMask</c>, а также при валидации UC-DSH-009 SetDietLabels.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Запросом одной поездкой собираются оба маркера — это уменьшает
+        /// количество round-trip-ов и упрощает Domain-сигнатуру:
+        /// <c>RecalculateDishMarkers</c> и <c>SetDietLabels</c> принимают
+        /// словарь одного и того же типа.
+        /// </para>
+        /// <para>
+        /// Идентификаторы, отсутствующие в БД (например, ингредиент уже удалён),
+        /// в результирующий словарь не попадают. Для них агрегат интерпретирует
+        /// маркеры как <see cref="GastronomePlatform.Modules.Dishes.Domain.Enums.AllergenType.None"/>
+        /// и <see cref="GastronomePlatform.Modules.Dishes.Domain.Enums.DietLabels.None"/>
+        /// (отсутствие маркеров — самая консервативная интерпретация).
+        /// </para>
+        /// </remarks>
+        /// <param name="ingredientIds">Уникальные идентификаторы catalog-ингредиентов
+        /// рецепта. Пустая коллекция допустима — возвращается пустой словарь.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Словарь <c>IngredientId → IngredientMarkers</c>.</returns>
+        Task<IReadOnlyDictionary<Guid, IngredientMarkers>> GetMarkersByIdsAsync(
+            IReadOnlyCollection<Guid> ingredientIds,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Сохраняет изменения в хранилище (Unit of Work).
         /// </summary>
         /// <param name="cancellationToken">Токен отмены операции.</param>

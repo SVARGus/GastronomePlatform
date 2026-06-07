@@ -160,10 +160,10 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
         }
 
         // DietLabelsMask редактируется отдельным Domain-методом Dish.SetDietLabels:
-        // декларация автора с будущей валидацией по составу ингредиентов имеет
-        // другую семантику, чем прочие поля карточки, и намеренно вынесена из UpdateCard.
-        // На draft-этапе рецепт пустой — валидации по составу нет; полноценная
-        // проверка появится вместе со справочником Ingredient.DietConflictsMask.
+        // декларация автора с валидацией по составу ингредиентов имеет другую семантику,
+        // чем прочие поля карточки, и намеренно вынесена из UpdateCard (ADR-0016).
+        // На draft-этапе рецепт пустой — словарь конфликтов пуст, Reject-проверка
+        // SetDietLabels гарантированно проходит, Result.Failure невозможен по структурному инварианту.
         private static void ApplyOptionalDietLabels(Dish dish, CreateDishDraftCommand request, DateTimeOffset utcNow)
         {
             if (request.DietLabelsMask is null)
@@ -171,7 +171,9 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
                 return;
             }
 
-            dish.SetDietLabels(request.DietLabelsMask.Value, utcNow);
+            IReadOnlyDictionary<Guid, DietLabels> noConflicts =
+                new Dictionary<Guid, DietLabels>(capacity: 0);
+            _ = dish.SetDietLabels(request.DietLabelsMask.Value, noConflicts, utcNow);
         }
 
         private static void ApplyOptionalHistory(Dish dish, CreateDishDraftCommand request, DateTimeOffset utcNow)

@@ -1,5 +1,4 @@
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
-using GastronomePlatform.Modules.Dishes.Domain.Enums;
 
 namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
 {
@@ -18,23 +17,6 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         /// <see cref="IngredientSpec"/>, если запись найдена; иначе <see langword="null"/>.
         /// </returns>
         Task<IngredientSpec?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Получает словарь «Id ингредиента → маска аллергенов» для указанного набора Id.
-        /// Используется в Application Handler'ах модификации состава рецепта
-        /// (UC-DSH-030, UC-DSH-031, UC-DSH-032) перед вызовом
-        /// <c>Dish.RecalculateAllergens(...)</c>.
-        /// </summary>
-        /// <param name="ingredientIds">Список идентификаторов ингредиентов.</param>
-        /// <param name="cancellationToken">Токен отмены операции.</param>
-        /// <returns>
-        /// Словарь Id → <see cref="AllergenType"/>. Ингредиенты без аллергенов
-        /// попадают в словарь со значением <see cref="AllergenType.None"/>.
-        /// Идентификаторы, не найденные в БД, в результирующем словаре отсутствуют.
-        /// </returns>
-        Task<IReadOnlyDictionary<Guid, AllergenType>> GetAllergensByIdsAsync(
-            IReadOnlyCollection<Guid> ingredientIds,
-            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Возвращает все сорта для указанного родительского ингредиента.

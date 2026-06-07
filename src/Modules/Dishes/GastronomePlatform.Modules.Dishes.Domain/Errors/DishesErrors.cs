@@ -81,6 +81,11 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
                 "Ингредиент рецепта должен ссылаться на справочник ИЛИ задаваться свободным текстом, " +
                 "но не оба сразу. Спецификация сорта допустима только при ссылке на справочник.");
 
+        public static readonly Error DietLabelsConflictWithComposition =
+            Error.Conflict("DISHES.DIET_LABELS_CONFLICT_WITH_COMPOSITION",
+                "Запрошенные диетические метки конфликтуют с составом рецепта. " +
+                "Снимите конфликтующие биты или измените состав ингредиентов.");
+
         public static readonly Error InvalidQuantity =
             Error.Conflict("DISHES.INVALID_QUANTITY",
                 "Количество ингредиента должно быть строго положительным.");

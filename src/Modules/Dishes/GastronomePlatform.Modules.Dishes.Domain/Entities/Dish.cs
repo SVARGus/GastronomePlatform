@@ -109,18 +109,20 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// </summary>
         public DietLabels DietLabelsMask { get; private set; }
 
-        // AllergensMask и HasUnverifiedAllergens — денормализованные публичные маркеры.
-        // Источник правды — состав Recipe.RecipeIngredients (Ingredient.AllergenType для
-        // ссылочных позиций, флаг unverified для freeform). Хранятся в корне агрегата
-        // для быстрого чтения в каталожных запросах.
+        // AllergensMask, HasUnverifiedAllergens и DietLabelsMask — денормализованные
+        // публичные маркеры. Источник правды для AllergensMask и автокоррекции
+        // DietLabelsMask — состав Recipe.RecipeIngredients (Ingredient.AllergenType и
+        // Ingredient.DietConflictsMask для catalog-позиций; freeform-позиции
+        // не учитываются — для них поднимается HasUnverifiedAllergens).
         //
-        // TODO: метод RecalculateAllergens(...) реализуется после добавления Recipe
-        // и RecipeIngredient. Вызов из Application-handler'ов модификации состава
-        // (UC-DSH-030..033), шаблон вызова:
+        // Шаблон вызова из Application-handler'ов модификации состава (UC-DSH-030..033)
+        // и UC-DSH-009 SetDietLabels:
         //
-        //   var ingredientAllergens = await _ingredientRepository
-        //       .GetAllergensByIdsAsync(recipeIngredientIds, ct);
-        //   dish.RecalculateAllergens(ingredientAllergens, utcNow);
+        //   var markers = await _ingredientRepository
+        //       .GetMarkersByIdsAsync(recipeIngredientIds, ct);
+        //   dish.RecalculateDishMarkers(markers, utcNow);
+        //   // или
+        //   var result = dish.SetDietLabels(desiredMask, conflictsMapForCurrentRecipe, utcNow);
 
         /// <summary>
         /// Битовая маска аллергенов блюда. Денормализованное поле — отражает суммарный
@@ -374,33 +376,62 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
 
         /// <summary>
         /// Устанавливает битовую маску диетических меток блюда (например,
-        /// <c>Vegan | GlutenFree</c>). Поднимает событие <see cref="DishUpdatedEvent"/>.
+        /// <c>Vegan | GlutenFree</c>) с проверкой согласованности по текущему составу
+        /// рецепта. Поднимает событие <see cref="DishUpdatedEvent"/>.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Сейчас метод работает как простая запись значения — присваивает маску
-        /// и фиксирует <see cref="UpdatedAt"/>, без проверок на согласованность
-        /// с составом ингредиентов рецепта.
+        /// Семантика — Reject при конфликте: если запрошенная маска содержит хотя бы
+        /// один бит, конфликтующий с <see cref="Entities.Ingredient.DietConflictsMask"/>
+        /// какого-либо catalog-ингредиента из текущего рецепта, метод возвращает
+        /// <see cref="DishesErrors.DietLabelsConflictWithComposition"/>. Автор должен
+        /// либо снять конфликтующие биты, либо изменить состав.
         /// </para>
         /// <para>
-        /// <b>TODO (после реализации справочника совместимости):</b> добавить
-        /// валидацию входной маски по текущему составу <see cref="Recipe"/>.
-        /// Например, попытка установить <c>DietLabels.Vegan</c> при наличии
-        /// в рецепте ингредиента, конфликтующего с этой меткой (мясо, рыба,
-        /// молочное и т.п.), должна возвращать ошибку. Справочник конфликтов
-        /// (<c>Ingredient.DietConflictsMask</c>) и автокоррекция
-        /// <see cref="DietLabelsMask"/> при изменении состава ингредиентов
-        /// (<c>Recipe.*Ingredient*</c> методы) — кандидат на отдельный ADR.
+        /// Freeform-ингредиенты в проверке не участвуют — у них нет справочной
+        /// маски конфликтов. Ответственность за согласованность маски с freeform-составом
+        /// лежит на авторе (как и для <see cref="HasUnverifiedAllergens"/>).
+        /// </para>
+        /// <para>
+        /// Реализует ADR-0016. Симметричное поведение при изменении состава —
+        /// silent auto-clear в <see cref="RecalculateDishMarkers"/>.
         /// </para>
         /// </remarks>
         /// <param name="dietLabelsMask">Новая битовая маска диетических меток.</param>
+        /// <param name="ingredientConflicts">Словарь <c>IngredientId → DietConflictsMask</c>
+        /// для catalog-ингредиентов текущего <see cref="Recipe"/>. Собирается
+        /// Application-handler-ом через <c>IIngredientRepository.GetMarkersByIdsAsync</c>.
+        /// Идентификаторы, отсутствующие в словаре, интерпретируются как
+        /// <see cref="DietLabels.None"/>.</param>
         /// <param name="utcNow">Текущее время UTC.</param>
-        public void SetDietLabels(DietLabels dietLabelsMask, DateTimeOffset utcNow)
+        /// <returns><see cref="Result.Success"/> при успешной установке;
+        /// <see cref="DishesErrors.DietLabelsConflictWithComposition"/> — если маска
+        /// конфликтует с составом.</returns>
+        public Result SetDietLabels(
+            DietLabels dietLabelsMask,
+            IReadOnlyDictionary<Guid, DietLabels> ingredientConflicts,
+            DateTimeOffset utcNow)
         {
+            DietLabels combinedConflicts = DietLabels.None;
+            foreach (RecipeIngredient ri in Recipe.Ingredients)
+            {
+                if (ri.IngredientId.HasValue
+                    && ingredientConflicts.TryGetValue(ri.IngredientId.Value, out DietLabels conflicts))
+                {
+                    combinedConflicts |= conflicts;
+                }
+            }
+
+            if ((dietLabelsMask & combinedConflicts) != DietLabels.None)
+            {
+                return DishesErrors.DietLabelsConflictWithComposition;
+            }
+
             DietLabelsMask = dietLabelsMask;
             UpdatedAt = utcNow;
 
             RaiseDomainEvent(new DishUpdatedEvent(Id, AuthorUserId));
+            return Result.Success();
         }
 
         /// <summary>
@@ -796,8 +827,8 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// </summary>
         /// <remarks>
         /// После изменения состава Application Handler должен отдельно вызвать
-        /// <see cref="RecalculateAllergens"/> для пересчёта <see cref="AllergensMask"/>
-        /// и <see cref="HasUnverifiedAllergens"/>.
+        /// <see cref="RecalculateDishMarkers"/> для пересчёта <see cref="AllergensMask"/>,
+        /// <see cref="HasUnverifiedAllergens"/> и автокоррекции <see cref="DietLabelsMask"/>.
         /// </remarks>
         /// <param name="ingredientId">Идентификатор ингредиента из справочника.</param>
         /// <param name="ingredientSpecId">Идентификатор спецификации. Опционально.</param>
@@ -834,7 +865,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// </summary>
         /// <remarks>
         /// Свободный текст устанавливает <see cref="HasUnverifiedAllergens"/> = <see langword="true"/>
-        /// при следующем вызове <see cref="RecalculateAllergens"/>.
+        /// при следующем вызове <see cref="RecalculateDishMarkers"/>.
         /// </remarks>
         /// <param name="freeformText">Свободный текст ингредиента.</param>
         /// <param name="quantity">Количество.</param>
@@ -865,7 +896,7 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         /// <summary>
         /// Обновляет существующий ингредиент рецепта. Допускает смену источника
         /// catalog↔freeform — в этом случае Application Handler должен вызвать
-        /// <see cref="RecalculateAllergens"/> после успешного обновления.
+        /// <see cref="RecalculateDishMarkers"/> после успешного обновления.
         /// </summary>
         /// <param name="recipeIngredientId">Идентификатор позиции для обновления.</param>
         /// <param name="ingredientId">Новый идентификатор ингредиента или <see langword="null"/>.</param>
@@ -956,41 +987,52 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
         }
 
         /// <summary>
-        /// Полностью пересобирает <see cref="AllergensMask"/> и
-        /// <see cref="HasUnverifiedAllergens"/> на основе текущего состава
-        /// <see cref="Recipe.Ingredients"/>.
+        /// Полностью пересобирает денормализованные маркеры блюда — <see cref="AllergensMask"/>,
+        /// <see cref="HasUnverifiedAllergens"/> и автокорректирует <see cref="DietLabelsMask"/> —
+        /// на основе текущего состава <see cref="Recipe.Ingredients"/>. Реализует ADR-0016.
         /// </summary>
         /// <remarks>
-        /// Логика: для каждой позиции с <c>IngredientId</c> — OR-им маску, взятую
-        /// из <paramref name="ingredientAllergens"/>; для каждой freeform-позиции —
-        /// поднимаем флаг <see cref="HasUnverifiedAllergens"/>. Старые значения
-        /// перезаписываются полностью.
         /// <para>
-        /// Application Handler собирает словарь заранее через
-        /// <c>IIngredientRepository.GetAllergensByIdsAsync</c>, передавая список
+        /// Логика за один проход по составу рецепта:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Для catalog-позиций (<c>IngredientId</c> заполнен) — OR-им маски из
+        ///   <paramref name="markers"/>: <c>AllergensMask</c> и
+        ///   <c>combinedConflictsMask</c> для последующего auto-clear диетических меток.</item>
+        ///   <item>Для freeform-позиций — поднимаем <see cref="HasUnverifiedAllergens"/>;
+        ///   в перерасчёте диет они не участвуют (ответственность автора).</item>
+        ///   <item>Из <see cref="DietLabelsMask"/> снимаются биты, попавшие в
+        ///   <c>combinedConflictsMask</c>. Если хотя бы один бит был снят —
+        ///   поднимается <see cref="DishDietLabelsAutoCorrectedEvent"/>.</item>
+        /// </list>
+        /// <para>
+        /// Application Handler собирает словарь маркеров через
+        /// <c>IIngredientRepository.GetMarkersByIdsAsync</c>, передавая список
         /// уникальных <c>IngredientId</c> из текущего <see cref="Recipe.Ingredients"/>.
         /// </para>
         /// </remarks>
-        /// <param name="ingredientAllergens">
-        /// Словарь IngredientId → маска аллергенов. Ингредиенты без аллергенов попадают
-        /// в словарь со значением <see cref="AllergenType.None"/>. Если какой-то Id
-        /// отсутствует в словаре — маска для него считается <see cref="AllergenType.None"/>.
+        /// <param name="markers">
+        /// Словарь <c>IngredientId → IngredientMarkers</c> (аллергены + конфликты диет).
+        /// Если какой-то Id отсутствует в словаре — маркеры для него считаются
+        /// <see cref="AllergenType.None"/> и <see cref="DietLabels.None"/> (консервативная интерпретация).
         /// </param>
         /// <param name="utcNow">Текущее время UTC.</param>
-        public void RecalculateAllergens(
-            IReadOnlyDictionary<Guid, AllergenType> ingredientAllergens,
+        public void RecalculateDishMarkers(
+            IReadOnlyDictionary<Guid, IngredientMarkers> markers,
             DateTimeOffset utcNow)
         {
-            var combined = AllergenType.None;
-            var hasUnverified = false;
+            AllergenType combinedAllergens = AllergenType.None;
+            DietLabels combinedConflicts = DietLabels.None;
+            bool hasUnverified = false;
 
-            foreach (var ri in Recipe.Ingredients)
+            foreach (RecipeIngredient ri in Recipe.Ingredients)
             {
                 if (ri.IngredientId.HasValue)
                 {
-                    if (ingredientAllergens.TryGetValue(ri.IngredientId.Value, out var allergens))
+                    if (markers.TryGetValue(ri.IngredientId.Value, out IngredientMarkers? m))
                     {
-                        combined |= allergens;
+                        combinedAllergens |= m.Allergens;
+                        combinedConflicts |= m.DietConflicts;
                     }
                 }
                 else
@@ -999,8 +1041,15 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
                 }
             }
 
-            AllergensMask = combined;
+            AllergensMask = combinedAllergens;
             HasUnverifiedAllergens = hasUnverified;
+
+            DietLabels removed = DietLabelsMask & combinedConflicts;
+            if (removed != DietLabels.None)
+            {
+                DietLabelsMask &= ~combinedConflicts;
+                RaiseDomainEvent(new DishDietLabelsAutoCorrectedEvent(Id, AuthorUserId, removed));
+            }
 
             MarkAsUpdated(utcNow);
         }

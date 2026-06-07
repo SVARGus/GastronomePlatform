@@ -2,6 +2,7 @@ using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft;
 using GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish;
+using GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById;
@@ -62,6 +63,13 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             CostEstimate CostEstimate,
             string? ShortDescription,
             string? Description);
+
+        /// <summary>
+        /// Данные для установки диетических меток блюда (UC-DSH-009).
+        /// </summary>
+        /// <param name="DietLabelsMask">Новая битовая маска диетических меток.
+        /// <c>None</c> допустимо (снять все метки).</param>
+        public sealed record SetDietLabelsRequest(DietLabels DietLabelsMask);
 
         /// <summary>
         /// Данные для обновления простых полей рецепта блюда (UC-DSH-003).
@@ -273,6 +281,50 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
                 Description: request.Description,
                 DifficultyLevel: request.DifficultyLevel,
                 CostEstimate: request.CostEstimate);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Устанавливает битовую маску диетических меток блюда (UC-DSH-009).
+        /// Доступно автору или Admin (POL-001). Реализует ADR-0016: при попытке
+        /// поставить метку, конфликтующую с составом рецепта, возвращается
+        /// <c>409 DISHES.DIET_LABELS_CONFLICT_WITH_COMPOSITION</c>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Серверная проверка — backstop поверх UI-валидации (UI помечает
+        /// недоступные метки серыми). Конфликт ингредиента определяется по
+        /// <c>Ingredient.DietConflictsMask</c>; freeform-ингредиенты в проверке
+        /// не участвуют (ответственность автора).
+        /// </para>
+        /// <para>
+        /// Маска <c>None</c> допустима — снять все метки.
+        /// </para>
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Новая битовая маска диетических меток.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешной установке;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c>, если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>), если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>), если блюдо не существует;
+        /// <c>409 Conflict</c> (<c>DISHES.DIET_LABELS_CONFLICT_WITH_COMPOSITION</c>),
+        /// если запрошенная маска конфликтует с составом рецепта.
+        /// </returns>
+        [HttpPatch("{id:guid}/diet-labels")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> SetDietLabelsAsync(
+            Guid id,
+            [FromBody] SetDietLabelsRequest request,
+            CancellationToken ct)
+        {
+            var command = new SetDietLabelsCommand(
+                DishId: id,
+                DietLabelsMask: request.DietLabelsMask);
 
             Result result = await Sender.Send(command, ct);
             return MapResult(result);

@@ -113,7 +113,7 @@ UI-страница — это **оркестратор**, который выз
 | UC-DSH-006 | Архивировать блюдо | Cmd | Core | 2 | Мягкое удаление (Status = Archived) |
 | UC-DSH-007 | Изменить категории блюда | Cmd | Core | 2 | Установка списка из 0–3 категорий |
 | UC-DSH-008 | Изменить теги блюда | Cmd | Core | 2 | Установка тегов; неизвестные создаются автоматически |
-| UC-DSH-009 | Установить диетические метки блюда | Cmd | Core | 2 | DietLabelsMask (Vegan, GlutenFree, …) |
+| UC-DSH-009 | Установить диетические метки блюда | Cmd | Core (реализовано) | 2 | DietLabelsMask с Reject-проверкой по составу (ADR-0016) |
 | UC-DSH-010 | Установить историческое описание блюда | Cmd | Core | 2 | Поле HistoryText |
 | UC-DSH-011 | Изменить главное фото блюда | Cmd | Core | 2 | Отдельно от UC-DSH-002 из-за attach/detach в Media |
 | UC-DSH-020 | Добавить шаг рецепта | Cmd | Core | 2 | RecipeStep |
@@ -344,10 +344,12 @@ Slug **не** меняется автоматически даже при сме
 
 ##### UC-DSH-009 — Установить диетические метки блюда
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** Core (реализовано). **Этап:** 2.
 **Authorization:** POL-001.
 
-DietLabelsMask. Битовая маска. Отдельный UC (не часть UC-DSH-002), потому что в будущем потребуется отдельная валидация (например, проверка соответствия меток составу ингредиентов — Vegan не должен содержать мясные ингредиенты, см. Q-2 в открытых вопросах). Правка не трогает `PublishedVersionData`.
+Подробное описание: [UC-DSH-009-SetDietLabels.md](UC-DSH-009-SetDietLabels.md).
+
+DietLabelsMask. Битовая маска. Отдельный UC (не часть UC-DSH-002), потому что валидация по составу ингредиентов специфична: Reject-семантика по ADR-0016 — Domain собирает `combinedConflictsMask` по `Ingredient.DietConflictsMask` catalog-позиций и возвращает `409 DIET_LABELS_CONFLICT_WITH_COMPOSITION` при пересечении с запрошенной маской. **Endpoint:** `PATCH /api/dishes/{id}/diet-labels`. Правка не трогает `PublishedVersionData`.
 
 ##### UC-DSH-010 — Установить историческое описание блюда
 
@@ -408,7 +410,7 @@ Domain-метод: `Dish.ChangeMainImage(mainImageId, utcNow)`. Параметр
 **Тип:** Command. **Статус:** Core. **Этап:** 2.
 **Authorization:** POL-001.
 
-Два режима: из справочника (передаётся `IngredientId`, опционально `IngredientSpecId`) или свободным текстом (`FreeformText`). `Quantity`, `MeasureUnitId` обязательны. `Order = max+1`. После добавления Application Handler вызывает `Dish.RecalculateAllergens(...)` — пересчитываются `AllergensMask` и `HasUnverifiedAllergens` (последний поднимается, если добавлена freeform-позиция).
+Два режима: из справочника (передаётся `IngredientId`, опционально `IngredientSpecId`) или свободным текстом (`FreeformText`). `Quantity`, `MeasureUnitId` обязательны. `Order = max+1`. После добавления Application Handler вызывает `Dish.RecalculateDishMarkers(...)` — пересчитываются `AllergensMask`, `HasUnverifiedAllergens` (последний поднимается, если добавлена freeform-позиция) и автокорректируется `DietLabelsMask` (ADR-0016).
 
 > **Реализация — два эндпоинта по природе ингредиента** (см. ADR-0012 и общий принцип ADR-0014). Функционально это **один** UC — одна операция автора «добавить позицию в список ингредиентов», — но из-за структурного различия входных данных (`IngredientId` обязателен в catalog-режиме; `FreeformText` обязателен в freeform-режиме) разделение на уровне API даёт типобезопасность и устраняет nullable-капканы:
 > - `POST /api/dishes/{id}/recipe/ingredients/catalog` — для позиции из справочника. Запрос: `IngredientId`, `IngredientSpecId?`, `Quantity`, `MeasureUnitId`, `IsOptional`, `PreparationNote?`.
@@ -425,14 +427,14 @@ Domain-метод: `Dish.ChangeMainImage(mainImageId, utcNow)`. Параметр
 **Тип:** Command. **Статус:** Core. **Этап:** 2.
 **Authorization:** POL-001.
 
-Изменение `Quantity`, `MeasureUnitId`, `IsOptional`, `PreparationNote`. Смена ингредиента (`IngredientId`/`FreeformText`) допустима — Application Handler после успешного `Dish.UpdateRecipeIngredient(...)` вызывает `Dish.RecalculateAllergens(...)` для пересчёта `AllergensMask` и `HasUnverifiedAllergens`. Правка не трогает `PublishedVersionData`.
+Изменение `Quantity`, `MeasureUnitId`, `IsOptional`, `PreparationNote`. Смена ингредиента (`IngredientId`/`FreeformText`) допустима — Application Handler после успешного `Dish.UpdateRecipeIngredient(...)` вызывает `Dish.RecalculateDishMarkers(...)` для пересчёта `AllergensMask`, `HasUnverifiedAllergens` и автокоррекции `DietLabelsMask`. Правка не трогает `PublishedVersionData`.
 
 ##### UC-DSH-032 — Удалить ингредиент из рецепта
 
 **Тип:** Command. **Статус:** Core. **Этап:** 2.
 **Authorization:** POL-001.
 
-Удаление с переупорядочиванием `Order` и последующим вызовом `Dish.RecalculateAllergens(...)` для пересчёта `AllergensMask` и `HasUnverifiedAllergens`. Правка не трогает `PublishedVersionData`.
+Удаление с переупорядочиванием `Order` и последующим вызовом `Dish.RecalculateDishMarkers(...)` для пересчёта `AllergensMask`, `HasUnverifiedAllergens` и автокоррекции `DietLabelsMask`. Правка не трогает `PublishedVersionData`.
 
 ##### UC-DSH-033 — Переупорядочить ингредиенты рецепта
 
@@ -709,13 +711,13 @@ Domain-метод: `Dish.ChangeMainImage(mainImageId, utcNow)`. Параметр
 
 **Тип:** Command. **Статус:** Core. **Этап:** 2.
 
-Все поля справочника: Name, PluralName, Description, ImageMediaId, IsLiquid, DensityApprox, IsAllergen, AllergenType, BaseMeasureUnitId, DefaultNutrition.
+Все поля справочника: Name, PluralName, Description, ImageMediaId, IsLiquid, DensityApprox, IsAllergen, AllergenType, DietConflictsMask (ADR-0016 — диет-метки, с которыми ингредиент конфликтует; default `None`), BaseMeasureUnitId, DefaultNutrition.
 
 ##### UC-DSH-111 — Обновить ингредиент (admin)
 
 **Тип:** Command. **Статус:** Core. **Этап:** 2.
 
-Изменение всех полей. Привязка/смена ImageMediaId через `IMediaService`.
+Изменение всех полей справочника, включая `DietConflictsMask`. Привязка/смена ImageMediaId через `IMediaService`. При изменении `DietConflictsMask` рабочие маски `Dish.DietLabelsMask` существующих блюд не пересчитываются автоматически — массовая инвалидация откладывается на фоновый механизм (Этап 4+/8+).
 
 ##### UC-DSH-112 — Деактивировать ингредиент (admin)
 

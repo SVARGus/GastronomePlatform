@@ -44,8 +44,9 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Extensions
 
             // Регистрация Repositories — добавляются по мере появления UC-потребителей
             services.AddScoped<IDishRepository, DishRepository>();
+            services.AddScoped<IIngredientRepository, IngredientRepository>();
 
-            // TODO: остальные репозитории (ICategoryRepository, ITagRepository, IIngredientRepository,
+            // TODO: остальные репозитории (ICategoryRepository, ITagRepository,
             // IIngredientSpecRepository, IMeasureUnitRepository, INutritionRepository) — по мере появления UC
             // TODO: специфичные сервисы модуля (например, для проверки POL-001 Dish Ownership)
 

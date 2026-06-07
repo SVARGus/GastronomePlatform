@@ -25,6 +25,7 @@
 | [ADR-0013](./ADR-0013-publish-spam-protection.md) | Защита `Dish.Publish` от спама `DishPublishedEvent` — Domain-инвариант | Accepted | 2026-05-30 | 2 | Dishes |
 | [ADR-0014](./ADR-0014-discriminated-unions-in-cqrs.md) | Discriminated Unions в CQRS-архитектуре проекта | Accepted | 2026-05-30 | — | Cross-cutting |
 | [ADR-0015](./ADR-0015-publish-precheck-before-snapshot-build.md) | Pre-check инвариантов публикации до сборки jsonb-снепшота — `Dish.CheckCanPublish` | Accepted | 2026-06-06 | 2 | Dishes |
+| [ADR-0016](./ADR-0016-diet-conflicts-mask.md) | Источник конфликтов диетических меток — поле `Ingredient.DietConflictsMask` | Accepted | 2026-06-07 | 2 | Dishes |
 
 ---
 

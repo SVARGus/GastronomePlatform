@@ -1,4 +1,5 @@
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
+using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -52,6 +53,12 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Configura
                 .HasDefaultValue(false);
 
             builder.Property(x => x.AllergenType);
+
+            // ADR-0016: маска диетических меток, с которыми конфликтует ингредиент.
+            // Заполняется модератором; default — DietLabels.None (конфликтов нет).
+            builder.Property(x => x.DietConflictsMask)
+                .IsRequired()
+                .HasDefaultValue(DietLabels.None);
 
             builder.Property(x => x.BaseMeasureUnitId)
                 .IsRequired();
