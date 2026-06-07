@@ -52,6 +52,10 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Extensions
             // Сборщик jsonb-снепшота для UC-DSH-004 Publish. Stateless, без I/O — Singleton.
             services.AddSingleton<IPublishedDishSnapshotBuilder, PublishedDishSnapshotBuilder>();
 
+            // Парсер jsonb-снепшота для UC-DSH-050 (snapshot-ветка карточки) и
+            // UC-DSH-052 (GetDishRecipe). Симметричен Builder, stateless — Singleton.
+            services.AddSingleton<IPublishedDishSnapshotReader, PublishedDishSnapshotReader>();
+
             return services;
         }
     }

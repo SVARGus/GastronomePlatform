@@ -5,6 +5,7 @@ using GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById;
+using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using MediatR;
@@ -131,6 +132,48 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             GetDishByIdQuery query = new(DishId: id);
 
             Result<DishDetailDto> result = await Sender.Send(query, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Возвращает рецепт блюда с полным составом (UC-DSH-052). Эндпоинт требует
+        /// аутентификации (политика <c>VALID_ACTOR</c>); видимость рабочей и публичной
+        /// версии симметрична UC-DSH-050.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Если у блюда есть публичный снепшот (<c>PublishedVersionData</c>) — отдаётся
+        /// рецепт из снепшота. Для автора и admin при наличии правок в рабочем слое
+        /// добавляется флаг <c>HasUnsavedChanges = true</c>.
+        /// </para>
+        /// <para>
+        /// Если снепшота нет (<c>Status = Draft</c> / <c>Unpublished</c>), доступ имеют
+        /// только автор и admin — они получают рабочую версию рецепта с
+        /// <c>IsPublishedVersion = false</c>. Остальным запрос отдаёт <c>404</c>.
+        /// </para>
+        /// <para>
+        /// Статус <c>Archived</c> всегда возвращает <c>404</c> на Этапе 2. Premium-проверка
+        /// через <c>ISubscriptionService</c> появится на Этапе 3+.
+        /// </para>
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>200 OK</c> с <see cref="DishRecipeDto"/> при успехе;
+        /// <c>400 Bad Request</c> при пустом идентификаторе;
+        /// <c>401 Unauthorized</c>, если запрос не аутентифицирован;
+        /// <c>404 Not Found</c>, если блюдо отсутствует, архивировано
+        /// или недоступно текущему пользователю.
+        /// </returns>
+        [HttpGet("{id:guid}/recipe")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> GetRecipeAsync(
+            Guid id,
+            CancellationToken ct)
+        {
+            GetDishRecipeQuery query = new(DishId: id);
+
+            Result<DishRecipeDto> result = await Sender.Send(query, ct);
             return MapResult(result);
         }
 

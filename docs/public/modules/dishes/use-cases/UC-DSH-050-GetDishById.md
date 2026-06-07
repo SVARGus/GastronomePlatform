@@ -1,6 +1,6 @@
 # UC-DSH-050: Получить публичную карточку блюда по ID
 
-**Version:** 1.0 (MVP — без snapshot-ветки; ожидает UC-DSH-004 PublishDish) | **Date:** 2026-05-28
+**Version:** 1.1 (snapshot-ветка реализована через `IPublishedDishSnapshotReader`) | **Date:** 2026-06-07
 
 ---
 
@@ -144,12 +144,12 @@ Body: отсутствует.
       - `isAdmin = _currentUser.IsInRole(PlatformRoles.ADMIN)`.
       - `isOwnerOrAdmin = isOwner || isAdmin`.
    4. **Ветка «есть снепшот».** Если `dish.PublishedVersionData is not null`:
+      - `PublishedDishSnapshot snapshot = _snapshotReader.Read(dish.PublishedVersionData)` — десериализация jsonb через `IPublishedDishSnapshotReader` (симметричный `IPublishedDishSnapshotBuilder`).
       - `hasUnsavedChanges = isOwnerOrAdmin ? (dish.PublishedAt.HasValue && dish.UpdatedAt > dish.PublishedAt.Value) : null`.
-      - Возврат `Map(dish, isPublishedVersion: true, hasUnsavedChanges)`.
-      - **Стаб на Этапе 2:** маппинг ведётся из текущих полей агрегата, а не из jsonb-снепшота. Ветка недостижима, пока UC-DSH-004 PublishDish не реализован. При появлении Publish — переключить источник данных на парсинг `PublishedVersionData`.
+      - Возврат `MapFromSnapshot(dish, snapshot, hasUnsavedChanges)`. Публичные поля карточки (`Name`, `Slug`, `ShortDescription`, `Description`, `HistoryText`, `MainImageId`, `DifficultyLevel`, `CostEstimate`, `OwnerType`, `DietLabelsMask`, `AllergensMask`, `HasUnverifiedAllergens`) берутся из снепшота. Lifecycle-метаданные (`Status`, `CreatedAt`, `UpdatedAt`, `PublishedAt`) и runtime-счётчики (`RatingAvg`, `RatingCount`, `ViewsCount`, `FavoritesCount`) — из самой записи `Dish` (в снепшот они не включаются по дизайну, см. `PublishedDishSnapshot`).
    5. **Ветка «нет снепшота».**
       - Если `!isOwnerOrAdmin` → `return DishesErrors.DishNotFound` → `404` (намеренно — не утечка существования черновика чужому пользователю).
-      - Иначе возврат `Map(dish, isPublishedVersion: false, hasUnsavedChanges: false)`.
+      - Иначе возврат `MapFromWorking(dish)` — все поля карточки берутся напрямую из агрегата.
 6. **Маппинг ответа.** `ApiController.MapResult<DishDetailDto>(Result<DishDetailDto>)` → `200 OK` с телом.
 
 ---
@@ -194,16 +194,18 @@ Body: отсутствует.
 
 ## Реализация Этапа 2 — что в наличии и что отложено
 
-### Реализовано (MVP)
+### Реализовано
 
-- Ветка «нет снепшота, читает автор/admin» (AF-2) — полностью работает с корректным маппингом и флагами.
+- Все три ветки чтения:
+  - AF-1 «Гость / аутентифицированный читает опубликованное блюдо» — данные из jsonb-снепшота через `IPublishedDishSnapshotReader`.
+  - AF-2 «Автор/admin читает свой черновик» — данные из основных таблиц.
+  - AF-3 «Автор/admin читает опубликованное блюдо с правками» — снепшот + флаг `HasUnsavedChanges = true`.
 - `404` для гостей и чужих пользователей при отсутствии снепшота (EC-1, EC-2).
 - `404` для `Archived` всем (EC-3).
-- Полный контракт `DishDetailDto`, рассчитанный сразу под двухслойную модель.
+- Полный контракт `DishDetailDto`.
 
-### Не реализовано (зависит от UC-DSH-004 PublishDish)
+### Отложено
 
-- Ветка «есть снепшот» — в Handler-е помечена `TODO`. Сейчас источник данных — текущие поля агрегата; должен стать парсинг jsonb-снепшота `Dish.PublishedVersionData`. На Этапе 2 ветка недостижима (ни одно блюдо не опубликовано), но при появлении Publish этот переключатель — единственная правка, которая потребуется в UC-050.
 - Параллельный вызов `UC-DSH-070 IncrementDishViews` — отдельный UC, появится позже.
 
 ---
@@ -214,5 +216,5 @@ Body: отсутствует.
 - `docs/public/modules/dishes/use-cases/README.md` — индекс UC модуля.
 - `docs/public/modules/dishes/use-cases/UC-DSH-053-GetMyDrafts.md` — списочное чтение черновиков (симметричный Query).
 - `docs/public/modules/dishes/use-cases/UC-DSH-051-GetDishBySlug.md` — будущий UC чтения по slug (только опубликованные).
-- `docs/public/modules/dishes/use-cases/UC-DSH-052-GetDishRecipe.md` — будущий UC чтения рецепта.
-- `docs/public/modules/dishes/use-cases/UC-DSH-004-PublishDish.md` — будущий UC, после которого UC-050 получит активную snapshot-ветку.
+- `docs/public/modules/dishes/use-cases/UC-DSH-052-GetDishRecipe.md` — рецепт блюда (использует тот же `IPublishedDishSnapshotReader`).
+- `docs/public/modules/dishes/use-cases/UC-DSH-004-PublishDish.md` — собирает jsonb-снепшот, который читает этот UC.
