@@ -2,15 +2,19 @@ using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngredientToRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Commands.AddFreeformIngredientToRecipe;
+using GastronomePlatform.Modules.Dishes.Application.Commands.AddRecipeStep;
 using GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft;
 using GastronomePlatform.Modules.Dishes.Application.Commands.IncrementDishViews;
 using GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish;
 using GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeIngredient;
+using GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeStep;
 using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeIngredients;
+using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeSteps;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeIngredient;
+using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeStep;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts;
@@ -160,6 +164,49 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// <param name="OrderedIngredientIds">Идентификаторы позиций в желаемом порядке.</param>
         public sealed record ReorderRecipeIngredientsRequest(
             IReadOnlyList<Guid> OrderedIngredientIds);
+
+        /// <summary>
+        /// Данные для добавления шага рецепта (UC-DSH-020).
+        /// </summary>
+        /// <param name="Description">Основной текст шага (10–4000 символов).</param>
+        /// <param name="Title">Короткий заголовок шага. Опционально, до 200 символов.</param>
+        /// <param name="ImageMediaId">Идентификатор иллюстрации шага в Media. Опционально.</param>
+        /// <param name="VideoUrl">URL внешнего видео (http/https). Опционально, до 500 символов.</param>
+        /// <param name="TemperatureCelsius">Температура приготовления (−30..300 °C). Опционально.</param>
+        /// <param name="TimerMinutes">Время для UI-таймера (1..1440 минут). Опционально.</param>
+        public sealed record AddRecipeStepRequest(
+            string Description,
+            string? Title,
+            Guid? ImageMediaId,
+            string? VideoUrl,
+            int? TemperatureCelsius,
+            int? TimerMinutes);
+
+        /// <summary>
+        /// Данные для обновления шага рецепта (UC-DSH-021). Все опциональные поля
+        /// принимают <see langword="null"/> для очистки.
+        /// </summary>
+        /// <param name="Description">Основной текст шага (10–4000 символов).</param>
+        /// <param name="Title">Заголовок шага. <see langword="null"/> — очистить.</param>
+        /// <param name="ImageMediaId">Иллюстрация в Media. <see langword="null"/> — очистить.</param>
+        /// <param name="VideoUrl">URL внешнего видео. <see langword="null"/> — очистить.</param>
+        /// <param name="TemperatureCelsius">Температура. <see langword="null"/> — очистить.</param>
+        /// <param name="TimerMinutes">Время таймера. <see langword="null"/> — очистить.</param>
+        public sealed record UpdateRecipeStepRequest(
+            string Description,
+            string? Title,
+            Guid? ImageMediaId,
+            string? VideoUrl,
+            int? TemperatureCelsius,
+            int? TimerMinutes);
+
+        /// <summary>
+        /// Данные для переупорядочивания шагов рецепта (UC-DSH-023). Список должен
+        /// содержать все шаги рецепта без дубликатов.
+        /// </summary>
+        /// <param name="OrderedStepIds">Идентификаторы шагов в желаемом порядке.</param>
+        public sealed record ReorderRecipeStepsRequest(
+            IReadOnlyList<Guid> OrderedStepIds);
 
         #endregion
 
@@ -394,6 +441,75 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             var command = new ReorderRecipeIngredientsCommand(
                 DishId: id,
                 OrderedIngredientIds: request.OrderedIngredientIds);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Обновляет существующий шаг рецепта (UC-DSH-021). Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="stepId">Идентификатор шага рецепта.</param>
+        /// <param name="request">Новые значения полей шага.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном обновлении;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> при отсутствии блюда (<c>DISHES.DISH_NOT_FOUND</c>)
+        /// или шага (<c>DISHES.STEP_NOT_FOUND</c>);
+        /// <c>409 Conflict</c> (<c>DISHES.INVALID_TEMPERATURE</c> / <c>DISHES.INVALID_TIMER_MINUTES</c>)
+        /// если значения вне допустимого диапазона.
+        /// </returns>
+        [HttpPut("{id:guid}/recipe/steps/{stepId:guid}")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> UpdateRecipeStepAsync(
+            Guid id,
+            Guid stepId,
+            [FromBody] UpdateRecipeStepRequest request,
+            CancellationToken ct)
+        {
+            var command = new UpdateRecipeStepCommand(
+                DishId: id,
+                StepId: stepId,
+                Description: request.Description,
+                Title: request.Title,
+                ImageMediaId: request.ImageMediaId,
+                VideoUrl: request.VideoUrl,
+                TemperatureCelsius: request.TemperatureCelsius,
+                TimerMinutes: request.TimerMinutes);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Переупорядочивает шаги рецепта (UC-DSH-023). Состав не меняется — только <c>Order</c>.
+        /// Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Список идентификаторов шагов в желаемом порядке.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном переупорядочивании;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> при отсутствии блюда или шага из списка;
+        /// <c>409 Conflict</c> (<c>DISHES.INVALID_STEP_ORDER</c>) если список неполон или содержит дубликаты.
+        /// </returns>
+        [HttpPut("{id:guid}/recipe/steps/order")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> ReorderRecipeStepsAsync(
+            Guid id,
+            [FromBody] ReorderRecipeStepsRequest request,
+            CancellationToken ct)
+        {
+            var command = new ReorderRecipeStepsCommand(
+                DishId: id,
+                OrderedStepIds: request.OrderedStepIds);
 
             Result result = await Sender.Send(command, ct);
             return MapResult(result);
@@ -700,6 +816,51 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
                 result.Value);
         }
 
+        /// <summary>
+        /// Добавляет шаг в рецепт блюда (UC-DSH-020). Порядковый номер назначается автоматически
+        /// (<c>Order = max+1</c>). Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Данные нового шага.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>201 Created</c> с <c>{ "id": "..." }</c> и заголовком <c>Location</c>
+        /// при успешном добавлении;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> при отсутствии блюда (<c>DISHES.DISH_NOT_FOUND</c>);
+        /// <c>409 Conflict</c> (<c>DISHES.INVALID_TEMPERATURE</c> / <c>DISHES.INVALID_TIMER_MINUTES</c>)
+        /// если значения вне допустимого диапазона.
+        /// </returns>
+        [HttpPost("{id:guid}/recipe/steps")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> AddRecipeStepAsync(
+            Guid id,
+            [FromBody] AddRecipeStepRequest request,
+            CancellationToken ct)
+        {
+            var command = new AddRecipeStepCommand(
+                DishId: id,
+                Description: request.Description,
+                Title: request.Title,
+                ImageMediaId: request.ImageMediaId,
+                VideoUrl: request.VideoUrl,
+                TemperatureCelsius: request.TemperatureCelsius,
+                TimerMinutes: request.TimerMinutes);
+
+            Result<AddRecipeStepResult> result = await Sender.Send(command, ct);
+
+            if (result.IsFailure)
+            {
+                return MapResult(result);
+            }
+
+            return Created(
+                $"/api/dishes/{id}/recipe/steps/{result.Value.Id}",
+                result.Value);
+        }
+
         #endregion
 
         #region DELETE Endpoints
@@ -732,6 +893,33 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             var command = new RemoveRecipeIngredientCommand(
                 DishId: id,
                 RecipeIngredientId: recipeIngredientId);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Удаляет шаг рецепта (UC-DSH-022) с переупорядочиванием оставшихся
+        /// (<c>Order = 1..N</c>). Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="stepId">Идентификатор удаляемого шага.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном удалении;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> при отсутствии блюда (<c>DISHES.DISH_NOT_FOUND</c>)
+        /// или шага (<c>DISHES.STEP_NOT_FOUND</c>).
+        /// </returns>
+        [HttpDelete("{id:guid}/recipe/steps/{stepId:guid}")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> RemoveRecipeStepAsync(
+            Guid id,
+            Guid stepId,
+            CancellationToken ct)
+        {
+            var command = new RemoveRecipeStepCommand(DishId: id, StepId: stepId);
 
             Result result = await Sender.Send(command, ct);
             return MapResult(result);

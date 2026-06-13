@@ -116,10 +116,10 @@ UI-страница — это **оркестратор**, который выз
 | UC-DSH-009 | Установить диетические метки блюда | Cmd | Core (реализовано) | 2 | DietLabelsMask с Reject-проверкой по составу (ADR-0016) |
 | UC-DSH-010 | Установить историческое описание блюда | Cmd | Core | 2 | Поле HistoryText |
 | UC-DSH-011 | Изменить главное фото блюда | Cmd | Core | 2 | Отдельно от UC-DSH-002 из-за attach/detach в Media |
-| UC-DSH-020 | Добавить шаг рецепта | Cmd | Core | 2 | RecipeStep |
-| UC-DSH-021 | Обновить шаг рецепта | Cmd | Core | 2 | Title, Description, Image, Temp, Timer, Video |
-| UC-DSH-022 | Удалить шаг рецепта | Cmd | Core | 2 | С автоматическим переупорядочиванием |
-| UC-DSH-023 | Переупорядочить шаги рецепта | Cmd | Core | 2 | Массовая смена Order |
+| UC-DSH-020 | Добавить шаг рецепта | Cmd | реализовано | 2 | `POST .../recipe/steps`. См. UC-DSH-020 |
+| UC-DSH-021 | Обновить шаг рецепта | Cmd | реализовано | 2 | `PUT .../recipe/steps/{stepId}`. Атомарное обновление всех полей. См. UC-DSH-021 |
+| UC-DSH-022 | Удалить шаг рецепта | Cmd | реализовано | 2 | `DELETE .../recipe/steps/{stepId}`. Переупорядочивает оставшиеся (`Order = 1..N`). См. UC-DSH-022 |
+| UC-DSH-023 | Переупорядочить шаги рецепта | Cmd | реализовано | 2 | `PUT .../recipe/steps/order`. Массовая смена Order. См. UC-DSH-023 |
 | UC-DSH-030 | Добавить ингредиент в рецепт | Cmd | реализовано | 2 | Два эндпоинта: `POST .../recipe/ingredients/catalog` и `POST .../recipe/ingredients/freeform`. После — `Dish.RecalculateDishMarkers`. См. UC-DSH-030 |
 | UC-DSH-031 | Обновить ингредиент в рецепте | Cmd | реализовано | 2 | `PUT .../recipe/ingredients/{id}`. Допускает смену catalog↔freeform; после — `RecalculateDishMarkers`. См. UC-DSH-031 |
 | UC-DSH-032 | Удалить ингредиент из рецепта | Cmd | реализовано | 2 | `DELETE .../recipe/ingredients/{id}`. Переупорядочивает оставшиеся; после — `RecalculateDishMarkers`. См. UC-DSH-032 |
@@ -377,31 +377,39 @@ Domain-метод: `Dish.ChangeMainImage(mainImageId, utcNow)`. Параметр
 
 ##### UC-DSH-020 — Добавить шаг рецепта
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** реализовано. **Этап:** 2.
 **Authorization:** POL-001.
 
-Создание `RecipeStep` с Order = max+1. Опциональные ImageMediaId (с attach через `IMediaService`), VideoUrl, TemperatureCelsius, TimerMinutes. Правка не трогает `PublishedVersionData`.
+Полное описание — `UC-DSH-020-AddRecipeStep.md`.
+
+`POST /api/dishes/{id}/recipe/steps`. Создание `RecipeStep` с `Order = max+1`. Опциональные `ImageMediaId`, `VideoUrl` (валидируется как absolute http(s) URI), `TemperatureCelsius` (−30..300), `TimerMinutes` (1..1440). Правка не трогает `PublishedVersionData`. Attach медиа через межмодульный `IMediaService` — отложен до отдельной сессии (сервис ещё не реализован).
 
 ##### UC-DSH-021 — Обновить шаг рецепта
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** реализовано. **Этап:** 2.
 **Authorization:** POL-001.
 
-Изменение Title, Description, ImageMediaId (с возможной сменой attach), VideoUrl, Temperature, Timer. Order меняется через UC-DSH-023. Правка не трогает `PublishedVersionData`.
+Полное описание — `UC-DSH-021-UpdateRecipeStep.md`.
+
+`PUT /api/dishes/{id}/recipe/steps/{stepId}`. Атомарное обновление: `Title`, `Description`, `ImageMediaId`, `VideoUrl`, `TemperatureCelsius`, `TimerMinutes`. `null` в опц. поле — «очистить». `Order` меняется через UC-DSH-023. Правка не трогает `PublishedVersionData`.
 
 ##### UC-DSH-022 — Удалить шаг рецепта
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** реализовано. **Этап:** 2.
 **Authorization:** POL-001.
 
-Удаление с автоматическим переупорядочиванием оставшихся (Order пересчитывается). Detach связанного медиа через `IMediaService`. Правка не трогает `PublishedVersionData`.
+Полное описание — `UC-DSH-022-RemoveRecipeStep.md`.
+
+`DELETE /api/dishes/{id}/recipe/steps/{stepId}`. Удаление с автоматическим переупорядочиванием оставшихся (`Order = 1..N`). Detach связанного медиа через `IMediaService` — отложен до отдельной сессии. Правка не трогает `PublishedVersionData`.
 
 ##### UC-DSH-023 — Переупорядочить шаги рецепта
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** реализовано. **Этап:** 2.
 **Authorization:** POL-001.
 
-Массовая смена Order. Принимает упорядоченный список StepId. Атомарная операция (вся в одной транзакции). Правка не трогает `PublishedVersionData`.
+Полное описание — `UC-DSH-023-ReorderRecipeSteps.md`.
+
+`PUT /api/dishes/{id}/recipe/steps/order`. Массовая смена `Order`. Принимает упорядоченный список `StepId`. Атомарная операция в одной транзакции. Состав не меняется — `Dish.RecalculateDishMarkers` не вызывается. Правка не трогает `PublishedVersionData`.
 
 #### Управление ингредиентами рецепта
 

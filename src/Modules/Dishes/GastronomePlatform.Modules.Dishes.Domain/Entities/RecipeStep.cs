@@ -16,6 +16,34 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
     /// </remarks>
     public sealed class RecipeStep : Entity<Guid>
     {
+        #region Limits
+
+        /// <summary>Минимальная длина <see cref="Description"/>.</summary>
+        public const int MIN_DESCRIPTION_LENGTH = 10;
+
+        /// <summary>Максимальная длина <see cref="Description"/>.</summary>
+        public const int MAX_DESCRIPTION_LENGTH = 4000;
+
+        /// <summary>Максимальная длина <see cref="Title"/>.</summary>
+        public const int MAX_TITLE_LENGTH = 200;
+
+        /// <summary>Максимальная длина <see cref="VideoUrl"/>.</summary>
+        public const int MAX_VIDEO_URL_LENGTH = 500;
+
+        /// <summary>Минимальное значение <see cref="TemperatureCelsius"/> в °C.</summary>
+        public const int MIN_TEMPERATURE_CELSIUS = -30;
+
+        /// <summary>Максимальное значение <see cref="TemperatureCelsius"/> в °C.</summary>
+        public const int MAX_TEMPERATURE_CELSIUS = 300;
+
+        /// <summary>Минимальное значение <see cref="TimerMinutes"/>.</summary>
+        public const int MIN_TIMER_MINUTES = 1;
+
+        /// <summary>Максимальное значение <see cref="TimerMinutes"/> (24 часа).</summary>
+        public const int MAX_TIMER_MINUTES = 1440;
+
+        #endregion
+
         #region Properties
 
         /// <summary>
@@ -173,12 +201,12 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             int? temperatureCelsius,
             int? timerMinutes)
         {
-            if (temperatureCelsius is < -30 or > 300)
+            if (temperatureCelsius is < MIN_TEMPERATURE_CELSIUS or > MAX_TEMPERATURE_CELSIUS)
             {
                 return Result.Failure(DishesErrors.InvalidTemperature);
             }
 
-            if (timerMinutes is < 1 or > 1440)
+            if (timerMinutes is < MIN_TIMER_MINUTES or > MAX_TIMER_MINUTES)
             {
                 return Result.Failure(DishesErrors.InvalidTimerMinutes);
             }
