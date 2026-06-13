@@ -1,11 +1,16 @@
 using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Domain.Results;
+using GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngredientToRecipe;
+using GastronomePlatform.Modules.Dishes.Application.Commands.AddFreeformIngredientToRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft;
 using GastronomePlatform.Modules.Dishes.Application.Commands.IncrementDishViews;
 using GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish;
+using GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeIngredient;
+using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeIngredients;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipe;
+using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeIngredient;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts;
@@ -92,6 +97,69 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             string? AuthorTips,
             string? ServingSuggestions,
             string? Notes);
+
+        /// <summary>
+        /// Данные для добавления ингредиента из справочника в рецепт блюда
+        /// (UC-DSH-030, catalog-ветка).
+        /// </summary>
+        /// <param name="IngredientId">Идентификатор ингредиента из справочника.</param>
+        /// <param name="IngredientSpecId">Идентификатор спецификации (сорта). Опционально.</param>
+        /// <param name="Quantity">Количество. Строго положительное.</param>
+        /// <param name="MeasureUnitId">Идентификатор единицы измерения.</param>
+        /// <param name="IsOptional">Признак опциональности позиции.</param>
+        /// <param name="PreparationNote">Заметка по подготовке (до 200 символов). Опционально.</param>
+        public sealed record AddCatalogIngredientToRecipeRequest(
+            Guid IngredientId,
+            Guid? IngredientSpecId,
+            decimal Quantity,
+            Guid MeasureUnitId,
+            bool IsOptional,
+            string? PreparationNote);
+
+        /// <summary>
+        /// Данные для добавления ингредиента свободным текстом в рецепт блюда
+        /// (UC-DSH-030, freeform-ветка).
+        /// </summary>
+        /// <param name="FreeformText">Свободный текст ингредиента (1–200 символов).</param>
+        /// <param name="Quantity">Количество. Строго положительное.</param>
+        /// <param name="MeasureUnitId">Идентификатор единицы измерения.</param>
+        /// <param name="IsOptional">Признак опциональности позиции.</param>
+        /// <param name="PreparationNote">Заметка по подготовке (до 200 символов). Опционально.</param>
+        public sealed record AddFreeformIngredientToRecipeRequest(
+            string FreeformText,
+            decimal Quantity,
+            Guid MeasureUnitId,
+            bool IsOptional,
+            string? PreparationNote);
+
+        /// <summary>
+        /// Данные для обновления позиции рецепта (UC-DSH-031). Допускается смена
+        /// источника catalog↔freeform — задайте ровно один из <c>IngredientId</c>
+        /// или <c>FreeformText</c>.
+        /// </summary>
+        /// <param name="IngredientId">Новый идентификатор ингредиента из справочника или <see langword="null"/>.</param>
+        /// <param name="IngredientSpecId">Новый идентификатор спецификации или <see langword="null"/>. Допустим только при заполненном <c>IngredientId</c>.</param>
+        /// <param name="FreeformText">Новый свободный текст или <see langword="null"/>.</param>
+        /// <param name="Quantity">Новое количество. Строго положительное.</param>
+        /// <param name="MeasureUnitId">Новый идентификатор единицы измерения.</param>
+        /// <param name="IsOptional">Признак опциональности позиции.</param>
+        /// <param name="PreparationNote">Новая заметка по подготовке. <see langword="null"/> — очистить.</param>
+        public sealed record UpdateRecipeIngredientRequest(
+            Guid? IngredientId,
+            Guid? IngredientSpecId,
+            string? FreeformText,
+            decimal Quantity,
+            Guid MeasureUnitId,
+            bool IsOptional,
+            string? PreparationNote);
+
+        /// <summary>
+        /// Данные для переупорядочивания позиций рецепта (UC-DSH-033). Список должен
+        /// содержать все позиции рецепта без дубликатов.
+        /// </summary>
+        /// <param name="OrderedIngredientIds">Идентификаторы позиций в желаемом порядке.</param>
+        public sealed record ReorderRecipeIngredientsRequest(
+            IReadOnlyList<Guid> OrderedIngredientIds);
 
         #endregion
 
@@ -245,6 +313,87 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
                 AuthorTips: request.AuthorTips,
                 ServingSuggestions: request.ServingSuggestions,
                 Notes: request.Notes);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Обновляет существующую позицию рецепта (UC-DSH-031). Допускает смену
+        /// источника catalog↔freeform. Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// После обновления сервер вызывает <c>Dish.RecalculateDishMarkers</c>:
+        /// пересчитываются <c>AllergensMask</c>, <c>HasUnverifiedAllergens</c>;
+        /// биты <c>DietLabelsMask</c>, конфликтующие с новой композицией, снимаются
+        /// (silent auto-clear по ADR-0016).
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="recipeIngredientId">Идентификатор позиции рецепта.</param>
+        /// <param name="request">Новые значения полей позиции.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном обновлении;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> при отсутствии блюда (<c>DISHES.DISH_NOT_FOUND</c>),
+        /// позиции (<c>DISHES.RECIPE_INGREDIENT_NOT_FOUND</c>), нового ингредиента
+        /// (<c>DISHES.INGREDIENT_NOT_FOUND</c>), спецификации (<c>DISHES.INGREDIENT_SPEC_NOT_FOUND</c>)
+        /// или единицы измерения (<c>DISHES.MEASURE_UNIT_NOT_FOUND</c>);
+        /// <c>409 Conflict</c> при <c>DISHES.INGREDIENT_INACTIVE</c>,
+        /// <c>DISHES.INGREDIENT_SPEC_MISMATCH</c>, <c>DISHES.INVALID_INGREDIENT_COMPOSITION</c>
+        /// или <c>DISHES.INVALID_QUANTITY</c>.
+        /// </returns>
+        [HttpPut("{id:guid}/recipe/ingredients/{recipeIngredientId:guid}")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> UpdateRecipeIngredientAsync(
+            Guid id,
+            Guid recipeIngredientId,
+            [FromBody] UpdateRecipeIngredientRequest request,
+            CancellationToken ct)
+        {
+            var command = new UpdateRecipeIngredientCommand(
+                DishId: id,
+                RecipeIngredientId: recipeIngredientId,
+                IngredientId: request.IngredientId,
+                IngredientSpecId: request.IngredientSpecId,
+                FreeformText: request.FreeformText,
+                Quantity: request.Quantity,
+                MeasureUnitId: request.MeasureUnitId,
+                IsOptional: request.IsOptional,
+                PreparationNote: request.PreparationNote);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Переупорядочивает позиции рецепта (UC-DSH-033). Состав не меняется —
+        /// меняется только <c>Order</c>. Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Список идентификаторов позиций в желаемом порядке.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном переупорядочивании;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> при отсутствии блюда или позиции из списка;
+        /// <c>409 Conflict</c> (<c>DISHES.INVALID_INGREDIENT_ORDER</c>) если список неполон
+        /// или содержит дубликаты.
+        /// </returns>
+        [HttpPut("{id:guid}/recipe/ingredients/order")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> ReorderRecipeIngredientsAsync(
+            Guid id,
+            [FromBody] ReorderRecipeIngredientsRequest request,
+            CancellationToken ct)
+        {
+            var command = new ReorderRecipeIngredientsCommand(
+                DishId: id,
+                OrderedIngredientIds: request.OrderedIngredientIds);
 
             Result result = await Sender.Send(command, ct);
             return MapResult(result);
@@ -451,9 +600,142 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             return MapResult(result);
         }
 
+        /// <summary>
+        /// Добавляет ингредиент из справочника в рецепт блюда (UC-DSH-030, catalog-ветка).
+        /// Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// После добавления сервер вызывает <c>Dish.RecalculateDishMarkers</c> —
+        /// пересчитываются <c>AllergensMask</c> и автокорректируется <c>DietLabelsMask</c>
+        /// (ADR-0016, silent auto-clear конфликтующих бит).
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Параметры добавляемой позиции.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>201 Created</c> с заголовком <c>Location</c> и телом
+        /// <see cref="AddCatalogIngredientToRecipeResult"/>;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> при отсутствии блюда (<c>DISHES.DISH_NOT_FOUND</c>),
+        /// ингредиента (<c>DISHES.INGREDIENT_NOT_FOUND</c>),
+        /// спецификации (<c>DISHES.INGREDIENT_SPEC_NOT_FOUND</c>)
+        /// или единицы измерения (<c>DISHES.MEASURE_UNIT_NOT_FOUND</c>);
+        /// <c>409 Conflict</c> при <c>DISHES.INGREDIENT_INACTIVE</c>
+        /// или <c>DISHES.INGREDIENT_SPEC_MISMATCH</c>.
+        /// </returns>
+        [HttpPost("{id:guid}/recipe/ingredients/catalog")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> AddCatalogIngredientToRecipeAsync(
+            Guid id,
+            [FromBody] AddCatalogIngredientToRecipeRequest request,
+            CancellationToken ct)
+        {
+            var command = new AddCatalogIngredientToRecipeCommand(
+                DishId: id,
+                IngredientId: request.IngredientId,
+                IngredientSpecId: request.IngredientSpecId,
+                Quantity: request.Quantity,
+                MeasureUnitId: request.MeasureUnitId,
+                IsOptional: request.IsOptional,
+                PreparationNote: request.PreparationNote);
+
+            Result<AddCatalogIngredientToRecipeResult> result = await Sender.Send(command, ct);
+
+            if (result.IsFailure)
+            {
+                return MapResult(result);
+            }
+
+            return Created(
+                $"/api/dishes/{id}/recipe/ingredients/{result.Value.Id}",
+                result.Value);
+        }
+
+        /// <summary>
+        /// Добавляет ингредиент свободным текстом в рецепт блюда (UC-DSH-030, freeform-ветка).
+        /// Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// Freeform-позиция не имеет справочной маски аллергенов и диет-конфликтов:
+        /// после добавления <c>Dish.RecalculateDishMarkers</c> поднимает
+        /// <c>HasUnverifiedAllergens = true</c>. Диет-метки блюда автоматически не снимаются.
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Параметры добавляемой позиции.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>201 Created</c> с заголовком <c>Location</c> и телом
+        /// <see cref="AddFreeformIngredientToRecipeResult"/>;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> при отсутствии блюда или единицы измерения.
+        /// </returns>
+        [HttpPost("{id:guid}/recipe/ingredients/freeform")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> AddFreeformIngredientToRecipeAsync(
+            Guid id,
+            [FromBody] AddFreeformIngredientToRecipeRequest request,
+            CancellationToken ct)
+        {
+            var command = new AddFreeformIngredientToRecipeCommand(
+                DishId: id,
+                FreeformText: request.FreeformText,
+                Quantity: request.Quantity,
+                MeasureUnitId: request.MeasureUnitId,
+                IsOptional: request.IsOptional,
+                PreparationNote: request.PreparationNote);
+
+            Result<AddFreeformIngredientToRecipeResult> result = await Sender.Send(command, ct);
+
+            if (result.IsFailure)
+            {
+                return MapResult(result);
+            }
+
+            return Created(
+                $"/api/dishes/{id}/recipe/ingredients/{result.Value.Id}",
+                result.Value);
+        }
+
         #endregion
 
         #region DELETE Endpoints
+
+        /// <summary>
+        /// Удаляет позицию рецепта (UC-DSH-032) с переупорядочиванием оставшихся.
+        /// Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// После удаления сервер вызывает <c>Dish.RecalculateDishMarkers</c>:
+        /// маркеры аллергенов и диет-метки могут измениться (ADR-0016).
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="recipeIngredientId">Идентификатор удаляемой позиции рецепта.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном удалении;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> при отсутствии блюда (<c>DISHES.DISH_NOT_FOUND</c>)
+        /// или позиции (<c>DISHES.RECIPE_INGREDIENT_NOT_FOUND</c>).
+        /// </returns>
+        [HttpDelete("{id:guid}/recipe/ingredients/{recipeIngredientId:guid}")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> RemoveRecipeIngredientAsync(
+            Guid id,
+            Guid recipeIngredientId,
+            CancellationToken ct)
+        {
+            var command = new RemoveRecipeIngredientCommand(
+                DishId: id,
+                RecipeIngredientId: recipeIngredientId);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
 
         #endregion
     }

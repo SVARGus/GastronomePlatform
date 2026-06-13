@@ -113,5 +113,25 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
         public static readonly Error SlugGenerationExhausted =
             Error.Failure("DISHES.SLUG_GENERATION_EXHAUSTED",
                 "Не удалось подобрать уникальный slug — превышен лимит попыток.");
+
+        public static readonly Error IngredientNotFound =
+            Error.NotFound("DISHES.INGREDIENT_NOT_FOUND",
+                "Ингредиент не найден в справочнике.");
+
+        public static readonly Error IngredientInactive =
+            Error.Conflict("DISHES.INGREDIENT_INACTIVE",
+                "Ингредиент деактивирован. Выберите активный ингредиент из справочника.");
+
+        public static readonly Error IngredientSpecNotFound =
+            Error.NotFound("DISHES.INGREDIENT_SPEC_NOT_FOUND",
+                "Спецификация (сорт) ингредиента не найдена.");
+
+        public static readonly Error IngredientSpecMismatch =
+            Error.Conflict("DISHES.INGREDIENT_SPEC_MISMATCH",
+                "Указанная спецификация принадлежит другому ингредиенту.");
+
+        public static readonly Error MeasureUnitNotFound =
+            Error.NotFound("DISHES.MEASURE_UNIT_NOT_FOUND",
+                "Единица измерения не найдена в справочнике.");
     }
 }

@@ -1,5 +1,6 @@
 using GastronomePlatform.Common.Application.Abstractions;
 using GastronomePlatform.Common.Application.Messaging;
+using GastronomePlatform.Common.Domain.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
 using GastronomePlatform.Modules.Dishes.Domain.Errors;
@@ -60,7 +61,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipe
             }
 
             var actorUserId = _currentUser.UserId!.Value;
-            if (dish.AuthorUserId != actorUserId)
+            bool isAdmin = _currentUser.IsInRole(PlatformRoles.ADMIN);
+            if (dish.AuthorUserId != actorUserId && !isAdmin)
             {
                 return DishesErrors.NotDishOwner;
             }

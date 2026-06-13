@@ -120,10 +120,10 @@ UI-страница — это **оркестратор**, который выз
 | UC-DSH-021 | Обновить шаг рецепта | Cmd | Core | 2 | Title, Description, Image, Temp, Timer, Video |
 | UC-DSH-022 | Удалить шаг рецепта | Cmd | Core | 2 | С автоматическим переупорядочиванием |
 | UC-DSH-023 | Переупорядочить шаги рецепта | Cmd | Core | 2 | Массовая смена Order |
-| UC-DSH-030 | Добавить ингредиент в рецепт | Cmd | Core | 2 | Из справочника ИЛИ свободным текстом |
-| UC-DSH-031 | Обновить ингредиент в рецепте | Cmd | Core | 2 | Quantity, Unit, IsOptional, PreparationNote |
-| UC-DSH-032 | Удалить ингредиент из рецепта | Cmd | Core | 2 | |
-| UC-DSH-033 | Переупорядочить ингредиенты рецепта | Cmd | Core | 2 | |
+| UC-DSH-030 | Добавить ингредиент в рецепт | Cmd | реализовано | 2 | Два эндпоинта: `POST .../recipe/ingredients/catalog` и `POST .../recipe/ingredients/freeform`. После — `Dish.RecalculateDishMarkers`. См. UC-DSH-030 |
+| UC-DSH-031 | Обновить ингредиент в рецепте | Cmd | реализовано | 2 | `PUT .../recipe/ingredients/{id}`. Допускает смену catalog↔freeform; после — `RecalculateDishMarkers`. См. UC-DSH-031 |
+| UC-DSH-032 | Удалить ингредиент из рецепта | Cmd | реализовано | 2 | `DELETE .../recipe/ingredients/{id}`. Переупорядочивает оставшиеся; после — `RecalculateDishMarkers`. См. UC-DSH-032 |
+| UC-DSH-033 | Переупорядочить ингредиенты рецепта | Cmd | реализовано | 2 | `PUT .../recipe/ingredients/order`. Состав не меняется; `RecalculateDishMarkers` не вызывается. См. UC-DSH-033 |
 | UC-DSH-040 | Установить тайминг рецепта | Cmd | Core | 2 | Prep / Cook / Rest / Active / Total |
 | UC-DSH-041 | Установить выход рецепта | Cmd | Core | 2 | QuantityTotal, YieldUnit, ServingsCount, GramsPerServing |
 | UC-DSH-042 | Установить КБЖУ рецепта | Cmd | Core | 2 | Nutrition: метод, ккал, БЖУ |
@@ -407,8 +407,10 @@ Domain-метод: `Dish.ChangeMainImage(mainImageId, utcNow)`. Параметр
 
 ##### UC-DSH-030 — Добавить ингредиент в рецепт
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** реализовано. **Этап:** 2.
 **Authorization:** POL-001.
+
+Полное описание — `UC-DSH-030-AddIngredientToRecipe.md`.
 
 Два режима: из справочника (передаётся `IngredientId`, опционально `IngredientSpecId`) или свободным текстом (`FreeformText`). `Quantity`, `MeasureUnitId` обязательны. `Order = max+1`. После добавления Application Handler вызывает `Dish.RecalculateDishMarkers(...)` — пересчитываются `AllergensMask`, `HasUnverifiedAllergens` (последний поднимается, если добавлена freeform-позиция) и автокорректируется `DietLabelsMask` (ADR-0016).
 
@@ -424,24 +426,30 @@ Domain-метод: `Dish.ChangeMainImage(mainImageId, utcNow)`. Параметр
 
 ##### UC-DSH-031 — Обновить ингредиент в рецепте
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** реализовано. **Этап:** 2.
 **Authorization:** POL-001.
 
-Изменение `Quantity`, `MeasureUnitId`, `IsOptional`, `PreparationNote`. Смена ингредиента (`IngredientId`/`FreeformText`) допустима — Application Handler после успешного `Dish.UpdateRecipeIngredient(...)` вызывает `Dish.RecalculateDishMarkers(...)` для пересчёта `AllergensMask`, `HasUnverifiedAllergens` и автокоррекции `DietLabelsMask`. Правка не трогает `PublishedVersionData`.
+Полное описание — `UC-DSH-031-UpdateRecipeIngredient.md`.
+
+`PUT /api/dishes/{id}/recipe/ingredients/{recipeIngredientId}`. Полная замена полей одним запросом: `IngredientId`/`FreeformText`, `IngredientSpecId`, `Quantity`, `MeasureUnitId`, `IsOptional`, `PreparationNote`. Допускает смену источника catalog↔freeform. После успешного `Dish.UpdateRecipeIngredient(...)` Application Handler вызывает `Dish.RecalculateDishMarkers(...)` для пересчёта `AllergensMask`, `HasUnverifiedAllergens` и автокоррекции `DietLabelsMask`. Правка не трогает `PublishedVersionData`.
 
 ##### UC-DSH-032 — Удалить ингредиент из рецепта
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** реализовано. **Этап:** 2.
 **Authorization:** POL-001.
 
-Удаление с переупорядочиванием `Order` и последующим вызовом `Dish.RecalculateDishMarkers(...)` для пересчёта `AllergensMask`, `HasUnverifiedAllergens` и автокоррекции `DietLabelsMask`. Правка не трогает `PublishedVersionData`.
+Полное описание — `UC-DSH-032-RemoveRecipeIngredient.md`.
+
+`DELETE /api/dishes/{id}/recipe/ingredients/{recipeIngredientId}`. Удаление с переупорядочиванием `Order` оставшихся (`1..n`) и последующим вызовом `Dish.RecalculateDishMarkers(...)`. Правка не трогает `PublishedVersionData`.
 
 ##### UC-DSH-033 — Переупорядочить ингредиенты рецепта
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** реализовано. **Этап:** 2.
 **Authorization:** POL-001.
 
-Массовая смена `Order`, аналогично UC-DSH-023. Состав ингредиентов не меняется — `AllergensMask` пересчитывать не нужно. Правка не трогает `PublishedVersionData`.
+Полное описание — `UC-DSH-033-ReorderRecipeIngredients.md`.
+
+`PUT /api/dishes/{id}/recipe/ingredients/order`. Массовая смена `Order` всего списка (полная замена порядка через `orderedIngredientIds`). Состав ингредиентов не меняется — `RecalculateDishMarkers` не вызывается. Правка не трогает `PublishedVersionData`.
 
 #### Управление вспомогательными частями рецепта
 
