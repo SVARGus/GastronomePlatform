@@ -19,6 +19,25 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
     /// </remarks>
     public sealed class Dish : AggregateRoot<Guid>
     {
+        #region Limits
+
+        /// <summary>Минимальная длина <see cref="Name"/>.</summary>
+        public const int MIN_NAME_LENGTH = 3;
+
+        /// <summary>Максимальная длина <see cref="Name"/>.</summary>
+        public const int MAX_NAME_LENGTH = 200;
+
+        /// <summary>Максимальная длина <see cref="ShortDescription"/>.</summary>
+        public const int MAX_SHORT_DESCRIPTION_LENGTH = 500;
+
+        /// <summary>Максимальная длина <see cref="Description"/>.</summary>
+        public const int MAX_DESCRIPTION_LENGTH = 4000;
+
+        /// <summary>Максимальная длина <see cref="HistoryText"/>.</summary>
+        public const int MAX_HISTORY_TEXT_LENGTH = 4000;
+
+        #endregion
+
         // Domain-инварианты ограничения на размер M:M-коллекций (см. дизайн-документ).
         private const int MAX_CATEGORIES = 3;
         private const int MAX_TAGS = 20;

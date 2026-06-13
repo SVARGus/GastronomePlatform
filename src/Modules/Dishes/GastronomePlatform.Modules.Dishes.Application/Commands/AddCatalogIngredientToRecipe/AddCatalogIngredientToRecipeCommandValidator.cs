@@ -1,4 +1,5 @@
 using FluentValidation;
+using GastronomePlatform.Modules.Dishes.Domain.Entities;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngredientToRecipe
 {
@@ -10,12 +11,11 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngre
     /// валидируется на уровне Handler-а (требуется обращение к БД) и возвращает
     /// доменные ошибки <c>DISHES.*_NOT_FOUND</c> / <c>DISHES.INGREDIENT_INACTIVE</c>
     /// / <c>DISHES.INGREDIENT_SPEC_MISMATCH</c>. Здесь — только структурные проверки.
+    /// Лимиты длины полей — единый источник в <see cref="RecipeIngredient"/>.
     /// </remarks>
     public sealed class AddCatalogIngredientToRecipeCommandValidator
         : AbstractValidator<AddCatalogIngredientToRecipeCommand>
     {
-        private const int MAX_PREPARATION_NOTE_LENGTH = 200;
-
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="AddCatalogIngredientToRecipeCommandValidator"/>.
         /// </summary>
@@ -39,8 +39,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngre
                 .NotEmpty().WithMessage("Идентификатор единицы измерения обязателен.");
 
             RuleFor(x => x.PreparationNote)
-                .MaximumLength(MAX_PREPARATION_NOTE_LENGTH)
-                .WithMessage($"Заметка по подготовке не должна превышать {MAX_PREPARATION_NOTE_LENGTH} символов.")
+                .MaximumLength(RecipeIngredient.MAX_PREPARATION_NOTE_LENGTH)
+                .WithMessage($"Заметка по подготовке не должна превышать {RecipeIngredient.MAX_PREPARATION_NOTE_LENGTH} символов.")
                 .When(x => x.PreparationNote is not null);
         }
     }

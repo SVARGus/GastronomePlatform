@@ -1,5 +1,6 @@
 using FluentValidation;
 using GastronomePlatform.Modules.Media.Domain.Constants;
+using GastronomePlatform.Modules.Media.Domain.Entities;
 
 namespace GastronomePlatform.Modules.Media.Application.Commands.UploadSystemFile
 {
@@ -10,6 +11,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadSystemFile
     /// Статические проверки формата и типа сущности. Размер файла и ограничения
     /// на пиксели проверяются в <see cref="UploadSystemFileCommandHandler"/>
     /// с учётом конфигурации (<c>Media:SystemUpload</c>).
+    /// Лимит длины имени файла — единый источник в <see cref="MediaFile"/>.
     /// </remarks>
     public sealed class UploadSystemFileCommandValidator : AbstractValidator<UploadSystemFileCommand>
     {
@@ -30,7 +32,8 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadSystemFile
         {
             RuleFor(x => x.FileName)
                 .NotEmpty().WithMessage("Имя файла обязательно.")
-                .MaximumLength(255).WithMessage("Имя файла не должно превышать 255 символов.");
+                .MaximumLength(MediaFile.MAX_FILE_NAME_LENGTH)
+                    .WithMessage($"Имя файла не должно превышать {MediaFile.MAX_FILE_NAME_LENGTH} символов.");
 
             RuleFor(x => x.ContentType)
                 .NotEmpty().WithMessage("Content-Type обязателен.")

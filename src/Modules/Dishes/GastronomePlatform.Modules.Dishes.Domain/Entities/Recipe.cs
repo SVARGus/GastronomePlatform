@@ -16,6 +16,25 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
     /// </remarks>
     public sealed class Recipe : Entity<Guid>
     {
+        #region Limits
+
+        /// <summary>Минимальное значение <see cref="ServingsDefault"/>.</summary>
+        public const int MIN_SERVINGS_DEFAULT = 1;
+
+        /// <summary>Максимальная длина <see cref="IntroductionText"/>.</summary>
+        public const int MAX_INTRODUCTION_TEXT_LENGTH = 4000;
+
+        /// <summary>Максимальная длина <see cref="AuthorTips"/>.</summary>
+        public const int MAX_AUTHOR_TIPS_LENGTH = 4000;
+
+        /// <summary>Максимальная длина <see cref="ServingSuggestions"/>.</summary>
+        public const int MAX_SERVING_SUGGESTIONS_LENGTH = 4000;
+
+        /// <summary>Максимальная длина <see cref="Notes"/>.</summary>
+        public const int MAX_NOTES_LENGTH = 4000;
+
+        #endregion
+
         // Вспомогательное поле для навигации по шагам. Настраивается в RecipeConfiguration
         // через HasField("_steps") + PropertyAccessMode.Field.
         private readonly List<RecipeStep> _steps = new();

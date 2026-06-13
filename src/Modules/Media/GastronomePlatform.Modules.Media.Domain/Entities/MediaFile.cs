@@ -32,6 +32,13 @@ namespace GastronomePlatform.Modules.Media.Domain.Entities
     /// </remarks>
     public sealed class MediaFile : AggregateRoot<Guid>
     {
+        #region Limits
+
+        /// <summary>Максимальная длина <see cref="OriginalFileName"/>.</summary>
+        public const int MAX_FILE_NAME_LENGTH = 255;
+
+        #endregion
+
         // Backing field для коллекции миниатюр. Настраивается в MediaFileConfiguration
         // через HasField("_thumbnails") + PropertyAccessMode.Field.
         private readonly List<MediaThumbnail> _thumbnails = new();

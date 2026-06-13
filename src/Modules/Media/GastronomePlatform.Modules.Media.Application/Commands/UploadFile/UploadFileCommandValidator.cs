@@ -1,5 +1,8 @@
 using FluentValidation;
+using GastronomePlatform.Modules.Media.Application.Configuration;
 using GastronomePlatform.Modules.Media.Domain.Constants;
+using GastronomePlatform.Modules.Media.Domain.Entities;
+using Microsoft.Extensions.Options;
 
 namespace GastronomePlatform.Modules.Media.Application.Commands.UploadFile
 {
@@ -10,39 +13,46 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadFile
     /// Проверяет только то, что не требует декодирования изображения: MIME-whitelist,
     /// размер файла, имя файла и тип целевой сущности. Проверка magic bytes и размеров
     /// изображения (width/height) выполняется в <see cref="UploadFileCommandHandler"/>.
+    /// <para>
+    /// Лимит длины имени файла — единый источник в <see cref="MediaFile"/>.
+    /// Минимальный и максимальный размер файла читаются из <see cref="MediaOptions.UserUpload"/>
+    /// (значения настраиваются через <c>appsettings.json</c>).
+    /// </para>
     /// </remarks>
     public sealed class UploadFileCommandValidator : AbstractValidator<UploadFileCommand>
     {
-        private const long MAX_FILE_SIZE = 10_485_760L;
-        private const long MIN_FILE_SIZE = 5_120L;
-
         private static readonly string[] _allowedMimeTypes = ["image/jpeg", "image/png"];
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="UploadFileCommandValidator"/>.
         /// </summary>
-        public UploadFileCommandValidator()
+        /// <param name="options">Конфигурация модуля Media.</param>
+        public UploadFileCommandValidator(IOptions<MediaOptions> options)
         {
+            ArgumentNullException.ThrowIfNull(options);
+            UserUploadOptions userUpload = options.Value.UserUpload;
+
             RuleFor(x => x.FileName)
                 .NotEmpty().WithMessage("Имя файла обязательно.")
-                .MaximumLength(255).WithMessage("Имя файла не должно превышать 255 символов.");
+                .MaximumLength(MediaFile.MAX_FILE_NAME_LENGTH)
+                    .WithMessage($"Имя файла не должно превышать {MediaFile.MAX_FILE_NAME_LENGTH} символов.");
 
             RuleFor(x => x.ContentType)
                 .NotEmpty().WithMessage("MIME-тип файла обязателен.")
                 .Must(ct => _allowedMimeTypes.Contains(ct, StringComparer.OrdinalIgnoreCase))
-                .WithMessage("Тип файла не поддерживается. Разрешены: image/jpeg, image/png.");
+                    .WithMessage("Тип файла не поддерживается. Разрешены: image/jpeg, image/png.");
 
             RuleFor(x => x.FileContent)
                 .NotEmpty().WithMessage("Содержимое файла обязательно.")
-                .Must(c => c.LongLength >= MIN_FILE_SIZE)
-                .WithMessage($"Размер файла должен быть не менее {MIN_FILE_SIZE / 1024} КБ.")
-                .Must(c => c.LongLength <= MAX_FILE_SIZE)
-                .WithMessage($"Размер файла не должен превышать {MAX_FILE_SIZE / 1_048_576} МБ.");
+                .Must(c => c.LongLength >= userUpload.MinSizeBytes)
+                    .WithMessage($"Размер файла должен быть не менее {userUpload.MinSizeBytes / 1024} КБ.")
+                .Must(c => c.LongLength <= userUpload.MaxSizeBytes)
+                    .WithMessage($"Размер файла не должен превышать {userUpload.MaxSizeBytes / 1_048_576} МБ.");
 
             RuleFor(x => x.IntendedEntityType)
                 .NotEmpty().WithMessage("Тип целевой сущности обязателен.")
                 .Must(t => MediaEntityTypes.KNOWN_TYPES.Contains(t))
-                .WithMessage("Указан неизвестный тип целевой сущности.");
+                    .WithMessage("Указан неизвестный тип целевой сущности.");
         }
     }
 }

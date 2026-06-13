@@ -26,6 +26,19 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
     /// <seealso href="../../../docs/public/adr/ADR-0014-discriminated-unions-in-cqrs.md">ADR-0014 — общий принцип discriminated unions в CQRS-архитектуре</seealso>
     public sealed class RecipeIngredient : Entity<Guid>
     {
+        #region Limits
+
+        /// <summary>Минимальная длина <see cref="FreeformText"/>.</summary>
+        public const int MIN_FREEFORM_LENGTH = 1;
+
+        /// <summary>Максимальная длина <see cref="FreeformText"/>.</summary>
+        public const int MAX_FREEFORM_LENGTH = 200;
+
+        /// <summary>Максимальная длина <see cref="PreparationNote"/>.</summary>
+        public const int MAX_PREPARATION_NOTE_LENGTH = 200;
+
+        #endregion
+
         #region Properties
 
         /// <summary>

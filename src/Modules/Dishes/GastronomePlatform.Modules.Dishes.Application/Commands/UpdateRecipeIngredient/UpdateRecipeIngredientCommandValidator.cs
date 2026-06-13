@@ -1,4 +1,5 @@
 using FluentValidation;
+using GastronomePlatform.Modules.Dishes.Domain.Entities;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeIngredient
 {
@@ -9,15 +10,11 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeIng
     /// XOR <c>IngredientId</c> ↔ <c>FreeformText</c> и requirement
     /// «<c>IngredientSpecId</c> только при заполненном <c>IngredientId</c>»
     /// дублируются в Domain (<c>RecipeIngredient.Update</c>). Здесь — ранний 400-ответ
-    /// до загрузки агрегата.
+    /// до загрузки агрегата. Лимиты длины полей — единый источник в <see cref="RecipeIngredient"/>.
     /// </remarks>
     public sealed class UpdateRecipeIngredientCommandValidator
         : AbstractValidator<UpdateRecipeIngredientCommand>
     {
-        private const int MIN_FREEFORM_LENGTH = 1;
-        private const int MAX_FREEFORM_LENGTH = 200;
-        private const int MAX_PREPARATION_NOTE_LENGTH = 200;
-
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="UpdateRecipeIngredientCommandValidator"/>.
         /// </summary>
@@ -31,12 +28,12 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeIng
 
             RuleFor(x => x.IngredientId)
                 .NotEqual(Guid.Empty)
-                .WithMessage("Идентификатор ингредиента не может быть пустым GUID.")
+                    .WithMessage("Идентификатор ингредиента не может быть пустым GUID.")
                 .When(x => x.IngredientId.HasValue);
 
             RuleFor(x => x.IngredientSpecId)
                 .NotEqual(Guid.Empty)
-                .WithMessage("Идентификатор спецификации не может быть пустым GUID.")
+                    .WithMessage("Идентификатор спецификации не может быть пустым GUID.")
                 .When(x => x.IngredientSpecId.HasValue);
 
             RuleFor(x => x.Quantity)
@@ -46,15 +43,17 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeIng
                 .NotEmpty().WithMessage("Идентификатор единицы измерения обязателен.");
 
             RuleFor(x => x.FreeformText)
-                .Length(MIN_FREEFORM_LENGTH, MAX_FREEFORM_LENGTH)
-                .WithMessage($"Свободный текст ингредиента должен быть от {MIN_FREEFORM_LENGTH} до {MAX_FREEFORM_LENGTH} символов.")
+                .Length(RecipeIngredient.MIN_FREEFORM_LENGTH, RecipeIngredient.MAX_FREEFORM_LENGTH)
+                    .WithMessage(
+                        $"Свободный текст ингредиента должен быть от {RecipeIngredient.MIN_FREEFORM_LENGTH} " +
+                        $"до {RecipeIngredient.MAX_FREEFORM_LENGTH} символов.")
                 .Must(text => !string.IsNullOrWhiteSpace(text))
-                .WithMessage("Свободный текст ингредиента не должен состоять только из пробелов.")
+                    .WithMessage("Свободный текст ингредиента не должен состоять только из пробелов.")
                 .When(x => x.FreeformText is not null);
 
             RuleFor(x => x.PreparationNote)
-                .MaximumLength(MAX_PREPARATION_NOTE_LENGTH)
-                .WithMessage($"Заметка по подготовке не должна превышать {MAX_PREPARATION_NOTE_LENGTH} символов.")
+                .MaximumLength(RecipeIngredient.MAX_PREPARATION_NOTE_LENGTH)
+                    .WithMessage($"Заметка по подготовке не должна превышать {RecipeIngredient.MAX_PREPARATION_NOTE_LENGTH} символов.")
                 .When(x => x.PreparationNote is not null);
 
             RuleFor(x => x)

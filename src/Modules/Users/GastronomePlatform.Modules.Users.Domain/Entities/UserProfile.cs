@@ -15,6 +15,46 @@ namespace GastronomePlatform.Modules.Users.Domain.Entities
     /// </remarks>
     public sealed class UserProfile : Entity<Guid>
     {
+        #region Limits
+
+        /// <summary>Максимальная длина <see cref="FirstName"/>.</summary>
+        public const int MAX_FIRST_NAME_LENGTH = 100;
+
+        /// <summary>Максимальная длина <see cref="LastName"/>.</summary>
+        public const int MAX_LAST_NAME_LENGTH = 100;
+
+        /// <summary>Максимальная длина <see cref="MiddleName"/>.</summary>
+        public const int MAX_MIDDLE_NAME_LENGTH = 100;
+
+        /// <summary>Максимальная длина <see cref="DisplayName"/>.</summary>
+        public const int MAX_DISPLAY_NAME_LENGTH = 100;
+
+        /// <summary>Максимальная длина <see cref="Bio"/>.</summary>
+        public const int MAX_BIO_LENGTH = 2000;
+
+        /// <summary>Максимальная длина <see cref="Country"/>.</summary>
+        public const int MAX_COUNTRY_LENGTH = 100;
+
+        /// <summary>Максимальная длина <see cref="Region"/>.</summary>
+        public const int MAX_REGION_LENGTH = 100;
+
+        /// <summary>Максимальная длина <see cref="City"/>.</summary>
+        public const int MAX_CITY_LENGTH = 100;
+
+        /// <summary>Максимальная длина <see cref="Email"/> (зеркало Auth).</summary>
+        public const int MAX_EMAIL_LENGTH = 256;
+
+        /// <summary>Максимальная длина <see cref="Phone"/> (зеркало Auth).</summary>
+        public const int MAX_PHONE_LENGTH = 50;
+
+        /// <summary>Минимальная длина <see cref="UserName"/> (зеркало Auth).</summary>
+        public const int MIN_USER_NAME_LENGTH = 3;
+
+        /// <summary>Максимальная длина <see cref="UserName"/> (зеркало Auth).</summary>
+        public const int MAX_USER_NAME_LENGTH = 100;
+
+        #endregion
+
         #region Properties
         /// <summary>
         /// Идентификатор пользователя.
