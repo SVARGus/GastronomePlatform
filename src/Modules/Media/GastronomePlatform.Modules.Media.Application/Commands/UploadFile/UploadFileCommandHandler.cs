@@ -8,7 +8,6 @@ using GastronomePlatform.Modules.Media.Domain.Entities;
 using GastronomePlatform.Modules.Media.Domain.Enums;
 using GastronomePlatform.Modules.Media.Domain.Errors;
 using GastronomePlatform.Modules.Media.Domain.Repositories;
-using MediatR;
 using Microsoft.Extensions.Options;
 
 namespace GastronomePlatform.Modules.Media.Application.Commands.UploadFile
@@ -40,7 +39,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadFile
         private readonly ICurrentUserService _currentUser;
         private readonly IDateTimeProvider _clock;
         private readonly IOptions<MediaOptions> _options;
-        private readonly IPublisher _publisher;
+        private readonly IDomainEventDispatcher _eventDispatcher;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="UploadFileCommandHandler"/>.
@@ -52,7 +51,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadFile
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="clock">Поставщик системного времени.</param>
         /// <param name="options">Типизированные настройки модуля Media.</param>
-        /// <param name="publisher">Издатель доменных событий MediatR.</param>
+        /// <param name="eventDispatcher">Диспетчер доменных событий.</param>
         public UploadFileCommandHandler(
             IMediaFileRepository repository,
             IFileStorage fileStorage,
@@ -61,7 +60,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadFile
             ICurrentUserService currentUser,
             IDateTimeProvider clock,
             IOptions<MediaOptions> options,
-            IPublisher publisher)
+            IDomainEventDispatcher eventDispatcher)
         {
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
             _fileStorage = fileStorage ?? throw new ArgumentNullException(nameof(fileStorage));
@@ -70,7 +69,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadFile
             _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _options = options ?? throw new ArgumentNullException(nameof(options));
-            _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
+            _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
         }
 
         /// <inheritdoc/>
@@ -197,20 +196,9 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadFile
             await _repository.AddAsync(mediaFile, cancellationToken);
             await _repository.SaveChangesAsync(cancellationToken);
 
-            await PublishDomainEventsAsync(mediaFile, cancellationToken);
+            await _eventDispatcher.DispatchAsync(mediaFile, cancellationToken);
 
             return new UploadFileResult(mediaFile.Id, mediaFile.Width, mediaFile.Height, mediaFile.SizeBytes);
-        }
-
-        private async Task PublishDomainEventsAsync(MediaFile mediaFile, CancellationToken ct)
-        {
-            var events = mediaFile.DomainEvents.ToList();
-            mediaFile.ClearDomainEvents();
-
-            foreach (var domainEvent in events)
-            {
-                await _publisher.Publish(domainEvent, ct);
-            }
         }
 
         // Верифицирует magic bytes: первые байты файла должны совпадать с заявленным ContentType.

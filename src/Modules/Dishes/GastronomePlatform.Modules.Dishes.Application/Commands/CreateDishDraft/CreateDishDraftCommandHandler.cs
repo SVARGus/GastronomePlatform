@@ -6,7 +6,6 @@ using GastronomePlatform.Modules.Dishes.Domain.Entities;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using GastronomePlatform.Modules.Dishes.Domain.Errors;
 using GastronomePlatform.Modules.Dishes.Domain.Repositories;
-using MediatR;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
 {
@@ -24,7 +23,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
     ///   <item>Применение опциональных полей через <see cref="Dish.UpdateCard"/> и
     ///         <see cref="Dish.UpdateHistory"/>.</item>
     ///   <item>Сохранение (один транзакционный коммит).</item>
-    ///   <item>Публикация доменных событий из агрегата через <see cref="IPublisher"/>.</item>
+    ///   <item>Публикация доменных событий из агрегата через <see cref="IDomainEventDispatcher"/>.</item>
     /// </list>
     /// </remarks>
     public sealed class CreateDishDraftCommandHandler
@@ -39,7 +38,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
         private readonly ICurrentUserService _currentUser;
         private readonly IDateTimeProvider _clock;
         private readonly ISlugGenerator _slugGenerator;
-        private readonly IPublisher _publisher;
+        private readonly IDomainEventDispatcher _eventDispatcher;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="CreateDishDraftCommandHandler"/>.
@@ -48,19 +47,19 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="clock">Поставщик системного времени.</param>
         /// <param name="slugGenerator">Генератор slug-идентификаторов.</param>
-        /// <param name="publisher">Издатель доменных событий MediatR.</param>
+        /// <param name="eventDispatcher">Диспетчер доменных событий.</param>
         public CreateDishDraftCommandHandler(
             IDishRepository dishRepository,
             ICurrentUserService currentUser,
             IDateTimeProvider clock,
             ISlugGenerator slugGenerator,
-            IPublisher publisher)
+            IDomainEventDispatcher eventDispatcher)
         {
             _dishRepository = dishRepository ?? throw new ArgumentNullException(nameof(dishRepository));
             _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _slugGenerator = slugGenerator ?? throw new ArgumentNullException(nameof(slugGenerator));
-            _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
+            _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
         }
 
         /// <inheritdoc/>
@@ -99,7 +98,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
             await _dishRepository.AddAsync(dish, cancellationToken);
             await _dishRepository.SaveChangesAsync(cancellationToken);
 
-            await PublishDomainEventsAsync(dish, cancellationToken);
+            await _eventDispatcher.DispatchAsync(dish, cancellationToken);
 
             return new CreateDishDraftResult(dish.Id, dish.Slug);
         }
@@ -184,20 +183,6 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft
             }
 
             dish.UpdateHistory(request.HistoryText, utcNow);
-        }
-
-        // Доменные события агрегата не публикуются автоматически — публикуем
-        // вручную после SaveChangesAsync. На Этапе 2 подписчиков нет, события
-        // «выстреливают вхолостую»; на Этапе 5+ появятся EventHandler-ы.
-        private async Task PublishDomainEventsAsync(Dish dish, CancellationToken ct)
-        {
-            var events = dish.DomainEvents.ToList();
-            dish.ClearDomainEvents();
-
-            foreach (var domainEvent in events)
-            {
-                await _publisher.Publish(domainEvent, ct);
-            }
         }
     }
 }

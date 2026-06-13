@@ -16,6 +16,7 @@ namespace GastronomePlatform.Common.Infrastructure.Extensions
             services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
             services.AddSingleton<ISlugGenerator, SlugGenerator>();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
             services.AddHttpContextAccessor();
 
             // Pipeline Behaviors и handlers Common.Application регистрируются здесь

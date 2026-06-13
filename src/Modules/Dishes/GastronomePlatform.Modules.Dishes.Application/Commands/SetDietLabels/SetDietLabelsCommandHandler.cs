@@ -6,7 +6,6 @@ using GastronomePlatform.Modules.Dishes.Domain.Entities;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using GastronomePlatform.Modules.Dishes.Domain.Errors;
 using GastronomePlatform.Modules.Dishes.Domain.Repositories;
-using MediatR;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels
 {
@@ -32,7 +31,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels
         private readonly IIngredientRepository _ingredientRepository;
         private readonly ICurrentUserService _currentUser;
         private readonly IDateTimeProvider _clock;
-        private readonly IPublisher _publisher;
+        private readonly IDomainEventDispatcher _eventDispatcher;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="SetDietLabelsCommandHandler"/>.
@@ -41,19 +40,19 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels
         /// <param name="ingredientRepository">Репозиторий справочника ингредиентов.</param>
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="clock">Поставщик системного времени.</param>
-        /// <param name="publisher">Издатель доменных событий MediatR.</param>
+        /// <param name="eventDispatcher">Диспетчер доменных событий.</param>
         public SetDietLabelsCommandHandler(
             IDishRepository dishRepository,
             IIngredientRepository ingredientRepository,
             ICurrentUserService currentUser,
             IDateTimeProvider clock,
-            IPublisher publisher)
+            IDomainEventDispatcher eventDispatcher)
         {
             _dishRepository = dishRepository ?? throw new ArgumentNullException(nameof(dishRepository));
             _ingredientRepository = ingredientRepository ?? throw new ArgumentNullException(nameof(ingredientRepository));
             _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-            _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
+            _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
         }
 
         /// <inheritdoc/>
@@ -86,7 +85,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels
             }
 
             await _dishRepository.SaveChangesAsync(cancellationToken);
-            await PublishDomainEventsAsync(dish, cancellationToken);
+            await _eventDispatcher.DispatchAsync(dish, cancellationToken);
 
             return Result.Success();
         }
@@ -118,17 +117,6 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels
             }
 
             return conflicts;
-        }
-
-        private async Task PublishDomainEventsAsync(Dish dish, CancellationToken ct)
-        {
-            List<Common.Domain.Events.IDomainEvent> events = dish.DomainEvents.ToList();
-            dish.ClearDomainEvents();
-
-            foreach (Common.Domain.Events.IDomainEvent domainEvent in events)
-            {
-                await _publisher.Publish(domainEvent, ct);
-            }
         }
     }
 }

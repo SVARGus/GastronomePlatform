@@ -7,7 +7,6 @@ using GastronomePlatform.Modules.Media.Domain.Entities;
 using GastronomePlatform.Modules.Media.Domain.Enums;
 using GastronomePlatform.Modules.Media.Domain.Errors;
 using GastronomePlatform.Modules.Media.Domain.Repositories;
-using MediatR;
 using Microsoft.Extensions.Options;
 
 namespace GastronomePlatform.Modules.Media.Application.Commands.DeleteAnyFile
@@ -28,7 +27,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.DeleteAnyFile
         private readonly ICurrentUserService _currentUser;
         private readonly IDateTimeProvider _clock;
         private readonly IOptions<MediaOptions> _options;
-        private readonly IPublisher _publisher;
+        private readonly IDomainEventDispatcher _eventDispatcher;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="DeleteAnyFileCommandHandler"/>.
@@ -37,19 +36,19 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.DeleteAnyFile
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="clock">Поставщик системного времени.</param>
         /// <param name="options">Типизированные настройки модуля Media.</param>
-        /// <param name="publisher">Издатель доменных событий MediatR.</param>
+        /// <param name="eventDispatcher">Диспетчер доменных событий.</param>
         public DeleteAnyFileCommandHandler(
             IMediaFileRepository repository,
             ICurrentUserService currentUser,
             IDateTimeProvider clock,
             IOptions<MediaOptions> options,
-            IPublisher publisher)
+            IDomainEventDispatcher eventDispatcher)
         {
-            _repository  = repository  ?? throw new ArgumentNullException(nameof(repository));
-            _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
-            _clock       = clock       ?? throw new ArgumentNullException(nameof(clock));
-            _options     = options     ?? throw new ArgumentNullException(nameof(options));
-            _publisher   = publisher   ?? throw new ArgumentNullException(nameof(publisher));
+            _repository      = repository      ?? throw new ArgumentNullException(nameof(repository));
+            _currentUser     = currentUser     ?? throw new ArgumentNullException(nameof(currentUser));
+            _clock           = clock           ?? throw new ArgumentNullException(nameof(clock));
+            _options         = options         ?? throw new ArgumentNullException(nameof(options));
+            _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
         }
 
         /// <inheritdoc/>
@@ -93,20 +92,9 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.DeleteAnyFile
             }
 
             await _repository.SaveChangesAsync(cancellationToken);
-            await PublishDomainEventsAsync(mediaFile, cancellationToken);
+            await _eventDispatcher.DispatchAsync(mediaFile, cancellationToken);
 
             return Result.Success();
-        }
-
-        private async Task PublishDomainEventsAsync(MediaFile mediaFile, CancellationToken ct)
-        {
-            var events = mediaFile.DomainEvents.ToList();
-            mediaFile.ClearDomainEvents();
-
-            foreach (var domainEvent in events)
-            {
-                await _publisher.Publish(domainEvent, ct);
-            }
         }
     }
 }

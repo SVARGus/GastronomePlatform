@@ -2,10 +2,10 @@ using GastronomePlatform.Common.Application.Abstractions;
 using GastronomePlatform.Common.Application.Messaging;
 using GastronomePlatform.Common.Domain.Constants;
 using GastronomePlatform.Common.Domain.Results;
+using GastronomePlatform.Modules.Dishes.Application.Services;
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
 using GastronomePlatform.Modules.Dishes.Domain.Errors;
 using GastronomePlatform.Modules.Dishes.Domain.Repositories;
-using MediatR;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngredientToRecipe
 {
@@ -24,11 +24,10 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngre
     ///   <item>Проверка существования <see cref="MeasureUnit"/>.</item>
     ///   <item>Вызов <see cref="Dish.AddRecipeIngredientFromCatalog"/> — позиция добавляется
     ///         с <c>Order = max+1</c>.</item>
-    ///   <item>Сбор словаря маркеров для всех catalog-позиций (включая новую) и вызов
-    ///         <see cref="Dish.RecalculateDishMarkers"/> — пересчёт
-    ///         <see cref="Dish.AllergensMask"/>, <see cref="Dish.HasUnverifiedAllergens"/>
-    ///         и автокоррекция <see cref="Dish.DietLabelsMask"/> (ADR-0016).</item>
-    ///   <item>Сохранение и публикация доменных событий.</item>
+    ///   <item>Пересчёт маркеров через <see cref="IDishMarkersRecalculator"/>
+    ///         (<see cref="Dish.AllergensMask"/>, <see cref="Dish.HasUnverifiedAllergens"/>,
+    ///         автокоррекция <see cref="Dish.DietLabelsMask"/> — ADR-0016).</item>
+    ///   <item>Сохранение и публикация доменных событий через <see cref="IDomainEventDispatcher"/>.</item>
     /// </list>
     /// </remarks>
     public sealed class AddCatalogIngredientToRecipeCommandHandler
@@ -40,18 +39,20 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngre
         private readonly IMeasureUnitRepository _measureUnitRepository;
         private readonly ICurrentUserService _currentUser;
         private readonly IDateTimeProvider _clock;
-        private readonly IPublisher _publisher;
+        private readonly IDishMarkersRecalculator _markersRecalculator;
+        private readonly IDomainEventDispatcher _eventDispatcher;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="AddCatalogIngredientToRecipeCommandHandler"/>.
         /// </summary>
         /// <param name="dishRepository">Репозиторий блюд.</param>
-        /// <param name="ingredientRepository">Репозиторий справочника ингредиентов.</param>
+        /// <param name="ingredientRepository">Репозиторий справочника ингредиентов (нужен для existence/IsActive-проверок).</param>
         /// <param name="specRepository">Репозиторий справочника спецификаций.</param>
         /// <param name="measureUnitRepository">Репозиторий справочника единиц измерения.</param>
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="clock">Поставщик системного времени.</param>
-        /// <param name="publisher">Издатель доменных событий MediatR.</param>
+        /// <param name="markersRecalculator">Сервис пересчёта маркеров блюда.</param>
+        /// <param name="eventDispatcher">Диспетчер доменных событий.</param>
         public AddCatalogIngredientToRecipeCommandHandler(
             IDishRepository dishRepository,
             IIngredientRepository ingredientRepository,
@@ -59,7 +60,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngre
             IMeasureUnitRepository measureUnitRepository,
             ICurrentUserService currentUser,
             IDateTimeProvider clock,
-            IPublisher publisher)
+            IDishMarkersRecalculator markersRecalculator,
+            IDomainEventDispatcher eventDispatcher)
         {
             _dishRepository = dishRepository ?? throw new ArgumentNullException(nameof(dishRepository));
             _ingredientRepository = ingredientRepository ?? throw new ArgumentNullException(nameof(ingredientRepository));
@@ -67,7 +69,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngre
             _measureUnitRepository = measureUnitRepository ?? throw new ArgumentNullException(nameof(measureUnitRepository));
             _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-            _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
+            _markersRecalculator = markersRecalculator ?? throw new ArgumentNullException(nameof(markersRecalculator));
+            _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
         }
 
         /// <inheritdoc/>
@@ -130,40 +133,12 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngre
                 preparationNote: request.PreparationNote,
                 utcNow: utcNow);
 
-            await RecalculateMarkersAsync(dish, utcNow, cancellationToken);
+            await _markersRecalculator.RecalculateAsync(dish, utcNow, cancellationToken);
 
             await _dishRepository.SaveChangesAsync(cancellationToken);
-            await PublishDomainEventsAsync(dish, cancellationToken);
+            await _eventDispatcher.DispatchAsync(dish, cancellationToken);
 
             return new AddCatalogIngredientToRecipeResult(newRecipeIngredientId);
-        }
-
-        // Собираем словарь маркеров по всем catalog-позициям текущего состава
-        // (включая только что добавленную) и вызываем Dish.RecalculateDishMarkers.
-        private async Task RecalculateMarkersAsync(Dish dish, DateTimeOffset utcNow, CancellationToken ct)
-        {
-            List<Guid> catalogIds = dish.Recipe.Ingredients
-                .Where(ri => ri.IngredientId.HasValue)
-                .Select(ri => ri.IngredientId!.Value)
-                .Distinct()
-                .ToList();
-
-            IReadOnlyDictionary<Guid, IngredientMarkers> markers = catalogIds.Count == 0
-                ? new Dictionary<Guid, IngredientMarkers>(capacity: 0)
-                : await _ingredientRepository.GetMarkersByIdsAsync(catalogIds, ct);
-
-            dish.RecalculateDishMarkers(markers, utcNow);
-        }
-
-        private async Task PublishDomainEventsAsync(Dish dish, CancellationToken ct)
-        {
-            List<Common.Domain.Events.IDomainEvent> events = dish.DomainEvents.ToList();
-            dish.ClearDomainEvents();
-
-            foreach (Common.Domain.Events.IDomainEvent domainEvent in events)
-            {
-                await _publisher.Publish(domainEvent, ct);
-            }
         }
     }
 }

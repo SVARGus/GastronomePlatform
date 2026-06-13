@@ -9,7 +9,6 @@ using GastronomePlatform.Modules.Media.Domain.Enums;
 using GastronomePlatform.Modules.Media.Domain.Errors;
 using GastronomePlatform.Modules.Media.Domain.Repositories;
 using GastronomePlatform.Common.Application.Abstractions;
-using MediatR;
 using Microsoft.Extensions.Options;
 
 namespace GastronomePlatform.Modules.Media.Application.Commands.UploadSystemFile
@@ -48,7 +47,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadSystemFile
         private readonly ICurrentUserService _currentUser;
         private readonly IDateTimeProvider _clock;
         private readonly IOptions<MediaOptions> _options;
-        private readonly IPublisher _publisher;
+        private readonly IDomainEventDispatcher _eventDispatcher;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="UploadSystemFileCommandHandler"/>.
@@ -61,7 +60,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadSystemFile
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="clock">Поставщик системного времени.</param>
         /// <param name="options">Типизированные настройки модуля Media.</param>
-        /// <param name="publisher">Издатель доменных событий MediatR.</param>
+        /// <param name="eventDispatcher">Диспетчер доменных событий.</param>
         public UploadSystemFileCommandHandler(
             IMediaFileRepository repository,
             IFileStorage fileStorage,
@@ -71,17 +70,17 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadSystemFile
             ICurrentUserService currentUser,
             IDateTimeProvider clock,
             IOptions<MediaOptions> options,
-            IPublisher publisher)
+            IDomainEventDispatcher eventDispatcher)
         {
-            _repository    = repository    ?? throw new ArgumentNullException(nameof(repository));
-            _fileStorage   = fileStorage   ?? throw new ArgumentNullException(nameof(fileStorage));
-            _keyGenerator  = keyGenerator  ?? throw new ArgumentNullException(nameof(keyGenerator));
-            _imageProcessor = imageProcessor ?? throw new ArgumentNullException(nameof(imageProcessor));
-            _svgSanitizer  = svgSanitizer  ?? throw new ArgumentNullException(nameof(svgSanitizer));
-            _currentUser   = currentUser   ?? throw new ArgumentNullException(nameof(currentUser));
-            _clock         = clock         ?? throw new ArgumentNullException(nameof(clock));
-            _options       = options       ?? throw new ArgumentNullException(nameof(options));
-            _publisher     = publisher     ?? throw new ArgumentNullException(nameof(publisher));
+            _repository      = repository      ?? throw new ArgumentNullException(nameof(repository));
+            _fileStorage     = fileStorage     ?? throw new ArgumentNullException(nameof(fileStorage));
+            _keyGenerator    = keyGenerator    ?? throw new ArgumentNullException(nameof(keyGenerator));
+            _imageProcessor  = imageProcessor  ?? throw new ArgumentNullException(nameof(imageProcessor));
+            _svgSanitizer    = svgSanitizer    ?? throw new ArgumentNullException(nameof(svgSanitizer));
+            _currentUser     = currentUser     ?? throw new ArgumentNullException(nameof(currentUser));
+            _clock           = clock           ?? throw new ArgumentNullException(nameof(clock));
+            _options         = options         ?? throw new ArgumentNullException(nameof(options));
+            _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
         }
 
         /// <inheritdoc/>
@@ -169,7 +168,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadSystemFile
 
             await _repository.AddAsync(mediaFile, cancellationToken);
             await _repository.SaveChangesAsync(cancellationToken);
-            await PublishDomainEventsAsync(mediaFile, cancellationToken);
+            await _eventDispatcher.DispatchAsync(mediaFile, cancellationToken);
 
             return new UploadSystemFileResult(mediaFile.Id, null, null, mediaFile.SizeBytes);
         }
@@ -292,21 +291,10 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadSystemFile
 
             await _repository.AddAsync(mediaFile, cancellationToken);
             await _repository.SaveChangesAsync(cancellationToken);
-            await PublishDomainEventsAsync(mediaFile, cancellationToken);
+            await _eventDispatcher.DispatchAsync(mediaFile, cancellationToken);
 
             return new UploadSystemFileResult(
                 mediaFile.Id, mediaFile.Width, mediaFile.Height, mediaFile.SizeBytes);
-        }
-
-        private async Task PublishDomainEventsAsync(MediaFile mediaFile, CancellationToken ct)
-        {
-            var events = mediaFile.DomainEvents.ToList();
-            mediaFile.ClearDomainEvents();
-
-            foreach (var domainEvent in events)
-            {
-                await _publisher.Publish(domainEvent, ct);
-            }
         }
 
         // Верифицирует magic bytes: первые байты файла должны совпадать с заявленным ContentType.

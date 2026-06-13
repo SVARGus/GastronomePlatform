@@ -1,4 +1,5 @@
 using FluentValidation;
+using GastronomePlatform.Modules.Dishes.Application.Services;
 using GastronomePlatform.Modules.Dishes.Application.Snapshots;
 using GastronomePlatform.Modules.Dishes.Domain.Repositories;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Persistence;
@@ -58,6 +59,10 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Extensions
             // Парсер jsonb-снепшота для UC-DSH-050 (snapshot-ветка карточки) и
             // UC-DSH-052 (GetDishRecipe). Симметричен Builder, stateless — Singleton.
             services.AddSingleton<IPublishedDishSnapshotReader, PublishedDishSnapshotReader>();
+
+            // Сервис пересчёта маркеров блюда после изменения состава рецепта.
+            // Используется хендлерами UC-DSH-030..032; зависит от IIngredientRepository (Scoped).
+            services.AddScoped<IDishMarkersRecalculator, DishMarkersRecalculator>();
 
             return services;
         }
