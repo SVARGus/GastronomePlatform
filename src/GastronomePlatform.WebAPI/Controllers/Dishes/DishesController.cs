@@ -13,6 +13,7 @@ using GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeStep;
 using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeIngredients;
 using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeSteps;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels;
+using GastronomePlatform.Modules.Dishes.Application.Commands.SetHistory;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetNutrition;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetTiming;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetYield;
@@ -86,6 +87,12 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// <param name="DietLabelsMask">Новая битовая маска диетических меток.
         /// <c>None</c> допустимо (снять все метки).</param>
         public sealed record SetDietLabelsRequest(DietLabels DietLabelsMask);
+
+        /// <summary>
+        /// Данные для установки исторического описания блюда (UC-DSH-010).
+        /// </summary>
+        /// <param name="HistoryText">Новый текст истории. <see langword="null"/> — очистить.</param>
+        public sealed record SetHistoryRequest(string? HistoryText);
 
         /// <summary>
         /// Данные для смены главного фото блюда (UC-DSH-011).
@@ -785,6 +792,42 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             var command = new SetDietLabelsCommand(
                 DishId: id,
                 DietLabelsMask: request.DietLabelsMask);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Устанавливает историко-культурное описание блюда (UC-DSH-010).
+        /// Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// Длинное текстовое поле (до 4000 символов; лимит — единый источник
+        /// <c>Dish.MAX_HISTORY_TEXT_LENGTH</c>), редактируется на отдельном экране UI —
+        /// поэтому вынесено в отдельный UC,
+        /// не в составе UC-DSH-002 UpdateDishCard. <see langword="null"/> в теле — очистить поле.
+        /// Правка не трогает <c>PublishedVersionData</c>.
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Новый текст истории.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешной установке;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>) при отсутствии блюда.
+        /// </returns>
+        [HttpPatch("{id:guid}/history")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> SetHistoryAsync(
+            Guid id,
+            [FromBody] SetHistoryRequest request,
+            CancellationToken ct)
+        {
+            var command = new SetHistoryCommand(
+                DishId: id,
+                HistoryText: request.HistoryText);
 
             Result result = await Sender.Send(command, ct);
             return MapResult(result);
