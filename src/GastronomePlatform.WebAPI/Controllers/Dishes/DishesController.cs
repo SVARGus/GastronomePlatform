@@ -29,6 +29,7 @@ using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishBySlug;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishesByAuthor;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts;
+using GastronomePlatform.Modules.Dishes.Application.Queries.GetScaledRecipeIngredients;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -474,6 +475,48 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             GetDishRecipeQuery query = new(DishId: id);
 
             Result<DishRecipeDto> result = await Sender.Send(query, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Возвращает список ингредиентов рецепта, пересчитанных на запрошенное
+        /// число порций (UC-DSH-056). Требует аутентификации (<c>VALID_ACTOR</c>).
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Источник данных — <c>Dish.PublishedVersionData</c>; рабочая копия по этому
+        /// эндпоинту не отдаётся. Для блюда без публичного snapshot (Draft/Unpublished)
+        /// или в статусе <c>Archived</c> — <c>404</c> всем (включая автора).
+        /// </para>
+        /// <para>
+        /// Реализация Этапа 2: линейное масштабирование <c>Quantity</c> по множителю
+        /// <c>Servings / ServingsDefault</c>; конвертация единиц (Mass ↔ Volume) пока
+        /// не выполняется. На Этапе 3+ через <c>ISubscriptionService</c> появится проверка
+        /// Premium-подписки.
+        /// </para>
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="servings">Запрошенное число порций (1..1000).</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>200 OK</c> с <see cref="GetScaledRecipeIngredientsResult"/>;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c>, если запрос не аутентифицирован;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>), если блюдо не существует,
+        /// архивировано или не опубликовано.
+        /// </returns>
+        [HttpGet("{id:guid}/recipe/scaled")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> GetScaledRecipeIngredientsAsync(
+            Guid id,
+            [FromQuery] int servings,
+            CancellationToken ct)
+        {
+            GetScaledRecipeIngredientsQuery query = new(
+                DishId: id,
+                Servings: servings);
+
+            Result<GetScaledRecipeIngredientsResult> result = await Sender.Send(query, ct);
             return MapResult(result);
         }
 
