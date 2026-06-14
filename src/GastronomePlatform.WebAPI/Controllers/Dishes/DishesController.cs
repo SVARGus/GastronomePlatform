@@ -3,6 +3,7 @@ using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngredientToRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Commands.AddFreeformIngredientToRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Commands.AddRecipeStep;
+using GastronomePlatform.Modules.Dishes.Application.Commands.ChangeMainImage;
 using GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft;
 using GastronomePlatform.Modules.Dishes.Application.Commands.IncrementDishViews;
 using GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish;
@@ -80,6 +81,15 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// <param name="DietLabelsMask">Новая битовая маска диетических меток.
         /// <c>None</c> допустимо (снять все метки).</param>
         public sealed record SetDietLabelsRequest(DietLabels DietLabelsMask);
+
+        /// <summary>
+        /// Данные для смены главного фото блюда (UC-DSH-011).
+        /// </summary>
+        /// <param name="MainImageId">
+        /// Идентификатор медиафайла из модуля Media. <see langword="null"/> — удалить главное фото
+        /// (detach предыдущего, если был).
+        /// </param>
+        public sealed record ChangeMainImageRequest(Guid? MainImageId);
 
         /// <summary>
         /// Данные для обновления простых полей рецепта блюда (UC-DSH-003).
@@ -591,6 +601,43 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             var command = new SetDietLabelsCommand(
                 DishId: id,
                 DietLabelsMask: request.DietLabelsMask);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Меняет главное фото блюда (UC-DSH-011). Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// Логика attach/detach медиафайла к Dish выполняется через <c>IMediaService</c>:
+        /// при смене значения предыдущий файл отвязывается (становится orphan),
+        /// новый — привязывается к блюду как <c>MediaEntityTypes.DISH</c>.
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Новое значение <c>MainImageId</c> (<see langword="null"/> — очистить).</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешной смене;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>403</c> (<c>MEDIA.NOT_OWNED</c>) если новый медиафайл не принадлежит пользователю;
+        /// <c>404 Not Found</c> при отсутствии блюда (<c>DISHES.DISH_NOT_FOUND</c>)
+        /// или медиафайла (<c>MEDIA.NOT_FOUND</c>);
+        /// <c>409 Conflict</c> (<c>MEDIA.NOT_READY</c> / <c>MEDIA.ALREADY_ATTACHED</c>)
+        /// при нарушении инвариантов медиафайла.
+        /// </returns>
+        [HttpPatch("{id:guid}/main-image")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> ChangeMainImageAsync(
+            Guid id,
+            [FromBody] ChangeMainImageRequest request,
+            CancellationToken ct)
+        {
+            var command = new ChangeMainImageCommand(
+                DishId: id,
+                MainImageId: request.MainImageId);
 
             Result result = await Sender.Send(command, ct);
             return MapResult(result);

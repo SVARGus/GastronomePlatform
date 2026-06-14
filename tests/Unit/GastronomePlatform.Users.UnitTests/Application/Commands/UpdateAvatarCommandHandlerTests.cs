@@ -2,6 +2,8 @@ using FluentAssertions;
 using FluentAssertions.Execution;
 using GastronomePlatform.Common.Application.Abstractions;
 using GastronomePlatform.Common.Domain.Results;
+using GastronomePlatform.Modules.Media.Application.Contracts;
+using GastronomePlatform.Modules.Media.Domain.Constants;
 using GastronomePlatform.Modules.Users.Application.Commands.UpdateAvatar;
 using GastronomePlatform.Modules.Users.Domain.Entities;
 using GastronomePlatform.Modules.Users.Domain.Errors;
@@ -17,6 +19,8 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
     {
         private readonly Mock<IUserProfileRepository> _repositoryMock = new();
         private readonly Mock<IDateTimeProvider> _dateTimeProviderMock = new();
+        private readonly Mock<ICurrentUserService> _currentUserMock = new();
+        private readonly Mock<IMediaService> _mediaServiceMock = new();
         private readonly UpdateAvatarCommandHandler _handler;
 
         private static readonly Guid _userId = Guid.NewGuid();
@@ -27,9 +31,24 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
 
         public UpdateAvatarCommandHandlerTests()
         {
+            _currentUserMock.SetupGet(c => c.UserId).Returns(_userId);
+
+            _mediaServiceMock
+                .Setup(m => m.AttachToEntityAsync(
+                    It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(),
+                    It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result.Success());
+
+            _mediaServiceMock
+                .Setup(m => m.DetachFromEntityAsync(
+                    It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result.Success());
+
             _handler = new UpdateAvatarCommandHandler(
                 _repositoryMock.Object,
-                _dateTimeProviderMock.Object);
+                _dateTimeProviderMock.Object,
+                _currentUserMock.Object,
+                _mediaServiceMock.Object);
         }
 
         private static UserProfile CreateProfile() =>
@@ -40,7 +59,8 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
         [Fact]
         public void Constructor_WithNullRepository_ShouldThrowArgumentNullException()
         {
-            Action action = () => new UpdateAvatarCommandHandler(null!, _dateTimeProviderMock.Object);
+            Action action = () => new UpdateAvatarCommandHandler(
+                null!, _dateTimeProviderMock.Object, _currentUserMock.Object, _mediaServiceMock.Object);
 
             action.Should().Throw<ArgumentNullException>().WithParameterName("userProfileRepository");
         }
@@ -48,9 +68,28 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
         [Fact]
         public void Constructor_WithNullDateTimeProvider_ShouldThrowArgumentNullException()
         {
-            Action action = () => new UpdateAvatarCommandHandler(_repositoryMock.Object, null!);
+            Action action = () => new UpdateAvatarCommandHandler(
+                _repositoryMock.Object, null!, _currentUserMock.Object, _mediaServiceMock.Object);
 
             action.Should().Throw<ArgumentNullException>().WithParameterName("dateTimeProvider");
+        }
+
+        [Fact]
+        public void Constructor_WithNullCurrentUserService_ShouldThrowArgumentNullException()
+        {
+            Action action = () => new UpdateAvatarCommandHandler(
+                _repositoryMock.Object, _dateTimeProviderMock.Object, null!, _mediaServiceMock.Object);
+
+            action.Should().Throw<ArgumentNullException>().WithParameterName("currentUser");
+        }
+
+        [Fact]
+        public void Constructor_WithNullMediaService_ShouldThrowArgumentNullException()
+        {
+            Action action = () => new UpdateAvatarCommandHandler(
+                _repositoryMock.Object, _dateTimeProviderMock.Object, _currentUserMock.Object, null!);
+
+            action.Should().Throw<ArgumentNullException>().WithParameterName("mediaService");
         }
 
         #endregion
@@ -58,9 +97,9 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
         #region Success
 
         [Fact]
-        public async Task Handle_WhenProfileExists_UpdatesAvatarAndSavesAsync()
+        public async Task Handle_WhenProfileExistsAndAvatarAdded_AttachesMediaAndSavesAsync()
         {
-            // Arrange
+            // Arrange — старт без аватара, ставим новый
             UserProfile profile = CreateProfile();
             Guid avatarId = Guid.NewGuid();
 
@@ -79,6 +118,16 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
                 profile.AvatarMediaId.Should().Be(avatarId);
                 profile.UpdatedAt.Should().Be(_now);
 
+                _mediaServiceMock.Verify(
+                    m => m.AttachToEntityAsync(
+                        avatarId, _userId, MediaEntityTypes.USER_AVATAR, _userId,
+                        It.IsAny<CancellationToken>()),
+                    Times.Once);
+
+                _mediaServiceMock.Verify(
+                    m => m.DetachFromEntityAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+                    Times.Never);
+
                 _repositoryMock.Verify(
                     r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
                     Times.Once);
@@ -86,19 +135,21 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
         }
 
         [Fact]
-        public async Task Handle_WithNullAvatarId_ShouldClearAvatarAndSaveAsync()
+        public async Task Handle_WithNullAvatarId_DetachesMediaAndSavesAsync()
         {
-            // Arrange — null трактуется доменом как "удалить аватар"
+            // Arrange — сначала ставим аватар, затем передаём null
             UserProfile profile = CreateProfile();
-            profile.UpdateAvatar(Guid.NewGuid(), _createdAt); // сначала ставим аватар
+            Guid existingAvatarId = Guid.NewGuid();
+            profile.UpdateAvatar(existingAvatarId, _createdAt);
 
             _repositoryMock
                 .Setup(r => r.GetByUserIdAsync(_userId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(profile);
             _dateTimeProviderMock.SetupGet(d => d.UtcNow).Returns(_now);
 
-            // Act — передаём null для удаления
-            Result result = await _handler.Handle(new UpdateAvatarCommand(_userId, AvatarMediaId: null), CancellationToken.None);
+            // Act
+            Result result = await _handler.Handle(
+                new UpdateAvatarCommand(_userId, AvatarMediaId: null), CancellationToken.None);
 
             // Assert
             using (new AssertionScope())
@@ -106,15 +157,127 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
                 result.IsSuccess.Should().BeTrue();
                 profile.AvatarMediaId.Should().BeNull();
 
+                _mediaServiceMock.Verify(
+                    m => m.DetachFromEntityAsync(existingAvatarId, It.IsAny<CancellationToken>()),
+                    Times.Once);
+
+                _mediaServiceMock.Verify(
+                    m => m.AttachToEntityAsync(
+                        It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(),
+                        It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+                    Times.Never);
+
                 _repositoryMock.Verify(
                     r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
                     Times.Once);
             }
         }
 
+        [Fact]
+        public async Task Handle_WhenAvatarReplaced_DetachesOldAndAttachesNewAsync()
+        {
+            // Arrange — был аватар, ставим другой
+            UserProfile profile = CreateProfile();
+            Guid oldAvatarId = Guid.NewGuid();
+            Guid newAvatarId = Guid.NewGuid();
+            profile.UpdateAvatar(oldAvatarId, _createdAt);
+
+            _repositoryMock
+                .Setup(r => r.GetByUserIdAsync(_userId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(profile);
+            _dateTimeProviderMock.SetupGet(d => d.UtcNow).Returns(_now);
+
+            // Act
+            Result result = await _handler.Handle(
+                new UpdateAvatarCommand(_userId, newAvatarId), CancellationToken.None);
+
+            // Assert
+            using (new AssertionScope())
+            {
+                result.IsSuccess.Should().BeTrue();
+                profile.AvatarMediaId.Should().Be(newAvatarId);
+
+                _mediaServiceMock.Verify(
+                    m => m.DetachFromEntityAsync(oldAvatarId, It.IsAny<CancellationToken>()),
+                    Times.Once);
+
+                _mediaServiceMock.Verify(
+                    m => m.AttachToEntityAsync(
+                        newAvatarId, _userId, MediaEntityTypes.USER_AVATAR, _userId,
+                        It.IsAny<CancellationToken>()),
+                    Times.Once);
+            }
+        }
+
+        [Fact]
+        public async Task Handle_WhenAvatarUnchanged_SkipsMediaOperationsAsync()
+        {
+            // Arrange — старое и новое значение совпадают
+            UserProfile profile = CreateProfile();
+            Guid avatarId = Guid.NewGuid();
+            profile.UpdateAvatar(avatarId, _createdAt);
+
+            _repositoryMock
+                .Setup(r => r.GetByUserIdAsync(_userId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(profile);
+            _dateTimeProviderMock.SetupGet(d => d.UtcNow).Returns(_now);
+
+            // Act
+            Result result = await _handler.Handle(
+                new UpdateAvatarCommand(_userId, avatarId), CancellationToken.None);
+
+            // Assert
+            using (new AssertionScope())
+            {
+                result.IsSuccess.Should().BeTrue();
+
+                _mediaServiceMock.Verify(
+                    m => m.AttachToEntityAsync(
+                        It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(),
+                        It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+                    Times.Never);
+
+                _mediaServiceMock.Verify(
+                    m => m.DetachFromEntityAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+                    Times.Never);
+            }
+        }
+
         #endregion
 
         #region Failure
+
+        [Fact]
+        public async Task Handle_WhenActorIsNotOwner_ReturnsNotAuthorizedAndDoesNotSaveAsync()
+        {
+            // Arrange — текущий пользователь не совпадает с UserId из команды
+            Guid otherUserId = Guid.NewGuid();
+            _currentUserMock.Reset();
+            _currentUserMock.SetupGet(c => c.UserId).Returns(otherUserId);
+
+            // Act
+            Result result = await _handler.Handle(
+                new UpdateAvatarCommand(_userId, Guid.NewGuid()), CancellationToken.None);
+
+            // Assert
+            using (new AssertionScope())
+            {
+                result.IsFailure.Should().BeTrue();
+                result.Error.Should().Be(UsersErrors.NotAuthorized);
+
+                _repositoryMock.Verify(
+                    r => r.GetByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+                    Times.Never);
+                _repositoryMock.Verify(
+                    r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
+                    Times.Never);
+                _mediaServiceMock.Verify(
+                    m => m.AttachToEntityAsync(
+                        It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(),
+                        It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+                    Times.Never);
+            }
+        }
 
         [Fact]
         public async Task Handle_WhenProfileNotFound_ReturnsErrorAndDoesNotSaveAsync()
@@ -125,13 +288,50 @@ namespace GastronomePlatform.Users.UnitTests.Application.Commands
                 .ReturnsAsync((UserProfile?)null);
 
             // Act
-            Result result = await _handler.Handle(new UpdateAvatarCommand(_userId, Guid.NewGuid()), CancellationToken.None);
+            Result result = await _handler.Handle(
+                new UpdateAvatarCommand(_userId, Guid.NewGuid()), CancellationToken.None);
 
             // Assert
             using (new AssertionScope())
             {
                 result.IsFailure.Should().BeTrue();
                 result.Error.Should().Be(UsersErrors.ProfileNotFound);
+
+                _repositoryMock.Verify(
+                    r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
+                    Times.Never);
+            }
+        }
+
+        [Fact]
+        public async Task Handle_WhenMediaAttachFails_ReturnsErrorAndDoesNotSaveAsync()
+        {
+            // Arrange — Media падает на attach, Users SaveChanges не вызывается
+            UserProfile profile = CreateProfile();
+            Guid avatarId = Guid.NewGuid();
+
+            _repositoryMock
+                .Setup(r => r.GetByUserIdAsync(_userId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(profile);
+            _dateTimeProviderMock.SetupGet(d => d.UtcNow).Returns(_now);
+
+            Error mediaError = Error.NotFound("MEDIA.NOT_FOUND", "fake");
+            _mediaServiceMock.Reset();
+            _mediaServiceMock
+                .Setup(m => m.AttachToEntityAsync(
+                    It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(),
+                    It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result.Failure(mediaError));
+
+            // Act
+            Result result = await _handler.Handle(
+                new UpdateAvatarCommand(_userId, avatarId), CancellationToken.None);
+
+            // Assert
+            using (new AssertionScope())
+            {
+                result.IsFailure.Should().BeTrue();
+                result.Error.Should().Be(mediaError);
 
                 _repositoryMock.Verify(
                     r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),

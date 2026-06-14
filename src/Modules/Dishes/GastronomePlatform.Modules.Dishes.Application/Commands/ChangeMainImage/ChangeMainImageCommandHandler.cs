@@ -8,31 +8,30 @@ using GastronomePlatform.Modules.Dishes.Domain.Repositories;
 using GastronomePlatform.Modules.Media.Application.Contracts;
 using GastronomePlatform.Modules.Media.Domain.Constants;
 
-namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeStep
+namespace GastronomePlatform.Modules.Dishes.Application.Commands.ChangeMainImage
 {
     /// <summary>
-    /// Обработчик команды <see cref="UpdateRecipeStepCommand"/> (UC-DSH-021).
+    /// Обработчик команды <see cref="ChangeMainImageCommand"/> (UC-DSH-011).
     /// </summary>
     /// <remarks>
     /// Поток выполнения:
     /// <list type="number">
-    ///   <item>Загрузка блюда с полным рецептом.</item>
-    ///   <item>POL-001: автор блюда или Admin.</item>
-    ///   <item>Ранняя проверка существования шага + получение текущего <c>ImageMediaId</c>.</item>
-    ///   <item>Вызов <see cref="Dish.UpdateRecipeStep"/> — Domain обновляет все поля,
-    ///         валидирует диапазоны температуры/таймера. Возвращает
-    ///         <see cref="DishesErrors.StepNotFound"/>, <see cref="DishesErrors.InvalidTemperature"/>
-    ///         или <see cref="DishesErrors.InvalidTimerMinutes"/> при нарушении.</item>
-    ///   <item>Синхронизация Media по разнице old/new <c>ImageMediaId</c> через
-    ///         <see cref="IMediaService"/> (UC-MED-200/201).</item>
-    ///   <item>Сохранение Dishes и публикация доменных событий.</item>
+    ///   <item>Загрузка блюда. <see cref="DishesErrors.DishNotFound"/> при отсутствии.</item>
+    ///   <item>POL-001: автор блюда или Admin. Иначе <see cref="DishesErrors.NotDishOwner"/>.</item>
+    ///   <item>Запоминаем текущий <c>MainImageId</c> для последующего detach.</item>
+    ///   <item>Вызов <see cref="Dish.ChangeMainImage"/> — Domain обновляет поле и
+    ///         поднимает <c>DishUpdatedEvent</c>.</item>
+    ///   <item>Синхронизация Media через <see cref="IMediaService"/> по разнице old/new
+    ///         (4 ветки: без изменений / стало null / добавлено / заменено).</item>
+    ///   <item>Сохранение Dishes и публикация доменных событий через
+    ///         <see cref="IDomainEventDispatcher"/>.</item>
     /// </list>
     /// <para>
-    /// <b>Consistency на Этапе 2:</b> Media синхронизируется в отдельной БД-транзакции.
-    /// Сценарии частичной согласованности — см. <c>AddRecipeStepCommandHandler</c>.
+    /// <b>Consistency на Этапе 2:</b> между Dishes и Media — две разные БД-транзакции
+    /// (см. <c>AddRecipeStepCommandHandler</c> и общий долг IMediaService).
     /// </para>
     /// </remarks>
-    public sealed class UpdateRecipeStepCommandHandler : ICommandHandler<UpdateRecipeStepCommand>
+    public sealed class ChangeMainImageCommandHandler : ICommandHandler<ChangeMainImageCommand>
     {
         private readonly IDishRepository _dishRepository;
         private readonly ICurrentUserService _currentUser;
@@ -41,14 +40,14 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeSte
         private readonly IMediaService _mediaService;
 
         /// <summary>
-        /// Инициализирует новый экземпляр <see cref="UpdateRecipeStepCommandHandler"/>.
+        /// Инициализирует новый экземпляр <see cref="ChangeMainImageCommandHandler"/>.
         /// </summary>
         /// <param name="dishRepository">Репозиторий блюд.</param>
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="clock">Поставщик системного времени.</param>
         /// <param name="eventDispatcher">Диспетчер доменных событий.</param>
         /// <param name="mediaService">Межмодульный сервис модуля Media.</param>
-        public UpdateRecipeStepCommandHandler(
+        public ChangeMainImageCommandHandler(
             IDishRepository dishRepository,
             ICurrentUserService currentUser,
             IDateTimeProvider clock,
@@ -63,11 +62,9 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeSte
         }
 
         /// <inheritdoc/>
-        public async Task<Result> Handle(
-            UpdateRecipeStepCommand request,
-            CancellationToken cancellationToken)
+        public async Task<Result> Handle(ChangeMainImageCommand request, CancellationToken cancellationToken)
         {
-            Dish? dish = await _dishRepository.GetByIdWithFullRecipeAsync(request.DishId, cancellationToken);
+            Dish? dish = await _dishRepository.GetByIdAsync(request.DishId, cancellationToken);
             if (dish is null)
             {
                 return DishesErrors.DishNotFound;
@@ -80,51 +77,30 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeSte
                 return DishesErrors.NotDishOwner;
             }
 
-            // Ранняя проверка существования шага — нужно знать текущий ImageMediaId
-            // до Domain-обновления, чтобы корректно синхронизировать Media (detach старого).
-            RecipeStep? existingStep = dish.Recipe.Steps.FirstOrDefault(s => s.Id == request.StepId);
-            if (existingStep is null)
+            Guid? oldMainImageId = dish.MainImageId;
+            Guid? newMainImageId = request.MainImageId;
+
+            dish.ChangeMainImage(newMainImageId, _clock.UtcNow);
+
+            if (oldMainImageId != newMainImageId)
             {
-                return DishesErrors.StepNotFound;
-            }
-
-            Guid? oldImageMediaId = existingStep.ImageMediaId;
-            Guid? newImageMediaId = request.ImageMediaId;
-
-            Result updateResult = dish.UpdateRecipeStep(
-                stepId: request.StepId,
-                description: request.Description,
-                title: request.Title,
-                imageMediaId: request.ImageMediaId,
-                videoUrl: request.VideoUrl,
-                temperatureCelsius: request.TemperatureCelsius,
-                timerMinutes: request.TimerMinutes,
-                utcNow: _clock.UtcNow);
-
-            if (updateResult.IsFailure)
-            {
-                return updateResult;
-            }
-
-            if (oldImageMediaId != newImageMediaId)
-            {
-                if (oldImageMediaId.HasValue)
+                if (oldMainImageId.HasValue)
                 {
                     Result detachResult = await _mediaService.DetachFromEntityAsync(
-                        oldImageMediaId.Value, cancellationToken);
+                        oldMainImageId.Value, cancellationToken);
                     if (detachResult.IsFailure)
                     {
                         return detachResult.Error;
                     }
                 }
 
-                if (newImageMediaId.HasValue)
+                if (newMainImageId.HasValue)
                 {
                     Result attachResult = await _mediaService.AttachToEntityAsync(
-                        mediaId: newImageMediaId.Value,
+                        mediaId: newMainImageId.Value,
                         actorUserId: actorUserId,
-                        entityType: MediaEntityTypes.RECIPE_STEP,
-                        entityId: request.StepId,
+                        entityType: MediaEntityTypes.DISH,
+                        entityId: request.DishId,
                         ct: cancellationToken);
                     if (attachResult.IsFailure)
                     {

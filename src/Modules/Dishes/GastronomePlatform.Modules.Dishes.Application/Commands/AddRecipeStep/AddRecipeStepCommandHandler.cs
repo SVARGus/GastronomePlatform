@@ -5,6 +5,8 @@ using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
 using GastronomePlatform.Modules.Dishes.Domain.Errors;
 using GastronomePlatform.Modules.Dishes.Domain.Repositories;
+using GastronomePlatform.Modules.Media.Application.Contracts;
+using GastronomePlatform.Modules.Media.Domain.Constants;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddRecipeStep
 {
@@ -19,12 +21,18 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddRecipeStep
     ///   <item>POL-001: автор блюда или Admin. Иначе <see cref="DishesErrors.NotDishOwner"/>.</item>
     ///   <item>Вызов <see cref="Dish.AddRecipeStep"/> — Domain создаёт <see cref="RecipeStep"/>
     ///         с очередным <c>Order</c> и поднимает <c>DishUpdatedEvent</c>.</item>
-    ///   <item>Сохранение и публикация доменных событий через <see cref="IDomainEventDispatcher"/>.</item>
+    ///   <item>Если задан <c>ImageMediaId</c> — attach медиа к новому шагу через
+    ///         <see cref="IMediaService"/> (UC-MED-200) синхронно в БД Media. При ошибке —
+    ///         возврат до сохранения Dishes.</item>
+    ///   <item>Сохранение Dishes и публикация доменных событий через
+    ///         <see cref="IDomainEventDispatcher"/>.</item>
     /// </list>
     /// <para>
-    /// На текущем этапе attach иллюстрации шага через межмодульный <c>IMediaService</c> не выполняется
-    /// (сервис ещё не реализован). <c>ImageMediaId</c> сохраняется как «логическая ссылка»;
-    /// orphan-проблема для шага решается в отдельной сессии вместе с реализацией <c>IMediaService</c>.
+    /// <b>Consistency на Этапе 2:</b> между Dishes и Media — две разные БД-транзакции
+    /// (Outbox/DTC не используются). Если attach Media успешен, но <c>SaveChanges</c>
+    /// Dishes падает — медиафайл оказывается привязан к несуществующему <c>RecipeStepId</c>
+    /// (висячая ссылка в обратную сторону). Это известный долг; orphan-cleanup
+    /// (UC-MED-210, Этап 8+) очистит такие записи.
     /// </para>
     /// </remarks>
     public sealed class AddRecipeStepCommandHandler
@@ -34,6 +42,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddRecipeStep
         private readonly ICurrentUserService _currentUser;
         private readonly IDateTimeProvider _clock;
         private readonly IDomainEventDispatcher _eventDispatcher;
+        private readonly IMediaService _mediaService;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="AddRecipeStepCommandHandler"/>.
@@ -42,16 +51,19 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddRecipeStep
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="clock">Поставщик системного времени.</param>
         /// <param name="eventDispatcher">Диспетчер доменных событий.</param>
+        /// <param name="mediaService">Межмодульный сервис модуля Media.</param>
         public AddRecipeStepCommandHandler(
             IDishRepository dishRepository,
             ICurrentUserService currentUser,
             IDateTimeProvider clock,
-            IDomainEventDispatcher eventDispatcher)
+            IDomainEventDispatcher eventDispatcher,
+            IMediaService mediaService)
         {
             _dishRepository = dishRepository ?? throw new ArgumentNullException(nameof(dishRepository));
             _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
+            _mediaService = mediaService ?? throw new ArgumentNullException(nameof(mediaService));
         }
 
         /// <inheritdoc/>
@@ -82,6 +94,21 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.AddRecipeStep
                 temperatureCelsius: request.TemperatureCelsius,
                 timerMinutes: request.TimerMinutes,
                 utcNow: utcNow);
+
+            if (request.ImageMediaId.HasValue)
+            {
+                Result attachResult = await _mediaService.AttachToEntityAsync(
+                    mediaId: request.ImageMediaId.Value,
+                    actorUserId: actorUserId,
+                    entityType: MediaEntityTypes.RECIPE_STEP,
+                    entityId: newStepId,
+                    ct: cancellationToken);
+
+                if (attachResult.IsFailure)
+                {
+                    return attachResult.Error;
+                }
+            }
 
             await _dishRepository.SaveChangesAsync(cancellationToken);
             await _eventDispatcher.DispatchAsync(dish, cancellationToken);

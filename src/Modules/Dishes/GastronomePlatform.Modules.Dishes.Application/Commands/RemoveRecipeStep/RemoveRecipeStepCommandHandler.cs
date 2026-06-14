@@ -5,6 +5,7 @@ using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
 using GastronomePlatform.Modules.Dishes.Domain.Errors;
 using GastronomePlatform.Modules.Dishes.Domain.Repositories;
+using GastronomePlatform.Modules.Media.Application.Contracts;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeStep
 {
@@ -16,10 +17,16 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeSte
     /// <list type="number">
     ///   <item>Загрузка блюда с полным рецептом.</item>
     ///   <item>POL-001: автор блюда или Admin.</item>
+    ///   <item>Поиск шага по <c>StepId</c> + запоминаем <c>ImageMediaId</c> (для detach Media).</item>
     ///   <item>Вызов <see cref="Dish.RemoveRecipeStep"/> — Domain удаляет шаг и
     ///         переупорядочивает оставшиеся (<c>Order = 1..N</c>).
     ///         <see cref="DishesErrors.StepNotFound"/> при отсутствии шага.</item>
-    ///   <item>Сохранение и публикация доменных событий через <see cref="IDomainEventDispatcher"/>.</item>
+    ///   <item>Если у удалённого шага был привязан медиафайл — detach через
+    ///         <see cref="IMediaService"/>. Медиа становится orphan и подлежит
+    ///         фоновой очистке (UC-MED-210). Soft-delete на стороне Media не делаем —
+    ///         это пользовательское решение через UC-MED-005.</item>
+    ///   <item>Сохранение Dishes и публикация доменных событий через
+    ///         <see cref="IDomainEventDispatcher"/>.</item>
     /// </list>
     /// </remarks>
     public sealed class RemoveRecipeStepCommandHandler : ICommandHandler<RemoveRecipeStepCommand>
@@ -28,6 +35,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeSte
         private readonly ICurrentUserService _currentUser;
         private readonly IDateTimeProvider _clock;
         private readonly IDomainEventDispatcher _eventDispatcher;
+        private readonly IMediaService _mediaService;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="RemoveRecipeStepCommandHandler"/>.
@@ -36,16 +44,19 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeSte
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="clock">Поставщик системного времени.</param>
         /// <param name="eventDispatcher">Диспетчер доменных событий.</param>
+        /// <param name="mediaService">Межмодульный сервис модуля Media.</param>
         public RemoveRecipeStepCommandHandler(
             IDishRepository dishRepository,
             ICurrentUserService currentUser,
             IDateTimeProvider clock,
-            IDomainEventDispatcher eventDispatcher)
+            IDomainEventDispatcher eventDispatcher,
+            IMediaService mediaService)
         {
             _dishRepository = dishRepository ?? throw new ArgumentNullException(nameof(dishRepository));
             _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
             _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
+            _mediaService = mediaService ?? throw new ArgumentNullException(nameof(mediaService));
         }
 
         /// <inheritdoc/>
@@ -66,10 +77,25 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeSte
                 return DishesErrors.NotDishOwner;
             }
 
+            // Запоминаем ImageMediaId до удаления — нужно для последующего detach.
+            // Если шаг не найден — Domain вернёт StepNotFound на следующем шаге.
+            RecipeStep? existingStep = dish.Recipe.Steps.FirstOrDefault(s => s.Id == request.StepId);
+            Guid? imageMediaId = existingStep?.ImageMediaId;
+
             Result removeResult = dish.RemoveRecipeStep(request.StepId, _clock.UtcNow);
             if (removeResult.IsFailure)
             {
                 return removeResult;
+            }
+
+            if (imageMediaId.HasValue)
+            {
+                Result detachResult = await _mediaService.DetachFromEntityAsync(
+                    imageMediaId.Value, cancellationToken);
+                if (detachResult.IsFailure)
+                {
+                    return detachResult.Error;
+                }
             }
 
             await _dishRepository.SaveChangesAsync(cancellationToken);
