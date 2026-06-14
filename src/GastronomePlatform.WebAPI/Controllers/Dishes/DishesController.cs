@@ -30,6 +30,7 @@ using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishesByAuthor;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetScaledRecipeIngredients;
+using GastronomePlatform.Modules.Dishes.Application.Queries.SearchDishes;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -433,6 +434,68 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
                 PageSize: pageSize);
 
             Result<GetDishesByAuthorResult> result = await Sender.Send(query, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Каталожный поиск опубликованных блюд (UC-DSH-054). Анонимный публичный эндпоинт.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Все фильтры опциональны; обязательный фильтр <c>PublishedVersionData IS NOT NULL</c>
+        /// применяется автоматически. Категории и теги резолвятся через
+        /// <c>DishCategoryPublished</c> / <c>DishTagPublished</c> — посетители видят
+        /// опубликованный набор связок, а не рабочую копию.
+        /// </para>
+        /// <para>
+        /// <c>dietLabelsMask</c> — битовая маска: блюдо должно иметь <b>все</b>
+        /// запрошенные метки (AND). Поиск по тексту — case-insensitive
+        /// (<c>ILIKE</c>) по <c>Name</c> и <c>ShortDescription</c>. Сортировка
+        /// по умолчанию — <c>Newest</c> (по <c>PublishedAt</c> убыванию).
+        /// </para>
+        /// </remarks>
+        /// <param name="text">Подстрока поиска по имени и краткому описанию. Опционально.</param>
+        /// <param name="categoryIds">Идентификаторы категорий (OR). Опционально.</param>
+        /// <param name="tagIds">Идентификаторы тегов (OR). Опционально.</param>
+        /// <param name="dietLabelsMask">Битовая маска требуемых меток. Опционально.</param>
+        /// <param name="difficulties">Уровни сложности (IN). Опционально.</param>
+        /// <param name="costs">Оценки стоимости (IN). Опционально.</param>
+        /// <param name="minRating">Минимальный <c>RatingAvg</c>. Опционально.</param>
+        /// <param name="sortBy">Способ сортировки. По умолчанию <c>Newest</c>.</param>
+        /// <param name="page">Номер страницы (≥ 1). По умолчанию 1.</param>
+        /// <param name="pageSize">Размер страницы (1..25). По умолчанию 12.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>200 OK</c> с <see cref="SearchDishesResult"/> (пустой <c>Items</c> допустим);
+        /// <c>400 Bad Request</c> при ошибке валидации.
+        /// </returns>
+        [HttpGet("search")]
+        public async Task<IActionResult> SearchAsync(
+            [FromQuery] string? text = null,
+            [FromQuery] Guid[]? categoryIds = null,
+            [FromQuery] Guid[]? tagIds = null,
+            [FromQuery] DietLabels? dietLabelsMask = null,
+            [FromQuery] DifficultyLevel[]? difficulties = null,
+            [FromQuery] CostEstimate[]? costs = null,
+            [FromQuery] decimal? minRating = null,
+            [FromQuery] DishSearchSortBy sortBy = DishSearchSortBy.Newest,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 12,
+            CancellationToken ct = default)
+        {
+            SearchDishesQuery query = new(
+                Text: text,
+                CategoryIds: categoryIds,
+                TagIds: tagIds,
+                DietLabelsMask: dietLabelsMask,
+                Difficulties: difficulties,
+                Costs: costs,
+                MinRating: minRating,
+                SortBy: sortBy,
+                Page: page,
+                PageSize: pageSize);
+
+            Result<SearchDishesResult> result = await Sender.Send(query, ct);
             return MapResult(result);
         }
 

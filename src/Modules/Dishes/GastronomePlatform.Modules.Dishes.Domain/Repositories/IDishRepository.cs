@@ -1,4 +1,5 @@
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
+using GastronomePlatform.Modules.Dishes.Domain.Enums;
 
 namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
 {
@@ -127,6 +128,57 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         /// </returns>
         Task<(IReadOnlyList<Dish> Items, int TotalCount)> ListPublishedByAuthorAsync(
             Guid authorUserId,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Каталожный поиск опубликованных блюд с фильтрами, сортировкой и пагинацией
+        /// (UC-DSH-054 SearchDishes). Обязательный фильтр —
+        /// <c>PublishedVersionData IS NOT NULL</c>; всё остальное опционально.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Поиск по тексту проходит через <c>ILIKE</c> по основным полям
+        /// <see cref="Dish.Name"/> и <see cref="Dish.ShortDescription"/>. Это компромисс
+        /// Этапа 2 (см. UC-DSH-054 §«Известные ограничения»). Поиск по jsonb-snapshot
+        /// — задача Этапа 8+ (возможно через ElasticSearch/OpenSearch).
+        /// </para>
+        /// <para>
+        /// Фильтры по категориям и тегам резолвятся через
+        /// <see cref="DishCategoryPublished"/> и <see cref="DishTagPublished"/> —
+        /// посетители видят опубликованный набор связок, а не рабочую копию.
+        /// </para>
+        /// <para>
+        /// <see cref="Dish.DietLabelsMask"/> фильтруется битовым AND: блюдо должно иметь
+        /// <b>все</b> запрошенные метки. Например, фильтр <c>Vegan | GlutenFree</c>
+        /// отбирает только блюда, у которых оба бита установлены.
+        /// </para>
+        /// </remarks>
+        /// <param name="text">Подстрока для поиска по имени и краткому описанию. <see langword="null"/> или пусто — без фильтра.</param>
+        /// <param name="categoryIds">Идентификаторы категорий (OR). <see langword="null"/> или пусто — без фильтра.</param>
+        /// <param name="tagIds">Идентификаторы тегов (OR). <see langword="null"/> или пусто — без фильтра.</param>
+        /// <param name="dietLabelsMask">Битовая маска требуемых диетических меток (AND). <see langword="null"/> или <c>None</c> — без фильтра.</param>
+        /// <param name="difficulties">Уровни сложности (IN). <see langword="null"/> или пусто — без фильтра.</param>
+        /// <param name="costs">Оценки стоимости (IN). <see langword="null"/> или пусто — без фильтра.</param>
+        /// <param name="minRating">Минимальный <see cref="Dish.RatingAvg"/>. <see langword="null"/> — без фильтра.</param>
+        /// <param name="sortBy">Способ сортировки результатов.</param>
+        /// <param name="page">Номер страницы, начиная с 1.</param>
+        /// <param name="pageSize">Количество элементов на странице.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// Кортеж: <c>Items</c> — элементы запрошенной страницы (может быть пустым),
+        /// <c>TotalCount</c> — общее количество подходящих блюд без учёта пагинации.
+        /// </returns>
+        Task<(IReadOnlyList<Dish> Items, int TotalCount)> SearchPublishedAsync(
+            string? text,
+            IReadOnlyCollection<Guid>? categoryIds,
+            IReadOnlyCollection<Guid>? tagIds,
+            DietLabels? dietLabelsMask,
+            IReadOnlyCollection<DifficultyLevel>? difficulties,
+            IReadOnlyCollection<CostEstimate>? costs,
+            decimal? minRating,
+            DishSearchSortBy sortBy,
             int page,
             int pageSize,
             CancellationToken cancellationToken = default);

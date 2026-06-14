@@ -116,6 +116,93 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
         }
 
         /// <inheritdoc/>
+        public async Task<(IReadOnlyList<Dish> Items, int TotalCount)> SearchPublishedAsync(
+            string? text,
+            IReadOnlyCollection<Guid>? categoryIds,
+            IReadOnlyCollection<Guid>? tagIds,
+            DietLabels? dietLabelsMask,
+            IReadOnlyCollection<DifficultyLevel>? difficulties,
+            IReadOnlyCollection<CostEstimate>? costs,
+            decimal? minRating,
+            DishSearchSortBy sortBy,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            // Базовый фильтр — только опубликованные блюда (jsonb-снепшот заполнен).
+            IQueryable<Dish> query = _context.Dishes
+                .AsNoTracking()
+                .Where(d => d.PublishedVersionData != null);
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                string pattern = $"%{text.Trim()}%";
+                query = query.Where(d =>
+                    EF.Functions.ILike(d.Name, pattern)
+                    || (d.ShortDescription != null && EF.Functions.ILike(d.ShortDescription, pattern)));
+            }
+
+            if (categoryIds is { Count: > 0 })
+            {
+                // EXISTS subquery по DishCategoryPublished — посетители видят
+                // опубликованный набор категорий, а не рабочую копию.
+                query = query.Where(d =>
+                    _context.Set<DishCategoryPublished>()
+                        .Any(dcp => dcp.DishId == d.Id && categoryIds.Contains(dcp.CategoryId)));
+            }
+
+            if (tagIds is { Count: > 0 })
+            {
+                query = query.Where(d =>
+                    _context.Set<DishTagPublished>()
+                        .Any(dtp => dtp.DishId == d.Id && tagIds.Contains(dtp.TagId)));
+            }
+
+            if (dietLabelsMask.HasValue && dietLabelsMask.Value != DietLabels.None)
+            {
+                DietLabels mask = dietLabelsMask.Value;
+                // Битовый AND: блюдо должно иметь ВСЕ запрошенные метки.
+                query = query.Where(d => (d.DietLabelsMask & mask) == mask);
+            }
+
+            if (difficulties is { Count: > 0 })
+            {
+                query = query.Where(d => difficulties.Contains(d.DifficultyLevel));
+            }
+
+            if (costs is { Count: > 0 })
+            {
+                query = query.Where(d => costs.Contains(d.CostEstimate));
+            }
+
+            if (minRating.HasValue)
+            {
+                decimal threshold = minRating.Value;
+                query = query.Where(d => d.RatingAvg >= threshold);
+            }
+
+            int totalCount = await query.CountAsync(cancellationToken);
+
+            query = sortBy switch
+            {
+                DishSearchSortBy.RatingDesc => query
+                    .OrderByDescending(d => d.RatingAvg)
+                    .ThenByDescending(d => d.PublishedAt),
+                DishSearchSortBy.ViewsDesc => query
+                    .OrderByDescending(d => d.ViewsCount)
+                    .ThenByDescending(d => d.PublishedAt),
+                _ => query.OrderByDescending(d => d.PublishedAt),
+            };
+
+            List<Dish> items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return (items, totalCount);
+        }
+
+        /// <inheritdoc/>
         public async Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default)
             => await _context.Dishes.AnyAsync(d => d.Slug == slug, cancellationToken);
 
