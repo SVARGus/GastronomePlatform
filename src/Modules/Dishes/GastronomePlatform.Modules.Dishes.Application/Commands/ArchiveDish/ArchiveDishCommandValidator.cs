@@ -18,7 +18,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.ArchiveDish
         /// </summary>
         public ArchiveDishCommandValidator()
         {
-            RuleFor(x => x.DishId).NotEmpty();
+            RuleFor(x => x.DishId)
+                .NotEmpty().WithMessage("Идентификатор блюда обязателен.");
         }
     }
 }

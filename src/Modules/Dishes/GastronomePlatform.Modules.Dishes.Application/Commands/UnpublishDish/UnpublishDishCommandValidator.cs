@@ -18,7 +18,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UnpublishDish
         /// </summary>
         public UnpublishDishCommandValidator()
         {
-            RuleFor(x => x.DishId).NotEmpty();
+            RuleFor(x => x.DishId)
+                .NotEmpty().WithMessage("Идентификатор блюда обязателен.");
         }
     }
 }

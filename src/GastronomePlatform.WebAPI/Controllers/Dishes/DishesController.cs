@@ -13,6 +13,9 @@ using GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeStep;
 using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeIngredients;
 using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeSteps;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels;
+using GastronomePlatform.Modules.Dishes.Application.Commands.SetNutrition;
+using GastronomePlatform.Modules.Dishes.Application.Commands.SetTiming;
+using GastronomePlatform.Modules.Dishes.Application.Commands.SetYield;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UnpublishDish;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipe;
@@ -219,6 +222,68 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// <param name="OrderedStepIds">Идентификаторы шагов в желаемом порядке.</param>
         public sealed record ReorderRecipeStepsRequest(
             IReadOnlyList<Guid> OrderedStepIds);
+
+        /// <summary>
+        /// Данные для установки тайминга рецепта (UC-DSH-040).
+        /// </summary>
+        /// <remarks>
+        /// Если <c>IsTotalManual = false</c>, общее время вычисляется автоматически как
+        /// сумма Prep + Cook + Rest; присланное <c>TotalTimeMinutes</c> игнорируется.
+        /// <c>ActiveTimeMinutes</c> в эту сумму не входит — это отдельная метрика
+        /// «сколько повар активно занят».
+        /// </remarks>
+        /// <param name="PrepTimeMinutes">Время подготовки в минутах. <see langword="null"/> — не задано.</param>
+        /// <param name="CookTimeMinutes">Время основного приготовления в минутах. <see langword="null"/> — не задано.</param>
+        /// <param name="RestTimeMinutes">Время отдыха в минутах. <see langword="null"/> — не задано.</param>
+        /// <param name="ActiveTimeMinutes">Время активной работы повара в минутах. <see langword="null"/> — не задано.</param>
+        /// <param name="TotalTimeMinutes">Общее время в минутах (используется при <c>IsTotalManual = true</c>).</param>
+        /// <param name="IsTotalManual">Если <see langword="true"/> — общее время задано вручную; иначе вычисляется.</param>
+        public sealed record SetTimingRequest(
+            int? PrepTimeMinutes,
+            int? CookTimeMinutes,
+            int? RestTimeMinutes,
+            int? ActiveTimeMinutes,
+            int TotalTimeMinutes,
+            bool IsTotalManual);
+
+        /// <summary>
+        /// Данные для установки выхода рецепта (UC-DSH-041).
+        /// </summary>
+        /// <param name="QuantityTotal">Общее количество готового продукта (≥ 0).</param>
+        /// <param name="YieldUnit">Единица выхода.</param>
+        /// <param name="ServingsCount">Количество порций (≥ 1).</param>
+        /// <param name="GramsPerServing">Вес одной порции в граммах. <see langword="null"/> — не задано.</param>
+        public sealed record SetYieldRequest(
+            decimal QuantityTotal,
+            YieldUnit YieldUnit,
+            int ServingsCount,
+            decimal? GramsPerServing);
+
+        /// <summary>
+        /// Данные для установки КБЖУ рецепта (UC-DSH-042).
+        /// </summary>
+        /// <remarks>
+        /// Если у рецепта ещё нет записи КБЖУ — она создаётся; иначе перезаписывается.
+        /// </remarks>
+        /// <param name="CalcMethod">Способ расчёта: на 100 г или на порцию.</param>
+        /// <param name="Calories">Калорийность, ккал.</param>
+        /// <param name="Proteins">Белки, г.</param>
+        /// <param name="Fats">Жиры, г.</param>
+        /// <param name="SaturatedFats">Насыщенные жиры, г. Опционально; ≤ <paramref name="Fats"/>.</param>
+        /// <param name="Carbs">Углеводы, г.</param>
+        /// <param name="Sugar">Сахара, г. Опционально; ≤ <paramref name="Carbs"/>.</param>
+        /// <param name="Fiber">Клетчатка, г. Опционально.</param>
+        /// <param name="Salt">Соль, г. Опционально.</param>
+        public sealed record SetNutritionRequest(
+            NutritionCalcMethod CalcMethod,
+            decimal Calories,
+            decimal Proteins,
+            decimal Fats,
+            decimal? SaturatedFats,
+            decimal Carbs,
+            decimal? Sugar,
+            decimal? Fiber,
+            decimal? Salt);
 
         #endregion
 
@@ -522,6 +587,123 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             var command = new ReorderRecipeStepsCommand(
                 DishId: id,
                 OrderedStepIds: request.OrderedStepIds);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Устанавливает тайминг рецепта (UC-DSH-040). Полная замена значений
+        /// <c>Timing</c>: Prep / Cook / Rest / Active / Total и признака
+        /// <c>IsTotalManual</c>. Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// Если <c>IsTotalManual = false</c>, общее время вычисляется автоматически
+        /// сервером как сумма Prep + Cook + Rest, присланное <c>TotalTimeMinutes</c>
+        /// игнорируется.
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Новые значения тайминга.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном обновлении;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>) при отсутствии блюда;
+        /// <c>409 Conflict</c> (<c>DISHES.INVALID_TIMING</c>) если Domain-инвариант нарушен.
+        /// </returns>
+        [HttpPut("{id:guid}/recipe/timing")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> SetTimingAsync(
+            Guid id,
+            [FromBody] SetTimingRequest request,
+            CancellationToken ct)
+        {
+            var command = new SetTimingCommand(
+                DishId: id,
+                PrepTimeMinutes: request.PrepTimeMinutes,
+                CookTimeMinutes: request.CookTimeMinutes,
+                RestTimeMinutes: request.RestTimeMinutes,
+                ActiveTimeMinutes: request.ActiveTimeMinutes,
+                TotalTimeMinutes: request.TotalTimeMinutes,
+                IsTotalManual: request.IsTotalManual);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Устанавливает выход рецепта (UC-DSH-041). Полная замена значений
+        /// <c>Yield</c>: <c>QuantityTotal</c>, <c>YieldUnit</c>, <c>ServingsCount</c>,
+        /// <c>GramsPerServing</c>. Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Новые значения выхода.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном обновлении;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>) при отсутствии блюда;
+        /// <c>409 Conflict</c> (<c>DISHES.INVALID_YIELD</c>) если Domain-инвариант нарушен.
+        /// </returns>
+        [HttpPut("{id:guid}/recipe/yield")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> SetYieldAsync(
+            Guid id,
+            [FromBody] SetYieldRequest request,
+            CancellationToken ct)
+        {
+            var command = new SetYieldCommand(
+                DishId: id,
+                QuantityTotal: request.QuantityTotal,
+                YieldUnit: request.YieldUnit,
+                ServingsCount: request.ServingsCount,
+                GramsPerServing: request.GramsPerServing);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Устанавливает КБЖУ рецепта (UC-DSH-042). Если у рецепта ещё нет записи
+        /// <c>Nutrition</c> — она создаётся; иначе перезаписывается. Доступно автору
+        /// или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// Валидация (неотрицательность всех значений, <c>Sugar ≤ Carbs</c>,
+        /// <c>SaturatedFats ≤ Fats</c>) выполняется на уровне команды.
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Новые значения КБЖУ.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном обновлении;
+        /// <c>400 Bad Request</c> при ошибке валидации;
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>) при отсутствии блюда.
+        /// </returns>
+        [HttpPut("{id:guid}/recipe/nutrition")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> SetNutritionAsync(
+            Guid id,
+            [FromBody] SetNutritionRequest request,
+            CancellationToken ct)
+        {
+            var command = new SetNutritionCommand(
+                DishId: id,
+                CalcMethod: request.CalcMethod,
+                Calories: request.Calories,
+                Proteins: request.Proteins,
+                Fats: request.Fats,
+                SaturatedFats: request.SaturatedFats,
+                Carbs: request.Carbs,
+                Sugar: request.Sugar,
+                Fiber: request.Fiber,
+                Salt: request.Salt);
 
             Result result = await Sender.Send(command, ct);
             return MapResult(result);
