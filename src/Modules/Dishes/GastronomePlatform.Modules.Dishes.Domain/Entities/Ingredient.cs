@@ -18,6 +18,22 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
     /// </remarks>
     public sealed class Ingredient : Entity<Guid>
     {
+        #region Limits
+
+        /// <summary>Минимальная длина <see cref="Name"/> после trim.</summary>
+        public const int MIN_NAME_LENGTH = 2;
+
+        /// <summary>Максимальная длина <see cref="Name"/>.</summary>
+        public const int MAX_NAME_LENGTH = 200;
+
+        /// <summary>Максимальная длина <see cref="PluralName"/>.</summary>
+        public const int MAX_PLURAL_NAME_LENGTH = 200;
+
+        /// <summary>Максимальная длина <see cref="Description"/>.</summary>
+        public const int MAX_DESCRIPTION_LENGTH = 4000;
+
+        #endregion
+
         #region Properties
 
         /// <summary>
@@ -208,6 +224,81 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
                 baseMeasureUnitId,
                 defaultNutritionId,
                 createdAt);
+        }
+
+        #endregion
+
+        #region Update Methods
+
+        /// <summary>
+        /// Обновляет все редактируемые поля ингредиента (UC-DSH-111 UpdateIngredient).
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Условные инварианты (<see cref="IsLiquid"/> ⇒ <see cref="DensityApprox"/>;
+        /// <see cref="IsAllergen"/> ⇒ <see cref="AllergenType"/>) ожидаются проверенными
+        /// на уровне команды (FluentValidation). Domain их не дублирует —
+        /// defense-in-depth обеспечивается CHECK-constraints в БД.
+        /// </para>
+        /// <para>
+        /// Поле <see cref="IsActive"/> через этот метод не меняется — для активации/деактивации
+        /// есть отдельные <see cref="Activate"/> / <see cref="Deactivate"/> (UC-DSH-112).
+        /// </para>
+        /// </remarks>
+        /// <param name="name">Новое название (уникальное в справочнике).</param>
+        /// <param name="pluralName">Форма родительного падежа. Опционально.</param>
+        /// <param name="description">Описание. Опционально.</param>
+        /// <param name="imageMediaId">Идентификатор изображения в Media. Опционально.</param>
+        /// <param name="isLiquid">Флаг «продукт жидкий».</param>
+        /// <param name="densityApprox">Плотность, г/мл. Обязательно при <paramref name="isLiquid"/>.</param>
+        /// <param name="isAllergen">Флаг «продукт-аллерген».</param>
+        /// <param name="allergenType">Тип аллергена. Обязательно при <paramref name="isAllergen"/>.</param>
+        /// <param name="dietConflictsMask">Маска конфликтующих диет-меток.</param>
+        /// <param name="baseMeasureUnitId">Базовая единица хранения.</param>
+        /// <param name="defaultNutritionId">Идентификатор КБЖУ по умолчанию. Опционально.</param>
+        public void Update(
+            string name,
+            string? pluralName,
+            string? description,
+            Guid? imageMediaId,
+            bool isLiquid,
+            decimal? densityApprox,
+            bool isAllergen,
+            AllergenType? allergenType,
+            DietLabels dietConflictsMask,
+            Guid baseMeasureUnitId,
+            Guid? defaultNutritionId)
+        {
+            Name = name;
+            PluralName = pluralName;
+            Description = description;
+            ImageMediaId = imageMediaId;
+            IsLiquid = isLiquid;
+            DensityApprox = densityApprox;
+            IsAllergen = isAllergen;
+            AllergenType = allergenType;
+            DietConflictsMask = dietConflictsMask;
+            BaseMeasureUnitId = baseMeasureUnitId;
+            DefaultNutritionId = defaultNutritionId;
+        }
+
+        /// <summary>
+        /// Деактивирует ингредиент (UC-DSH-112). Существующие <c>RecipeIngredient</c>,
+        /// ссылающиеся на этот ингредиент, остаются работоспособными — при добавлении
+        /// в новые рецепты ингредиент не предлагается (см. <c>SearchActiveByNamePrefixAsync</c>).
+        /// </summary>
+        public void Deactivate()
+        {
+            IsActive = false;
+        }
+
+        /// <summary>
+        /// Активирует ранее деактивированный ингредиент. Парный метод для
+        /// <see cref="Deactivate"/>.
+        /// </summary>
+        public void Activate()
+        {
+            IsActive = true;
         }
 
         #endregion

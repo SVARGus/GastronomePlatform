@@ -114,6 +114,10 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
             Error.NotFound("DISHES.TAG_NOT_FOUND",
                 "Тег не найден в справочнике.");
 
+        public static readonly Error IngredientNameTaken =
+            Error.Conflict("DISHES.INGREDIENT_NAME_TAKEN",
+                "Ингредиент с таким названием уже существует в справочнике.");
+
         public static readonly Error DuplicateTagId =
             Error.Conflict("DISHES.DUPLICATE_TAG_ID",
                 "Список тегов не должен содержать дубликатов.");
