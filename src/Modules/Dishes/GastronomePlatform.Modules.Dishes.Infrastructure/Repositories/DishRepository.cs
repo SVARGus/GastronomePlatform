@@ -92,6 +92,30 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
         }
 
         /// <inheritdoc/>
+        public async Task<(IReadOnlyList<Dish> Items, int TotalCount)> ListPublishedByAuthorAsync(
+            Guid authorUserId,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            // Фильтр публичных блюд — наличие jsonb-снепшота. Сравнение с null
+            // транслируется в "PublishedVersionData IS NOT NULL".
+            IQueryable<Dish> query = _context.Dishes
+                .AsNoTracking()
+                .Where(d => d.AuthorUserId == authorUserId && d.PublishedVersionData != null);
+
+            int totalCount = await query.CountAsync(cancellationToken);
+
+            List<Dish> items = await query
+                .OrderByDescending(d => d.PublishedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return (items, totalCount);
+        }
+
+        /// <inheritdoc/>
         public async Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default)
             => await _context.Dishes.AnyAsync(d => d.Slug == slug, cancellationToken);
 

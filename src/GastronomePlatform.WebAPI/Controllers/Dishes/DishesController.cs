@@ -26,6 +26,7 @@ using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeIngredi
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeStep;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishBySlug;
+using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishesByAuthor;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
@@ -396,6 +397,41 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             GetDishBySlugQuery query = new(Slug: slug);
 
             Result<DishDetailDto> result = await Sender.Send(query, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Возвращает постраничный список опубликованных блюд указанного автора
+        /// (UC-DSH-055). Эндпоинт анонимный — карточки публичных блюд видны всем.
+        /// </summary>
+        /// <remarks>
+        /// Сортировка — по <c>PublishedAt</c> убыванию (свежие сверху). В выдачу
+        /// попадают только блюда с <c>PublishedVersionData IS NOT NULL</c> — черновики,
+        /// снятые и архивированные не показываются даже самому автору (для черновиков —
+        /// UC-DSH-053 GetMyDrafts).
+        /// </remarks>
+        /// <param name="authorUserId">Идентификатор автора.</param>
+        /// <param name="page">Номер страницы, начиная с 1. По умолчанию 1.</param>
+        /// <param name="pageSize">Количество элементов на странице (1..25). По умолчанию 12.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>200 OK</c> с <see cref="GetDishesByAuthorResult"/> (пустой список <c>Items</c> —
+        /// допустимый ответ для автора без публикаций);
+        /// <c>400 Bad Request</c> при ошибке валидации параметров.
+        /// </returns>
+        [HttpGet("by-author/{authorUserId:guid}")]
+        public async Task<IActionResult> GetByAuthorAsync(
+            Guid authorUserId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 12,
+            CancellationToken ct = default)
+        {
+            GetDishesByAuthorQuery query = new(
+                AuthorUserId: authorUserId,
+                Page: page,
+                PageSize: pageSize);
+
+            Result<GetDishesByAuthorResult> result = await Sender.Send(query, ct);
             return MapResult(result);
         }
 
