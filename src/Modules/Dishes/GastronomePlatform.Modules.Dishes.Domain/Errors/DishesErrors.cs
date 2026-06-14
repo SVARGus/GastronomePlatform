@@ -106,6 +106,10 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
             Error.Conflict("DISHES.DUPLICATE_CATEGORY_ID",
                 "Список категорий не должен содержать дубликатов.");
 
+        public static readonly Error CategoryNotFound =
+            Error.NotFound("DISHES.CATEGORY_NOT_FOUND",
+                "Одна или несколько категорий не найдены в справочнике или деактивированы.");
+
         public static readonly Error DuplicateTagId =
             Error.Conflict("DISHES.DUPLICATE_TAG_ID",
                 "Список тегов не должен содержать дубликатов.");

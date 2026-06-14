@@ -48,9 +48,10 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Extensions
             services.AddScoped<IIngredientRepository, IngredientRepository>();
             services.AddScoped<IMeasureUnitRepository, MeasureUnitRepository>();
             services.AddScoped<IIngredientSpecRepository, IngredientSpecRepository>();
+            services.AddScoped<ICategoryRepository, CategoryRepository>();
 
-            // TODO: остальные репозитории (ICategoryRepository, ITagRepository,
-            // INutritionRepository) — по мере появления UC
+            // TODO: остальные репозитории (ITagRepository, INutritionRepository) —
+            // по мере появления UC
             // TODO: специфичные сервисы модуля (например, для проверки POL-001 Dish Ownership)
 
             // Сборщик jsonb-снепшота для UC-DSH-004 Publish. Stateless, без I/O — Singleton.

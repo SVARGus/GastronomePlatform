@@ -12,6 +12,7 @@ using GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeIngredi
 using GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeStep;
 using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeIngredients;
 using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeSteps;
+using GastronomePlatform.Modules.Dishes.Application.Commands.SetCategories;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetHistory;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetNutrition;
@@ -80,6 +81,14 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             CostEstimate CostEstimate,
             string? ShortDescription,
             string? Description);
+
+        /// <summary>
+        /// Данные для установки набора категорий блюда (UC-DSH-007). Replace-семантика:
+        /// присланный список полностью заменяет текущий набор. Пустой список —
+        /// снять все категории.
+        /// </summary>
+        /// <param name="CategoryIds">Идентификаторы категорий (0–3, без дубликатов).</param>
+        public sealed record SetCategoriesRequest(IReadOnlyList<Guid> CategoryIds);
 
         /// <summary>
         /// Данные для установки диетических меток блюда (UC-DSH-009).
@@ -711,6 +720,46 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
                 Sugar: request.Sugar,
                 Fiber: request.Fiber,
                 Salt: request.Salt);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Устанавливает набор категорий блюда (UC-DSH-007). Replace-семантика:
+        /// присланный список полностью заменяет текущий. Пустой список — снять
+        /// все категории. Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// Лимит — 3 категории, без дубликатов. Существование каждой <c>CategoryId</c>
+        /// и активность категории проверяются перед делегированием в Domain.
+        /// Правка не трогает <c>PublishedVersionData</c> и <c>DishCategoryPublished</c>:
+        /// каталог продолжает показывать прежний набор до явной перепубликации (UC-DSH-004).
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Новый набор идентификаторов категорий.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешной установке;
+        /// <c>400 Bad Request</c> при ошибке валидации (превышен лимит, дубликаты, пустой Guid);
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>) при отсутствии блюда
+        /// или (<c>DISHES.CATEGORY_NOT_FOUND</c>) если одна или несколько категорий
+        /// не найдены или неактивны;
+        /// <c>409 Conflict</c> (<c>DISHES.CATEGORY_LIMIT_EXCEEDED</c> /
+        /// <c>DISHES.DUPLICATE_CATEGORY_ID</c>) — defense-in-depth от Domain.
+        /// </returns>
+        [HttpPut("{id:guid}/categories")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> SetCategoriesAsync(
+            Guid id,
+            [FromBody] SetCategoriesRequest request,
+            CancellationToken ct)
+        {
+            var command = new SetCategoriesCommand(
+                DishId: id,
+                CategoryIds: request.CategoryIds);
 
             Result result = await Sender.Send(command, ct);
             return MapResult(result);

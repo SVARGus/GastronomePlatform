@@ -38,6 +38,25 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         Task<IReadOnlyList<Category>> ListActiveAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Возвращает категории, идентификаторы которых входят в указанный набор.
+        /// Используется в UC-DSH-007 SetCategories для проверки существования всех
+        /// присланных <c>CategoryId</c> одним SQL-запросом.
+        /// </summary>
+        /// <remarks>
+        /// Возвращает только активные категории (<see cref="Category.IsActive"/> = <see langword="true"/>) —
+        /// присвоение деактивированной категории блюду не должно проходить. Если количество
+        /// возвращённых записей не совпадает с количеством запрошенных <c>id</c> — какой-то
+        /// идентификатор не существует или неактивен, Application Handler должен вернуть ошибку.
+        /// При пустом наборе возвращает пустой список без обращения к БД.
+        /// </remarks>
+        /// <param name="ids">Набор идентификаторов категорий для проверки.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Найденные активные категории; порядок не гарантируется.</returns>
+        Task<IReadOnlyList<Category>> ListByIdsAsync(
+            IReadOnlyCollection<Guid> ids,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Добавляет новую категорию в хранилище. Вызывается из admin-команды UC-DSH-101.
         /// </summary>
         /// <param name="category">Категория для сохранения.</param>
