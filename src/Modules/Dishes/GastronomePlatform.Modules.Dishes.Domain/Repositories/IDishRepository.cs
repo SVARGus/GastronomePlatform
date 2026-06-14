@@ -64,6 +64,21 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         Task<Dish?> GetByIdWithCategoriesAsync(Guid id, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Находит блюдо с подгруженной коллекцией <see cref="Dish.Tags"/>
+        /// (без <c>Recipe</c> и <c>Categories</c>). Используется в командах replace-семантики
+        /// набора тегов (UC-DSH-008): без явной подгрузки коллекции EF Core не
+        /// отследит удаление существующих записей <c>DishTag</c> при
+        /// <c>_tags.Clear()</c> в Domain.
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see cref="Dish"/> с подгруженной коллекцией <see cref="Dish.Tags"/>,
+        /// если запись найдена; иначе <see langword="null"/>.
+        /// </returns>
+        Task<Dish?> GetByIdWithTagsAsync(Guid id, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Находит блюдо по уникальному <see cref="Dish.Slug"/>.
         /// Используется для публичного доступа к карточке блюда
         /// (UC-DSH-050, UC-DSH-051, UC-DSH-052).

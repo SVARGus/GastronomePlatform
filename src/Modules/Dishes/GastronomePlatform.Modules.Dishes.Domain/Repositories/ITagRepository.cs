@@ -22,13 +22,51 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         /// Используется для дедупликации перед созданием нового тега
         /// (UC-DSH-008 SetTags): «Без глютена» и «без глютена» должны мапиться на одну запись.
         /// </summary>
-        /// <param name="normalizedName">Нормализованное имя тега (lowercase + trim + транслит).</param>
+        /// <param name="normalizedName">Нормализованное имя тега (lowercase + trim + collapse пробелов).</param>
         /// <param name="cancellationToken">Токен отмены операции.</param>
         /// <returns>
         /// <see cref="Tag"/>, если запись с таким нормализованным именем найдена;
         /// иначе <see langword="null"/>.
         /// </returns>
         Task<Tag?> GetByNormalizedNameAsync(string normalizedName, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Возвращает теги, нормализованные имена которых входят в указанный набор.
+        /// Используется в UC-DSH-008 SetTags для batch-резолва входного набора имён:
+        /// найденные теги переиспользуются, отсутствующие создаются Application Handler-ом.
+        /// </summary>
+        /// <param name="normalizedNames">Набор нормализованных имён для поиска.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Найденные теги; порядок не гарантируется. Пустой список при пустом входе.</returns>
+        Task<IReadOnlyList<Tag>> ListByNormalizedNamesAsync(
+            IReadOnlyCollection<string> normalizedNames,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Возвращает теги, идентификаторы которых входят в указанный набор.
+        /// Используется в UC-DSH-008 SetTags для загрузки <see cref="Tag"/>-объектов,
+        /// у которых нужно изменить <see cref="Tag.UsageCount"/> (дельта старых/новых тегов).
+        /// </summary>
+        /// <param name="ids">Набор идентификаторов тегов для загрузки.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Найденные теги; порядок не гарантируется. Пустой список при пустом входе.</returns>
+        Task<IReadOnlyList<Tag>> ListByIdsAsync(
+            IReadOnlyCollection<Guid> ids,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Проверяет, существует ли тег с указанным <see cref="Tag.Slug"/>.
+        /// Используется при создании нового тега для разрешения коллизий
+        /// автоматически сгенерированного slug — Application Handler добавляет суффикс
+        /// (<c>-2</c>, <c>-3</c>, …) до тех пор, пока метод не вернёт <see langword="false"/>.
+        /// </summary>
+        /// <param name="slug">URL-friendly идентификатор для проверки.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see langword="true"/>, если тег с таким slug уже существует;
+        /// иначе <see langword="false"/>.
+        /// </returns>
+        Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Добавляет новый тег в хранилище.

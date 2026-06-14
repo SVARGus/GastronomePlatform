@@ -20,11 +20,15 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Configura
 
             builder.Property(x => x.Name)
                 .IsRequired()
-                .HasMaxLength(50);
+                .HasMaxLength(Tag.MAX_NAME_LENGTH);
 
             builder.Property(x => x.NormalizedName)
                 .IsRequired()
-                .HasMaxLength(50);
+                .HasMaxLength(Tag.MAX_NAME_LENGTH);
+
+            builder.Property(x => x.Slug)
+                .IsRequired()
+                .HasMaxLength(Tag.MAX_SLUG_LENGTH);
 
             builder.Property(x => x.UsageCount)
                 .IsRequired()
@@ -40,6 +44,9 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Configura
                 .IsRequired();
 
             builder.HasIndex(x => x.NormalizedName)
+                .IsUnique();
+
+            builder.HasIndex(x => x.Slug)
                 .IsUnique();
         }
     }

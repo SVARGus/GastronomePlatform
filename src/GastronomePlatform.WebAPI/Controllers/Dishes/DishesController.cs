@@ -16,6 +16,7 @@ using GastronomePlatform.Modules.Dishes.Application.Commands.SetCategories;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetHistory;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetNutrition;
+using GastronomePlatform.Modules.Dishes.Application.Commands.SetTags;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetTiming;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetYield;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UnpublishDish;
@@ -89,6 +90,16 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// </summary>
         /// <param name="CategoryIds">Идентификаторы категорий (0–3, без дубликатов).</param>
         public sealed record SetCategoriesRequest(IReadOnlyList<Guid> CategoryIds);
+
+        /// <summary>
+        /// Данные для установки набора тегов блюда (UC-DSH-008). Replace-семантика:
+        /// присланный список имён полностью заменяет текущий набор. Сервер выполняет
+        /// find-or-create по нормализованной форме (lowercase + trim + collapse-whitespace).
+        /// Дубликаты по нормализации схлопываются (например, «Веган» и «веган» — один тег).
+        /// Пустой список — снять все теги.
+        /// </summary>
+        /// <param name="TagNames">Имена тегов (0..20 после дедупликации, до 100 элементов на входе).</param>
+        public sealed record SetTagsRequest(IReadOnlyList<string> TagNames);
 
         /// <summary>
         /// Данные для установки диетических меток блюда (UC-DSH-009).
@@ -760,6 +771,48 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             var command = new SetCategoriesCommand(
                 DishId: id,
                 CategoryIds: request.CategoryIds);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Устанавливает набор тегов блюда (UC-DSH-008). Replace-семантика:
+        /// присланный список имён полностью заменяет текущий. Пустой список —
+        /// снять все теги. Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// Клиент передаёт <b>имена</b>, не идентификаторы. Сервер делает find-or-create
+        /// по нормализованной форме (Trim + lowercase + collapse-whitespace). Существующие
+        /// теги переиспользуются, новые — создаются с автогенерируемым slug
+        /// (транслитерация через <c>ISlugGenerator</c>; коллизии разрешаются суффиксом).
+        /// Дубликаты по нормализации (например, «Веган» и «веган» в одной команде)
+        /// схлопываются без ошибки. <c>Tag.UsageCount</c> атомарно пересчитывается
+        /// по дельте старых/новых тегов. Правка не трогает <c>PublishedVersionData</c>
+        /// и связку <c>DishTagPublished</c>.
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="request">Имена тегов (0..100 на входе; после дедупликации не более 20).</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешной установке;
+        /// <c>400 Bad Request</c> при ошибке валидации (пустое имя, длина имени &gt; 50, &gt; 100 элементов);
+        /// <c>401 Unauthorized</c> если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>) если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>) при отсутствии блюда;
+        /// <c>409 Conflict</c> (<c>DISHES.TAG_LIMIT_EXCEEDED</c>) если после дедупликации
+        /// число уникальных тегов превышает 20.
+        /// </returns>
+        [HttpPut("{id:guid}/tags")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> SetTagsAsync(
+            Guid id,
+            [FromBody] SetTagsRequest request,
+            CancellationToken ct)
+        {
+            var command = new SetTagsCommand(
+                DishId: id,
+                TagNames: request.TagNames);
 
             Result result = await Sender.Send(command, ct);
             return MapResult(result);

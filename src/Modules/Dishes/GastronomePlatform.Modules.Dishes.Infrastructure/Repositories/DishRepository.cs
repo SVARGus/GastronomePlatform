@@ -58,6 +58,12 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
                 .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 
         /// <inheritdoc/>
+        public async Task<Dish?> GetByIdWithTagsAsync(Guid id, CancellationToken cancellationToken = default)
+            => await _context.Dishes
+                .Include(d => d.Tags)
+                .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+
+        /// <inheritdoc/>
         public async Task<Dish?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default)
             => await _context.Dishes.FirstOrDefaultAsync(d => d.Slug == slug, cancellationToken);
 

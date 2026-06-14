@@ -49,8 +49,9 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Extensions
             services.AddScoped<IMeasureUnitRepository, MeasureUnitRepository>();
             services.AddScoped<IIngredientSpecRepository, IngredientSpecRepository>();
             services.AddScoped<ICategoryRepository, CategoryRepository>();
+            services.AddScoped<ITagRepository, TagRepository>();
 
-            // TODO: остальные репозитории (ITagRepository, INutritionRepository) —
+            // TODO: остальные репозитории (INutritionRepository) —
             // по мере появления UC
             // TODO: специфичные сервисы модуля (например, для проверки POL-001 Dish Ownership)
 
