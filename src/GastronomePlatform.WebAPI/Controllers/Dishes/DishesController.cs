@@ -25,6 +25,7 @@ using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeIngredient;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeStep;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById;
+using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishBySlug;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
@@ -358,6 +359,41 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             CancellationToken ct)
         {
             GetDishByIdQuery query = new(DishId: id);
+
+            Result<DishDetailDto> result = await Sender.Send(query, ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Возвращает публичную карточку блюда по slug (UC-DSH-051). Эндпоинт анонимный.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// В отличие от <see cref="GetByIdAsync"/>, отдаёт <b>только</b> snapshot-версию:
+        /// slug — это публичный URL, и рабочая копия по slug не доступна. Если у блюда
+        /// нет <c>PublishedVersionData</c> (статус <c>Draft</c> или <c>Unpublished</c>),
+        /// возвращается <c>404</c> даже автору. Для редактирования рабочей версии
+        /// автор использует UC-DSH-050 (по Id).
+        /// </para>
+        /// <para>
+        /// Статус <c>Archived</c> также возвращает <c>404</c>.
+        /// Для автора/admin в ответе поднимается флаг <c>HasUnsavedChanges = true</c>,
+        /// если в рабочем слое есть правки относительно опубликованной версии.
+        /// </para>
+        /// </remarks>
+        /// <param name="slug">URL-friendly идентификатор блюда.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>200 OK</c> с <see cref="DishDetailDto"/> при успехе;
+        /// <c>400 Bad Request</c> при пустом или слишком длинном slug;
+        /// <c>404 Not Found</c>, если блюдо не найдено, архивировано или не опубликовано.
+        /// </returns>
+        [HttpGet("by-slug/{slug}")]
+        public async Task<IActionResult> GetBySlugAsync(
+            string slug,
+            CancellationToken ct)
+        {
+            GetDishBySlugQuery query = new(Slug: slug);
 
             Result<DishDetailDto> result = await Sender.Send(query, ct);
             return MapResult(result);
