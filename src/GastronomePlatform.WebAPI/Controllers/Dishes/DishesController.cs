@@ -3,6 +3,7 @@ using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Commands.AddCatalogIngredientToRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Commands.AddFreeformIngredientToRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Commands.AddRecipeStep;
+using GastronomePlatform.Modules.Dishes.Application.Commands.ArchiveDish;
 using GastronomePlatform.Modules.Dishes.Application.Commands.ChangeMainImage;
 using GastronomePlatform.Modules.Dishes.Application.Commands.CreateDishDraft;
 using GastronomePlatform.Modules.Dishes.Application.Commands.IncrementDishViews;
@@ -12,6 +13,7 @@ using GastronomePlatform.Modules.Dishes.Application.Commands.RemoveRecipeStep;
 using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeIngredients;
 using GastronomePlatform.Modules.Dishes.Application.Commands.ReorderRecipeSteps;
 using GastronomePlatform.Modules.Dishes.Application.Commands.SetDietLabels;
+using GastronomePlatform.Modules.Dishes.Application.Commands.UnpublishDish;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipe;
 using GastronomePlatform.Modules.Dishes.Application.Commands.UpdateRecipeIngredient;
@@ -724,6 +726,83 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
             CancellationToken ct)
         {
             Result result = await Sender.Send(new PublishDishCommand(id), ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Снимает блюдо с публикации (UC-DSH-005). Переводит блюдо в статус
+        /// <c>Unpublished</c>, обнуляет <c>PublishedVersionData</c> и очищает связки
+        /// <c>*Published</c>-таблиц. Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Тело запроса не требуется: снятие — переход состояния без дополнительных
+        /// параметров. Основные таблицы блюда не затрагиваются — автор может вернуться
+        /// к редактированию или повторно опубликовать через UC-DSH-004.
+        /// </para>
+        /// <para>
+        /// Снять с публикации можно только блюдо в статусе <c>Published</c>; для черновика,
+        /// уже снятого и архивного блюда возвращается <c>409 DISHES.DISH_NOT_PUBLISHED</c>.
+        /// </para>
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном снятии с публикации;
+        /// <c>400 Bad Request</c> при ошибке валидации (<c>DishId = Guid.Empty</c>);
+        /// <c>401 Unauthorized</c>, если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>), если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>), если блюдо не существует;
+        /// <c>409 Conflict</c> (<c>DISHES.DISH_NOT_PUBLISHED</c>), если блюдо не находится
+        /// в статусе <c>Published</c>.
+        /// </returns>
+        [HttpPost("{id:guid}/unpublish")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> UnpublishAsync(
+            Guid id,
+            CancellationToken ct)
+        {
+            Result result = await Sender.Send(new UnpublishDishCommand(id), ct);
+            return MapResult(result);
+        }
+
+        /// <summary>
+        /// Архивирует блюдо (UC-DSH-006). Мягкое удаление: блюдо перестаёт показываться
+        /// в каталоге и по прямой ссылке отдаёт <c>404</c>, но данные остаются в БД.
+        /// Доступно автору или Admin (POL-001).
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Допустимо архивировать блюдо в статусах <c>Draft</c>, <c>Published</c>,
+        /// <c>Unpublished</c>. Повторное архивирование возвращает
+        /// <c>409 DISHES.DISH_ALREADY_ARCHIVED</c>. Восстановление из <c>Archived</c>
+        /// автору на Этапе 2 недоступно (отдельный admin-UC появится позже).
+        /// </para>
+        /// <para>
+        /// Связанные медиафайлы (главное фото, иллюстрации шагов) намеренно не отвязываются —
+        /// они нужны для целостности будущих снепшотов модуля Orders (Этап 6+)
+        /// и возможного восстановления. Hard-delete медиа произойдёт только
+        /// при hard-delete блюда (Этап 8+).
+        /// </para>
+        /// </remarks>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешном архивировании;
+        /// <c>400 Bad Request</c> при ошибке валидации (<c>DishId = Guid.Empty</c>);
+        /// <c>401 Unauthorized</c>, если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.NOT_DISH_OWNER</c>), если пользователь не автор и не Admin;
+        /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>), если блюдо не существует;
+        /// <c>409 Conflict</c> (<c>DISHES.DISH_ALREADY_ARCHIVED</c>), если блюдо
+        /// уже находится в статусе <c>Archived</c>.
+        /// </returns>
+        [HttpPost("{id:guid}/archive")]
+        [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
+        public async Task<IActionResult> ArchiveAsync(
+            Guid id,
+            CancellationToken ct)
+        {
+            Result result = await Sender.Send(new ArchiveDishCommand(id), ct);
             return MapResult(result);
         }
 
