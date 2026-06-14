@@ -124,6 +124,37 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
         }
 
         /// <inheritdoc/>
+        public async Task<IReadOnlyList<Guid>> RemoveWithLinksAsync(
+            Guid tagId,
+            CancellationToken cancellationToken = default)
+        {
+            // Снимаем список затронутых блюд по рабочим связкам — нужен Application Handler-у
+            // для MarkAsUpdated. По *Published-таблице список повторяется, но он подмножество
+            // рабочего, поэтому отдельно его не возвращаем.
+            IReadOnlyList<Guid> affectedDishIds = await _context.Set<DishTag>()
+                .AsNoTracking()
+                .Where(dt => dt.TagId == tagId)
+                .Select(dt => dt.DishId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            // Каскад через EF8 ExecuteDeleteAsync — без загрузки в трекер.
+            await _context.Set<DishTag>()
+                .Where(dt => dt.TagId == tagId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            await _context.Set<DishTagPublished>()
+                .Where(dtp => dtp.TagId == tagId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            await _context.Tags
+                .Where(t => t.Id == tagId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            return affectedDishIds;
+        }
+
+        /// <inheritdoc/>
         public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
             => await _context.SaveChangesAsync(cancellationToken);
     }

@@ -223,6 +223,26 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
                     cancellationToken);
 
         /// <inheritdoc/>
+        public async Task<int> BulkMarkAsUpdatedAsync(
+            IReadOnlyCollection<Guid> dishIds,
+            DateTimeOffset utcNow,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(dishIds);
+
+            if (dishIds.Count == 0)
+            {
+                return 0;
+            }
+
+            return await _context.Dishes
+                .Where(d => dishIds.Contains(d.Id))
+                .ExecuteUpdateAsync(
+                    s => s.SetProperty(d => d.UpdatedAt, utcNow),
+                    cancellationToken);
+        }
+
+        /// <inheritdoc/>
         public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
             => await _context.SaveChangesAsync(cancellationToken);
     }

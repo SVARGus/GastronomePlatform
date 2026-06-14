@@ -105,6 +105,28 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         Task AddAsync(Tag tag, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Удаляет тег вместе со всеми связками <c>DishTag</c> и <c>DishTagPublished</c>
+        /// (UC-DSH-131 DeleteTag). Возвращает идентификаторы блюд, которые имели этот тег
+        /// в рабочей копии — Application Handler использует их для обновления
+        /// <c>Dish.UpdatedAt</c>.
+        /// </summary>
+        /// <remarks>
+        /// Каскад удаления связок выполняется через EF Core 8 <c>ExecuteDeleteAsync</c>
+        /// без загрузки блюд в трекер. Это безопасно: для пересчёта <c>UsageCount</c> нечего делать —
+        /// тег уходит целиком. <c>Dish.UpdatedAt</c> и <c>DishUpdatedEvent</c> поднимаются
+        /// в Handler-е после получения списка затронутых блюд.
+        /// </remarks>
+        /// <param name="tagId">Идентификатор удаляемого тега.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// Список идентификаторов блюд, у которых был этот тег в рабочей копии
+        /// (по таблице <c>DishTag</c>, до удаления). Пустой список — тег не использовался.
+        /// </returns>
+        Task<IReadOnlyList<Guid>> RemoveWithLinksAsync(
+            Guid tagId,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Сохраняет изменения в хранилище (Unit of Work).
         /// </summary>
         /// <param name="cancellationToken">Токен отмены операции.</param>

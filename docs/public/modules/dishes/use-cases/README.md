@@ -160,8 +160,8 @@ UI-страница — это **оркестратор**, который выз
 | UC-DSH-115 | Удалить сорт ингредиента (admin) | Cmd | Drafted | 8+ | |
 | UC-DSH-120 | Создать единицу измерения (admin) | Cmd | Drafted | 8+ | На Этапе 2 — seed-данные, без API |
 | UC-DSH-121 | Обновить единицу измерения (admin) | Cmd | Drafted | 8+ | |
-| UC-DSH-130 | Верифицировать тег (admin) | Cmd | Core | 2 | IsVerified = true |
-| UC-DSH-131 | Удалить тег (admin) | Cmd | Core | 2 | С каскадом по связям DishTag |
+| UC-DSH-130 | Верифицировать тег (admin) | Cmd | Core (реализовано) | 2 | `POST /api/tags/{id}/verify`. `IsVerified = true`. Идемпотентно. См. UC-DSH-130 |
+| UC-DSH-131 | Удалить тег (admin) | Cmd | Core (реализовано) | 2 | `DELETE /api/tags/{id}`. Hard delete + каскад DishTag/DishTagPublished + bulk UpdatedAt. См. UC-DSH-131 |
 | UC-DSH-132 | Объединить теги (admin) | Cmd | Drafted | 8+ | Слияние дубликатов после нормализации |
 | UC-DSH-140 | Перерегенерировать slug блюда (admin) | Cmd | Drafted | 8+ | Опасная операция; пока — вручную через БД |
 | UC-DSH-141 | Принудительно архивировать блюдо (admin) | Cmd | Drafted | 8+ | Без участия автора |
@@ -819,15 +819,19 @@ IngredientSpec. На Этапе 2 — без API, через seed.
 
 ##### UC-DSH-130 — Верифицировать тег (admin)
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** Core (реализовано). **Этап:** 2.
 
-IsVerified = true. После верификации тег попадает в общий список автокомплита.
+Подробное описание: [UC-DSH-130-VerifyTag.md](UC-DSH-130-VerifyTag.md).
+
+`POST /api/tags/{id}/verify`. Авторизация — роль `Admin`. `Tag.IsVerified = true`. Идемпотентно. После верификации тег попадает в облако популярных (UC-DSH-061).
 
 ##### UC-DSH-131 — Удалить тег (admin)
 
-**Тип:** Command. **Статус:** Core. **Этап:** 2.
+**Тип:** Command. **Статус:** Core (реализовано). **Этап:** 2.
 
-Hard delete. Каскад по DishTag. Используется для очистки спама/мата.
+Подробное описание: [UC-DSH-131-DeleteTag.md](UC-DSH-131-DeleteTag.md).
+
+`DELETE /api/tags/{id}`. Авторизация — роль `Admin`. Hard delete тега + каскадное удаление связок `DishTag` и `DishTagPublished` через EF8 `ExecuteDeleteAsync`. У всех затронутых блюд обновляется `Dish.UpdatedAt` через bulk-update (без `DishUpdatedEvent` — компромисс admin-каскада).
 
 ##### UC-DSH-132 — Объединить теги (admin)
 

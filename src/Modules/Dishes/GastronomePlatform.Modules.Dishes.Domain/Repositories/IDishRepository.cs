@@ -224,6 +224,29 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         Task<int> IncrementViewsAsync(Guid dishId, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Массово обновляет <see cref="Dish.UpdatedAt"/> у блюд из указанного набора.
+        /// Используется в admin-сценариях каскадного изменения связок (например,
+        /// UC-DSH-131 DeleteTag) — у каждого затронутого блюда состав связок поменялся,
+        /// и индикатор «есть несохранённые правки» должен сработать.
+        /// </summary>
+        /// <remarks>
+        /// Реализуется через EF Core 8 <c>ExecuteUpdateAsync</c> одним <c>UPDATE</c>
+        /// без загрузки агрегатов. Доменные события (<c>DishUpdatedEvent</c>) при этом
+        /// не поднимаются — это сознательный компромисс admin-операций массового
+        /// каскада: подписчиков на Этапе 2 нет, а грузить десятки агрегатов ради
+        /// одного поля и события дорого. При появлении подписчиков (Этап 5+)
+        /// потребуется явный механизм рассылки событий после batch-update.
+        /// </remarks>
+        /// <param name="dishIds">Идентификаторы блюд для обновления. Пустой набор — no-op.</param>
+        /// <param name="utcNow">Новое значение <see cref="Dish.UpdatedAt"/>.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Количество затронутых строк.</returns>
+        Task<int> BulkMarkAsUpdatedAsync(
+            IReadOnlyCollection<Guid> dishIds,
+            DateTimeOffset utcNow,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Сохраняет изменения в хранилище (Unit of Work).
         /// </summary>
         /// <param name="cancellationToken">Токен отмены операции.</param>

@@ -169,6 +169,27 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             }
         }
 
+        /// <summary>
+        /// Помечает тег как верифицированный администратором (UC-DSH-130 VerifyTag).
+        /// После верификации тег попадает в облако популярных (UC-DSH-061) и в общий
+        /// автокомплит даже при низком <see cref="UsageCount"/>.
+        /// </summary>
+        public void Verify()
+        {
+            IsVerified = true;
+        }
+
+        /// <summary>
+        /// Снимает верификацию тега. Парный метод для <see cref="Verify"/>, на случай
+        /// если admin ошибся. На Этапе 2 отдельный UC для этого не выделен — UI может
+        /// использовать тот же эндпоинт <c>UC-DSH-130</c> с параметром, либо отдельный
+        /// admin-сценарий появится по требованию.
+        /// </summary>
+        public void Unverify()
+        {
+            IsVerified = false;
+        }
+
         #endregion
     }
 }
