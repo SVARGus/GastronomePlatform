@@ -44,6 +44,32 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
 
         /// <inheritdoc/>
+        public async Task<IReadOnlyList<Ingredient>> SearchActiveByNamePrefixAsync(
+            string namePrefix,
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(namePrefix);
+
+            if (namePrefix.Length == 0 || limit <= 0)
+            {
+                return Array.Empty<Ingredient>();
+            }
+
+            // ILike — PostgreSQL-specific оператор, регистронезависимый. EF.Functions.ILike
+            // транслируется в нативный ILIKE; индекс по Name (если есть) используется
+            // только для префиксного поиска без wildcard в начале.
+            string pattern = namePrefix + "%";
+
+            return await _context.Ingredients
+                .AsNoTracking()
+                .Where(x => x.IsActive && EF.Functions.ILike(x.Name, pattern))
+                .OrderBy(x => x.Name)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+        }
+
+        /// <inheritdoc/>
         public async Task AddAsync(Ingredient ingredient, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(ingredient);

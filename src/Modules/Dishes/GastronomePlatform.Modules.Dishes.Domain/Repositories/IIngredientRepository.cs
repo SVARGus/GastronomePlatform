@@ -37,6 +37,21 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         Task<IReadOnlyList<Ingredient>> ListActiveAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Возвращает активные ингредиенты, имя которых начинается с указанного префикса
+        /// (case-insensitive). Используется в UC-DSH-062 SearchIngredients для UI
+        /// добавления ингредиента в рецепт. Ранжирование — по алфавиту имени.
+        /// </summary>
+        /// <param name="namePrefix">Префикс имени для поиска. Учёт регистра отключён
+        /// на уровне SQL через <c>ILIKE</c> / <c>EF.Functions.ILike</c>.</param>
+        /// <param name="limit">Максимальное количество возвращаемых записей.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Список ингредиентов, отсортированный по имени.</returns>
+        Task<IReadOnlyList<Ingredient>> SearchActiveByNamePrefixAsync(
+            string namePrefix,
+            int limit,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Добавляет новый ингредиент в хранилище. Вызывается из admin-команды UC-DSH-111.
         /// </summary>
         /// <param name="ingredient">Ингредиент для сохранения.</param>

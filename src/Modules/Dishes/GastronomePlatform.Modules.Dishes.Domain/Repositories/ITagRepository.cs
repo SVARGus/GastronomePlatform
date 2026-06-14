@@ -55,6 +55,34 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Возвращает теги, у которых <see cref="Tag.NormalizedName"/> начинается
+        /// с указанного префикса. Используется для автокомплита (UC-DSH-060).
+        /// Ранжирование по <see cref="Tag.UsageCount"/> по убыванию;
+        /// при равенстве — по имени.
+        /// </summary>
+        /// <param name="normalizedPrefix">Нормализованный префикс поиска
+        /// (lowercase + trim, формируется <c>TagNameNormalizer</c>).</param>
+        /// <param name="limit">Максимальное количество возвращаемых записей.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Список тегов, отсортированный по популярности и имени.</returns>
+        Task<IReadOnlyList<Tag>> SearchByNormalizedNamePrefixAsync(
+            string normalizedPrefix,
+            int limit,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Возвращает топ-N верифицированных тегов по <see cref="Tag.UsageCount"/>
+        /// (UC-DSH-061). Только <see cref="Tag.IsVerified"/> = <see langword="true"/> —
+        /// для облака тегов на главной странице нужны admin-одобренные теги.
+        /// </summary>
+        /// <param name="limit">Максимальное количество возвращаемых записей.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Список тегов, отсортированный по <see cref="Tag.UsageCount"/> убыванию.</returns>
+        Task<IReadOnlyList<Tag>> ListTopVerifiedByUsageAsync(
+            int limit,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Проверяет, существует ли тег с указанным <see cref="Tag.Slug"/>.
         /// Используется при создании нового тега для разрешения коллизий
         /// автоматически сгенерированного slug — Application Handler добавляет суффикс

@@ -72,6 +72,47 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
         }
 
         /// <inheritdoc/>
+        public async Task<IReadOnlyList<Tag>> SearchByNormalizedNamePrefixAsync(
+            string normalizedPrefix,
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(normalizedPrefix);
+
+            if (normalizedPrefix.Length == 0 || limit <= 0)
+            {
+                return Array.Empty<Tag>();
+            }
+
+            return await _context.Tags
+                .AsNoTracking()
+                .Where(x => x.NormalizedName.StartsWith(normalizedPrefix))
+                .OrderByDescending(x => x.UsageCount)
+                .ThenBy(x => x.NormalizedName)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<Tag>> ListTopVerifiedByUsageAsync(
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            if (limit <= 0)
+            {
+                return Array.Empty<Tag>();
+            }
+
+            return await _context.Tags
+                .AsNoTracking()
+                .Where(x => x.IsVerified)
+                .OrderByDescending(x => x.UsageCount)
+                .ThenBy(x => x.NormalizedName)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+        }
+
+        /// <inheritdoc/>
         public async Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default)
             => await _context.Tags.AnyAsync(x => x.Slug == slug, cancellationToken);
 
