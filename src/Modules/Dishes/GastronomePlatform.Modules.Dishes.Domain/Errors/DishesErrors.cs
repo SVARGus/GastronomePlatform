@@ -118,6 +118,22 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
             Error.Conflict("DISHES.INGREDIENT_NAME_TAKEN",
                 "Ингредиент с таким названием уже существует в справочнике.");
 
+        public static readonly Error CategoryParentNotFound =
+            Error.NotFound("DISHES.CATEGORY_PARENT_NOT_FOUND",
+                "Родительская категория не найдена в справочнике или деактивирована.");
+
+        public static readonly Error CategoryDepthExceeded =
+            Error.Conflict("DISHES.CATEGORY_DEPTH_EXCEEDED",
+                "Глубина иерархии категорий не должна превышать 3 уровня.");
+
+        public static readonly Error CategorySlugTaken =
+            Error.Conflict("DISHES.CATEGORY_SLUG_TAKEN",
+                "Категория с таким slug уже существует.");
+
+        public static readonly Error CategoryMoveToOwnDescendant =
+            Error.Conflict("DISHES.CATEGORY_MOVE_TO_OWN_DESCENDANT",
+                "Категорию нельзя перемещать в её же поддерево.");
+
         public static readonly Error DuplicateTagId =
             Error.Conflict("DISHES.DUPLICATE_TAG_ID",
                 "Список тегов не должен содержать дубликатов.");

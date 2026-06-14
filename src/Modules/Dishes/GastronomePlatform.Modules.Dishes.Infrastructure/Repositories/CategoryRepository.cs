@@ -42,6 +42,12 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
                 .ToListAsync(cancellationToken);
 
         /// <inheritdoc/>
+        public async Task<IReadOnlyList<Category>> ListAllAsync(CancellationToken cancellationToken = default)
+            => await _context.Categories
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+
+        /// <inheritdoc/>
         public async Task<IReadOnlyList<Category>> ListByIdsAsync(
             IReadOnlyCollection<Guid> ids,
             CancellationToken cancellationToken = default)
@@ -58,6 +64,34 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
                 .Where(x => ids.Contains(x.Id) && x.IsActive)
                 .ToListAsync(cancellationToken);
         }
+
+        /// <inheritdoc/>
+        public async Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default)
+            => await _context.Categories.AnyAsync(x => x.Slug == slug, cancellationToken);
+
+        /// <inheritdoc/>
+        public async Task<bool> HasChildrenAsync(Guid categoryId, CancellationToken cancellationToken = default)
+            => await _context.Categories.AnyAsync(x => x.ParentId == categoryId, cancellationToken);
+
+        /// <inheritdoc/>
+        public async Task<bool> HasDishLinksAsync(Guid categoryId, CancellationToken cancellationToken = default)
+        {
+            bool inWorking = await _context.Set<DishCategory>()
+                .AnyAsync(dc => dc.CategoryId == categoryId, cancellationToken);
+            if (inWorking)
+            {
+                return true;
+            }
+
+            return await _context.Set<DishCategoryPublished>()
+                .AnyAsync(dcp => dcp.CategoryId == categoryId, cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public async Task<int> DeleteAsync(Guid categoryId, CancellationToken cancellationToken = default)
+            => await _context.Categories
+                .Where(x => x.Id == categoryId)
+                .ExecuteDeleteAsync(cancellationToken);
 
         /// <inheritdoc/>
         public async Task AddAsync(Category category, CancellationToken cancellationToken = default)

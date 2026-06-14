@@ -38,6 +38,63 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         Task<IReadOnlyList<Category>> ListActiveAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Возвращает все категории справочника, включая неактивные. Используется
+        /// в admin-сценариях (UC-DSH-104 MoveCategory) для проверки циклов и глубины
+        /// иерархии — деактивированные узлы тоже учитываются.
+        /// </summary>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Полный список категорий справочника.</returns>
+        Task<IReadOnlyList<Category>> ListAllAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Проверяет существование категории с указанным slug. Используется
+        /// в UC-DSH-101 CreateCategory и UC-DSH-105 RegenerateSlug для разрешения коллизий
+        /// автоматически сгенерированного slug — Application Handler добавляет суффикс
+        /// (<c>-2</c>, <c>-3</c>, …) до тех пор, пока метод не вернёт <see langword="false"/>.
+        /// </summary>
+        /// <param name="slug">URL-friendly идентификатор для проверки.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see langword="true"/>, если категория с таким slug уже существует;
+        /// иначе <see langword="false"/>.
+        /// </returns>
+        Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Проверяет, есть ли у указанной категории дочерние записи. Используется
+        /// в UC-DSH-103 для решения между hard delete и soft delete.
+        /// </summary>
+        /// <param name="categoryId">Идентификатор категории.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see langword="true"/>, если есть хотя бы один наследник; иначе <see langword="false"/>.
+        /// </returns>
+        Task<bool> HasChildrenAsync(Guid categoryId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Проверяет, есть ли связки <c>DishCategory</c> или <c>DishCategoryPublished</c>
+        /// для указанной категории. Используется в UC-DSH-103 для решения
+        /// между hard delete и soft delete: если категория где-то используется, удалять
+        /// её физически нельзя.
+        /// </summary>
+        /// <param name="categoryId">Идентификатор категории.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see langword="true"/>, если есть хотя бы одна связка; иначе <see langword="false"/>.
+        /// </returns>
+        Task<bool> HasDishLinksAsync(Guid categoryId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Физически удаляет категорию из БД (UC-DSH-103). Вызывается Application Handler-ом
+        /// только после проверки отсутствия детей и связок. Реализация — прямой
+        /// <c>ExecuteDeleteAsync</c> без загрузки агрегата в трекер.
+        /// </summary>
+        /// <param name="categoryId">Идентификатор категории.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Количество затронутых строк (1 при удалении, 0 если категории нет).</returns>
+        Task<int> DeleteAsync(Guid categoryId, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Возвращает категории, идентификаторы которых входят в указанный набор.
         /// Используется в UC-DSH-007 SetCategories для проверки существования всех
         /// присланных <c>CategoryId</c> одним SQL-запросом.

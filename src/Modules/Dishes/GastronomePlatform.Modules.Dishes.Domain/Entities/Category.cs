@@ -13,6 +13,22 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
     /// </remarks>
     public sealed class Category : Entity<Guid>
     {
+        #region Limits
+
+        /// <summary>Минимальная длина <see cref="Name"/> после trim.</summary>
+        public const int MIN_NAME_LENGTH = 2;
+
+        /// <summary>Максимальная длина <see cref="Name"/>.</summary>
+        public const int MAX_NAME_LENGTH = 100;
+
+        /// <summary>Максимальная длина <see cref="Slug"/>.</summary>
+        public const int MAX_SLUG_LENGTH = 120;
+
+        /// <summary>Максимальная глубина иерархии (корневая категория — 1).</summary>
+        public const int MAX_DEPTH = 3;
+
+        #endregion
+
         #region Properties
 
         /// <summary>
@@ -104,6 +120,65 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Entities
             int order)
         {
             return new Category(name, slug, parentId, order);
+        }
+
+        #endregion
+
+        #region Update Methods
+
+        /// <summary>
+        /// Обновляет редактируемые поля категории (UC-DSH-102 UpdateCategory).
+        /// Slug, <see cref="ParentId"/> и <see cref="IsActive"/> через этот метод
+        /// не меняются — для них есть отдельные операции:
+        /// <see cref="RegenerateSlug"/>, <see cref="Move"/>, <see cref="Activate"/> / <see cref="Deactivate"/>.
+        /// </summary>
+        /// <param name="name">Новое имя категории.</param>
+        /// <param name="order">Новый порядок отображения в группе.</param>
+        /// <param name="iconMediaId">Идентификатор иконки в Media. Опционально.</param>
+        public void Update(string name, int order, Guid? iconMediaId)
+        {
+            Name = name;
+            Order = order;
+            IconMediaId = iconMediaId;
+        }
+
+        /// <summary>
+        /// Меняет родителя категории (UC-DSH-104 MoveCategory). Проверка отсутствия
+        /// циклов и соблюдения <see cref="MAX_DEPTH"/> — задача Application Handler-а,
+        /// потому что для них нужен полный обход дерева.
+        /// </summary>
+        /// <param name="newParentId">Новый родитель или <see langword="null"/> для перемещения в корень.</param>
+        public void Move(Guid? newParentId)
+        {
+            ParentId = newParentId;
+        }
+
+        /// <summary>
+        /// Заменяет slug категории (UC-DSH-105 RegenerateSlug). Опасная операция —
+        /// ломает существующие публичные ссылки. Уникальность нового slug проверяется
+        /// в Application через <see cref="Repositories.ICategoryRepository.GetBySlugAsync"/>.
+        /// </summary>
+        /// <param name="newSlug">Новый уникальный URL-friendly идентификатор.</param>
+        public void RegenerateSlug(string newSlug)
+        {
+            Slug = newSlug;
+        }
+
+        /// <summary>
+        /// Активирует категорию (UC-DSH-103 Activate-обратная ветка).
+        /// </summary>
+        public void Activate()
+        {
+            IsActive = true;
+        }
+
+        /// <summary>
+        /// Деактивирует категорию: мягкое удаление, запись остаётся в БД, но скрыта
+        /// из каталога и автокомплитов (UC-DSH-103 при наличии связей или детей).
+        /// </summary>
+        public void Deactivate()
+        {
+            IsActive = false;
         }
 
         #endregion
