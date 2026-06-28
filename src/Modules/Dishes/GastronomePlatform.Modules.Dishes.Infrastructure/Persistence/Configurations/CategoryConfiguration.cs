@@ -20,11 +20,11 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Configura
 
             builder.Property(x => x.Name)
                 .IsRequired()
-                .HasMaxLength(100);
+                .HasMaxLength(Category.MAX_NAME_LENGTH);
 
             builder.Property(x => x.Slug)
                 .IsRequired()
-                .HasMaxLength(120);
+                .HasMaxLength(Category.MAX_SLUG_LENGTH);
 
             builder.Property(x => x.ParentId);
 

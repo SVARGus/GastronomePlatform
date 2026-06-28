@@ -32,10 +32,10 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Configura
 
             builder.Property(x => x.Name)
                 .IsRequired()
-                .HasMaxLength(200);
+                .HasMaxLength(Ingredient.MAX_NAME_LENGTH);
 
             builder.Property(x => x.PluralName)
-                .HasMaxLength(200);
+                .HasMaxLength(Ingredient.MAX_PLURAL_NAME_LENGTH);
 
             builder.Property(x => x.Description);
 

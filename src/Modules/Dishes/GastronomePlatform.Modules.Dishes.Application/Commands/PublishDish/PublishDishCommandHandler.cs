@@ -1,5 +1,6 @@
 using GastronomePlatform.Common.Application.Abstractions;
 using GastronomePlatform.Common.Application.Messaging;
+using GastronomePlatform.Common.Domain.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Snapshots;
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
@@ -18,7 +19,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish
     ///         <c>Recipe</c>, <c>Timing</c>, <c>Yield</c>, <c>Nutrition</c>, <c>Steps</c>,
     ///         <c>Ingredients</c>, <c>Categories</c>, <c>Tags</c>.</item>
     ///   <item>Проверка владения (POL-001 DishOwnership): автор блюда совпадает
-    ///         с идентификатором текущего пользователя.</item>
+    ///         с идентификатором текущего пользователя либо актор — Admin.</item>
     ///   <item>Pre-check инвариантов публикации через <see cref="Dish.CheckCanPublish"/>:
     ///         если блюдо не готово к публикации (Archived, AlreadyPublished, отсутствие
     ///         главного фото, шагов, ингредиентов или ненулевого общего времени) —
@@ -75,8 +76,9 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.PublishDish
                 return DishesErrors.DishNotFound;
             }
 
-            var actorUserId = _currentUser.UserId!.Value;
-            if (dish.AuthorUserId != actorUserId)
+            Guid actorUserId = _currentUser.UserId!.Value;
+            bool isAdmin = _currentUser.IsInRole(PlatformRoles.ADMIN);
+            if (dish.AuthorUserId != actorUserId && !isAdmin)
             {
                 return DishesErrors.NotDishOwner;
             }

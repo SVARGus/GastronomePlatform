@@ -1,5 +1,6 @@
 using GastronomePlatform.Common.Application.Abstractions;
 using GastronomePlatform.Common.Application.Messaging;
+using GastronomePlatform.Common.Domain.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Helpers;
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
@@ -16,7 +17,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard
     /// <list type="number">
     ///   <item>Загрузка блюда по <c>DishId</c> без рецепта (карточные поля не трогают рецепт).</item>
     ///   <item>Проверка владения (POL-001 DishOwnership): автор блюда совпадает
-    ///         с идентификатором текущего пользователя.</item>
+    ///         с идентификатором текущего пользователя либо актор — Admin.</item>
     ///   <item>Резолв актуального <see cref="Domain.Enums.OwnerType"/> из ролей пользователя.</item>
     ///   <item>Применение изменений через <see cref="Dish.UpdateCard"/>.</item>
     ///   <item>Сохранение (один транзакционный коммит).</item>
@@ -61,8 +62,9 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UpdateDishCard
                 return DishesErrors.DishNotFound;
             }
 
-            var actorUserId = _currentUser.UserId!.Value;
-            if (dish.AuthorUserId != actorUserId)
+            Guid actorUserId = _currentUser.UserId!.Value;
+            bool isAdmin = _currentUser.IsInRole(PlatformRoles.ADMIN);
+            if (dish.AuthorUserId != actorUserId && !isAdmin)
             {
                 return DishesErrors.NotDishOwner;
             }
