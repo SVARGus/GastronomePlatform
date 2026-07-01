@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.25">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Common\GastronomePlatform.Common.Infrastructure\GastronomePlatform.Common.Infrastructure.csproj" />
+    <ProjectReference Include="..\GastronomePlatform.Modules.Subscriptions.Application\GastronomePlatform.Modules.Subscriptions.Application.csproj" />
+  </ItemGroup>
+</Project>

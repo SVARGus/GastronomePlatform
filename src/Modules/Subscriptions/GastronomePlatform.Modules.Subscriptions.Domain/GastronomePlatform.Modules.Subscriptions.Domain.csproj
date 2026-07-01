@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Common\GastronomePlatform.Common.Domain\GastronomePlatform.Common.Domain.csproj" />
+  </ItemGroup>
+</Project>

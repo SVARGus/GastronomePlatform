@@ -61,6 +61,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Media.Infrastructure", "src\Modules\Media\GastronomePlatform.Modules.Media.Infrastructure\GastronomePlatform.Modules.Media.Infrastructure.csproj", "{6270A76F-16B0-4ED3-897E-C3BBB4221779}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Subscriptions", "Subscriptions", "{D5A8F4E1-67B9-4C2A-9E0F-3A5E8B1C2D4F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Subscriptions.Domain", "src\Modules\Subscriptions\GastronomePlatform.Modules.Subscriptions.Domain\GastronomePlatform.Modules.Subscriptions.Domain.csproj", "{E2B7C3F4-8D9E-4A1B-9C2D-5E6F7A8B9C0D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Subscriptions.Application", "src\Modules\Subscriptions\GastronomePlatform.Modules.Subscriptions.Application\GastronomePlatform.Modules.Subscriptions.Application.csproj", "{F3C8D4E5-9E0F-4B2C-AD3E-6F7A8B9C0D1E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GastronomePlatform.Modules.Subscriptions.Infrastructure", "src\Modules\Subscriptions\GastronomePlatform.Modules.Subscriptions.Infrastructure\GastronomePlatform.Modules.Subscriptions.Infrastructure.csproj", "{A1B9C0D1-E2F3-4D5E-9F60-718293A4B5C6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -143,6 +151,18 @@ Global
 		{6270A76F-16B0-4ED3-897E-C3BBB4221779}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6270A76F-16B0-4ED3-897E-C3BBB4221779}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6270A76F-16B0-4ED3-897E-C3BBB4221779}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2B7C3F4-8D9E-4A1B-9C2D-5E6F7A8B9C0D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2B7C3F4-8D9E-4A1B-9C2D-5E6F7A8B9C0D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2B7C3F4-8D9E-4A1B-9C2D-5E6F7A8B9C0D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2B7C3F4-8D9E-4A1B-9C2D-5E6F7A8B9C0D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F3C8D4E5-9E0F-4B2C-AD3E-6F7A8B9C0D1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F3C8D4E5-9E0F-4B2C-AD3E-6F7A8B9C0D1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F3C8D4E5-9E0F-4B2C-AD3E-6F7A8B9C0D1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F3C8D4E5-9E0F-4B2C-AD3E-6F7A8B9C0D1E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B9C0D1-E2F3-4D5E-9F60-718293A4B5C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B9C0D1-E2F3-4D5E-9F60-718293A4B5C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B9C0D1-E2F3-4D5E-9F60-718293A4B5C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B9C0D1-E2F3-4D5E-9F60-718293A4B5C6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -174,6 +194,10 @@ Global
 		{41653FEE-E0FA-44FA-BD88-155847B49D11} = {79BAD461-696C-48E6-9128-8577E84E0EE8}
 		{804BEFFB-3FAA-4F2F-B5EF-9BAAEDA7AA38} = {79BAD461-696C-48E6-9128-8577E84E0EE8}
 		{6270A76F-16B0-4ED3-897E-C3BBB4221779} = {79BAD461-696C-48E6-9128-8577E84E0EE8}
+		{D5A8F4E1-67B9-4C2A-9E0F-3A5E8B1C2D4F} = {00711347-4A39-4E92-801B-F2B91A6AD02B}
+		{E2B7C3F4-8D9E-4A1B-9C2D-5E6F7A8B9C0D} = {D5A8F4E1-67B9-4C2A-9E0F-3A5E8B1C2D4F}
+		{F3C8D4E5-9E0F-4B2C-AD3E-6F7A8B9C0D1E} = {D5A8F4E1-67B9-4C2A-9E0F-3A5E8B1C2D4F}
+		{A1B9C0D1-E2F3-4D5E-9F60-718293A4B5C6} = {D5A8F4E1-67B9-4C2A-9E0F-3A5E8B1C2D4F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0F038E81-ECD2-4406-A5D1-FF6E377DF99A}
