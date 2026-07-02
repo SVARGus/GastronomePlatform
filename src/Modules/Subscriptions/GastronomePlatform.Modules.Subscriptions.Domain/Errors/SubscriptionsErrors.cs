@@ -48,5 +48,78 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Errors
                 "Запрошенный оффер недоступен к покупке.");
 
         #endregion
+
+        #region Инварианты каталога (SubscriptionPlan)
+
+        /// <summary>У AddOn-плана не может быть покупочного роль-гейта <c>RequiredRole</c> (domain-model §4.7).</summary>
+        public static readonly Error AddOnCannotHaveRequiredRole =
+            Error.Validation("SUBS.ADDON_CANNOT_HAVE_ROLE",
+                "У AddOn-плана не может быть покупочного роль-гейта (RequiredRole).");
+
+        #endregion
+
+        #region Инварианты оффера (PlanPrice)
+
+        /// <summary>Сумма оффера отрицательна.</summary>
+        public static readonly Error PriceNegativeAmount =
+            Error.Validation("SUBS.PRICE_NEGATIVE_AMOUNT",
+                "Сумма оффера не может быть отрицательной.");
+
+        /// <summary>
+        /// Оффер вида <c>Trial</c> обязан иметь <c>Amount = 0</c> и заданный <c>TrialDays</c>
+        /// (domain-model §9).
+        /// </summary>
+        public static readonly Error PriceTrialRequiresFreeWithDays =
+            Error.Validation("SUBS.PRICE_TRIAL_REQUIRES_FREE_WITH_DAYS",
+                "Оффер вида Trial обязан иметь Amount = 0 и заданный TrialDays.");
+
+        /// <summary>
+        /// У непродляющегося оффера (<c>IsRecurring = false</c>) не может быть переходов
+        /// <c>RenewsAsPriceId</c>/<c>FallbackPriceId</c> — переходить некуда (domain-model §9).
+        /// </summary>
+        public static readonly Error PriceNonRecurringCannotTransition =
+            Error.Validation("SUBS.PRICE_NON_RECURRING_CANNOT_TRANSITION",
+                "У непродляющегося оффера не может быть переходов RenewsAs/Fallback.");
+
+        #endregion
+
+        #region Переходы UserSubscription
+
+        /// <summary>
+        /// Попытка активировать триал без заданного <c>TrialDays</c> оффера
+        /// (не проходит валидацию оффера в фабрике).
+        /// </summary>
+        public static readonly Error ActivateTrialRequiresTrialDays =
+            Error.Validation("SUBS.ACTIVATE_TRIAL_REQUIRES_TRIAL_DAYS",
+                "Для активации триала оффер должен содержать TrialDays.");
+
+        /// <summary>
+        /// Попытка активировать платный оффер без заданного <c>DurationDays</c>
+        /// (для Standard/Intro с ограниченной длительностью).
+        /// </summary>
+        public static readonly Error ActivatePaidRequiresDurationDays =
+            Error.Validation("SUBS.ACTIVATE_PAID_REQUIRES_DURATION_DAYS",
+                "Для активации платного оффера должен быть задан DurationDays.");
+
+        /// <summary>Отмена возможна только из статусов <c>Trialing</c> или <c>Active</c>.</summary>
+        public static readonly Error CannotCancelInStatus =
+            Error.Conflict("SUBS.CANNOT_CANCEL_IN_STATUS",
+                "Отмена возможна только для подписки в статусе Trialing или Active.");
+
+        /// <summary>Истечение возможно только из статуса <c>Canceled</c> (Phase A подмножество).</summary>
+        public static readonly Error CannotExpireInStatus =
+            Error.Conflict("SUBS.CANNOT_EXPIRE_IN_STATUS",
+                "Истечение возможно только для подписки в статусе Canceled.");
+
+        #endregion
+
+        #region Переходы SubscriptionPayment
+
+        /// <summary>Недопустимый переход статуса платежа (например, <c>Refunded</c> из <c>Pending</c>).</summary>
+        public static readonly Error PaymentInvalidTransition =
+            Error.Conflict("SUBS.PAYMENT_INVALID_TRANSITION",
+                "Недопустимый переход статуса платежа.");
+
+        #endregion
     }
 }
