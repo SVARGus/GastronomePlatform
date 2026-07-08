@@ -51,6 +51,35 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Repositories
         }
 
         /// <inheritdoc/>
+        public Task<bool> HasActiveBaseAsync(
+            Guid userId,
+            DateTimeOffset utcNow,
+            CancellationToken cancellationToken = default)
+        {
+            var query =
+                from subscription in _context.UserSubscriptions
+                where subscription.UserId == userId
+                      && (subscription.Status == SubscriptionStatus.Trialing
+                          || subscription.Status == SubscriptionStatus.Active
+                          || subscription.Status == SubscriptionStatus.PastDue
+                          || subscription.Status == SubscriptionStatus.Canceled)
+                      && subscription.CurrentPeriodEnd > utcNow
+                join plan in _context.SubscriptionPlans
+                    on subscription.PlanId equals plan.Id
+                where plan.PlanKind == PlanKind.Base
+                select subscription.Id;
+
+            return query.AnyAsync(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public async Task AddAsync(UserSubscription subscription, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(subscription);
+            await _context.UserSubscriptions.AddAsync(subscription, cancellationToken);
+        }
+
+        /// <inheritdoc/>
         public Task SaveChangesAsync(CancellationToken cancellationToken = default)
             => _context.SaveChangesAsync(cancellationToken);
     }

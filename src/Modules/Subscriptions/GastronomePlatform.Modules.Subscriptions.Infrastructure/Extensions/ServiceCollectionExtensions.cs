@@ -1,6 +1,8 @@
 using FluentValidation;
 using GastronomePlatform.Modules.Subscriptions.Application.Authorization;
+using GastronomePlatform.Modules.Subscriptions.Application.Payments;
 using GastronomePlatform.Modules.Subscriptions.Domain.Repositories;
+using GastronomePlatform.Modules.Subscriptions.Infrastructure.Payments;
 using GastronomePlatform.Modules.Subscriptions.Infrastructure.Persistence;
 using GastronomePlatform.Modules.Subscriptions.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -48,9 +50,11 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Extensions
             // Заглушка покупочного роль-гейта — реальная реализация на Этапе 6 (KYC через Users).
             services.AddScoped<IRoleEligibilityService, RoleEligibilityService>();
 
-            // IPaymentGateway (mock в Phase A → YooKassa в Phase B),
-            // hosted-сервис UC-SUB-200 (scheduler-скелет) —
-            // будут добавляться по мере появления UC-потребителей.
+            // Порт платёжного шлюза. Phase A — синтетический mock (всегда success),
+            // Phase B заменит реализацией через YooKassa + webhook UC-SUB-201.
+            services.AddScoped<IPaymentGateway, MockPaymentGateway>();
+
+            // Hosted-сервис UC-SUB-200 (scheduler-скелет) — по мере появления UC-потребителей.
 
             return services;
         }

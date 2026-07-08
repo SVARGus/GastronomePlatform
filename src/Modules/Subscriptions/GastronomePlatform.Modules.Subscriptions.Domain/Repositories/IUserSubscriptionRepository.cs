@@ -76,6 +76,47 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Repositories
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Проверяет, есть ли у пользователя активная <see cref="PlanKind.Base"/>-подписка.
+        /// Инвариант POL-004 §4.2 «мульти-слот»: одновременно допускается ≤1 активной Base
+        /// (AddOn-подписок может быть несколько).
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// «Активная» — тот же фильтр, что и в <see cref="ListActiveGrantsByUserAsync"/>:
+        /// <see cref="UserSubscription.Status"/> ∈ {
+        /// <see cref="SubscriptionStatus.Trialing"/>, <see cref="SubscriptionStatus.Active"/>,
+        /// <see cref="SubscriptionStatus.PastDue"/>, <see cref="SubscriptionStatus.Canceled"/> }
+        /// И <see cref="UserSubscription.CurrentPeriodEnd"/> &gt; <paramref name="utcNow"/>.
+        /// <see cref="SubscriptionStatus.Canceled"/> в фильтре, потому что доступ сохраняется
+        /// до конца оплаченного периода.
+        /// </para>
+        /// <para>
+        /// Реализация — JOIN <c>UserSubscriptions</c> ⋈ <c>SubscriptionPlans</c> по <c>PlanId</c>
+        /// для чтения <c>PlanKind</c>: денормализация <c>PlanKind</c> в <c>UserSubscription</c>
+        /// сознательно не делалась (см. лог сессии UC-SUB-020 — миграция БД дороже).
+        /// </para>
+        /// </remarks>
+        /// <param name="userId">Идентификатор пользователя.</param>
+        /// <param name="utcNow">Текущее время UTC.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see langword="true"/>, если у пользователя есть активная Base-подписка;
+        /// иначе <see langword="false"/>.
+        /// </returns>
+        Task<bool> HasActiveBaseAsync(
+            Guid userId,
+            DateTimeOffset utcNow,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Добавляет новую подписку в хранилище.
+        /// </summary>
+        /// <param name="subscription">Подписка для сохранения.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>Задача, представляющая асинхронную операцию.</returns>
+        Task AddAsync(UserSubscription subscription, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Сохраняет изменения в хранилище (Unit of Work).
         /// </summary>
         /// <param name="cancellationToken">Токен отмены операции.</param>

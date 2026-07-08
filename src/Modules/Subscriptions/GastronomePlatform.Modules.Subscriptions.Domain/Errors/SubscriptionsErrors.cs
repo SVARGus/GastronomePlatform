@@ -18,6 +18,10 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Errors
         public static readonly Error PlanNotFound =
             Error.NotFound("SUBS.PLAN_NOT_FOUND", "Тарифный план не найден.");
 
+        /// <summary>Оффер каталога не существует.</summary>
+        public static readonly Error PriceNotFound =
+            Error.NotFound("SUBS.PRICE_NOT_FOUND", "Оффер каталога не найден.");
+
         #endregion
 
         #region Авторизация (POL-004)
