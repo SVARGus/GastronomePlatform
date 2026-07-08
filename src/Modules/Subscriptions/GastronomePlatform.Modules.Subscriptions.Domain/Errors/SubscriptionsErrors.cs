@@ -56,6 +56,14 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Errors
             Error.Validation("SUBS.ADDON_CANNOT_HAVE_ROLE",
                 "У AddOn-плана не может быть покупочного роль-гейта (RequiredRole).");
 
+        /// <summary>
+        /// План с указанным <c>SubscriptionPlan.TechnicalName</c> уже существует
+        /// (partial UNIQUE-индекс).
+        /// </summary>
+        public static readonly Error TechnicalNameTaken =
+            Error.Conflict("SUBS.TECHNICAL_NAME_TAKEN",
+                "План с таким системным именем уже существует.");
+
         #endregion
 
         #region Инварианты оффера (PlanPrice)

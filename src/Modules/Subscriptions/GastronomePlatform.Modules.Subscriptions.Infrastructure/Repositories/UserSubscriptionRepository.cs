@@ -1,0 +1,57 @@
+using GastronomePlatform.Modules.Subscriptions.Domain.Entities;
+using GastronomePlatform.Modules.Subscriptions.Domain.Enums;
+using GastronomePlatform.Modules.Subscriptions.Domain.Repositories;
+using GastronomePlatform.Modules.Subscriptions.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Repositories
+{
+    /// <summary>
+    /// Реализация <see cref="IUserSubscriptionRepository"/> через EF Core.
+    /// </summary>
+    public sealed class UserSubscriptionRepository : IUserSubscriptionRepository
+    {
+        private readonly SubscriptionsDbContext _context;
+
+        /// <summary>
+        /// Инициализирует новый экземпляр <see cref="UserSubscriptionRepository"/>.
+        /// </summary>
+        /// <param name="context">Контекст базы данных модуля Subscriptions.</param>
+        public UserSubscriptionRepository(SubscriptionsDbContext context)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
+
+        /// <inheritdoc/>
+        public async Task<UserSubscription?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+            => await _context.UserSubscriptions
+                .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<FeatureGrant>> ListActiveGrantsByUserAsync(
+            Guid userId,
+            DateTimeOffset utcNow,
+            CancellationToken cancellationToken = default)
+        {
+            var query =
+                from subscription in _context.UserSubscriptions
+                where subscription.UserId == userId
+                      && (subscription.Status == SubscriptionStatus.Trialing
+                          || subscription.Status == SubscriptionStatus.Active
+                          || subscription.Status == SubscriptionStatus.PastDue
+                          || subscription.Status == SubscriptionStatus.Canceled)
+                      && subscription.CurrentPeriodEnd > utcNow
+                join grant in _context.PlanGrants
+                    on subscription.PlanId equals grant.PlanId
+                select grant.Grant;
+
+            return await query
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+            => _context.SaveChangesAsync(cancellationToken);
+    }
+}

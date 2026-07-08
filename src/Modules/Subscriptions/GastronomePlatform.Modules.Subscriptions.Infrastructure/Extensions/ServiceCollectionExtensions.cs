@@ -1,5 +1,8 @@
 using FluentValidation;
+using GastronomePlatform.Modules.Subscriptions.Application.Authorization;
+using GastronomePlatform.Modules.Subscriptions.Domain.Repositories;
 using GastronomePlatform.Modules.Subscriptions.Infrastructure.Persistence;
+using GastronomePlatform.Modules.Subscriptions.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,9 +36,20 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Extensions
             services.AddDbContext<SubscriptionsDbContext>(options =>
                 options.UseNpgsql(configuration.GetConnectionString("Database")));
 
-            // Репозитории, конфигурация, IPaymentGateway (mock в Phase A → YooKassa в Phase B),
-            // ISubscriptionAccessPolicy, ISubscriptionAccessService, IRoleEligibilityService,
-            // hosted-сервис UC-SUB-200 (scheduler-скелет) — будут добавляться по мере появления UC-потребителей.
+            // Репозитории (Phase A: минимальный набор под UC-SUB-001 и авторизацию POL-004).
+            services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+            services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
+
+            // Авторизация POL-004 (Application/Authorization/).
+            services.AddScoped<ISubscriptionAccessService, SubscriptionAccessService>();
+            services.AddScoped<ISubscriptionAccessPolicy, SubscriptionAccessPolicy>();
+
+            // Заглушка покупочного роль-гейта — реальная реализация на Этапе 6 (KYC через Users).
+            services.AddScoped<IRoleEligibilityService, RoleEligibilityService>();
+
+            // IPaymentGateway (mock в Phase A → YooKassa в Phase B),
+            // hosted-сервис UC-SUB-200 (scheduler-скелет) —
+            // будут добавляться по мере появления UC-потребителей.
 
             return services;
         }
