@@ -27,6 +27,17 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Repositories
                 .AnyAsync(p => p.TechnicalName == technicalName, cancellationToken);
 
         /// <inheritdoc/>
+        public Task<SubscriptionPlan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken = default)
+            => _context.SubscriptionPlans
+                .FirstOrDefaultAsync(p => p.Id == planId, cancellationToken);
+
+        /// <inheritdoc/>
+        public Task<SubscriptionPlan?> GetByIdWithGrantsAsync(Guid planId, CancellationToken cancellationToken = default)
+            => _context.SubscriptionPlans
+                .Include(p => p.Grants)
+                .FirstOrDefaultAsync(p => p.Id == planId, cancellationToken);
+
+        /// <inheritdoc/>
         public async Task AddAsync(SubscriptionPlan plan, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(plan);

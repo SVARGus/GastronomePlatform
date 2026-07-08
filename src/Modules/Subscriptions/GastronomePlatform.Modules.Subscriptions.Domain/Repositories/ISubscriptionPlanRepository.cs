@@ -6,10 +6,11 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Repositories
     /// Репозиторий каталога тарифных планов (<see cref="SubscriptionPlan"/>).
     /// </summary>
     /// <remarks>
-    /// Bootstrap-этап модуля (Phase A) — минимальный набор под UC-SUB-001
-    /// (Create) и pre-check уникальности <see cref="SubscriptionPlan.TechnicalName"/>.
-    /// Операции чтения витрины (UC-SUB-040) и редактирования плана (UC-SUB-002/003)
-    /// добавляются по мере появления соответствующих UC.
+    /// Набор методов расширяется по мере появления UC-потребителей: сейчас покрывает
+    /// UC-SUB-001 (Create + pre-check уникальности <see cref="SubscriptionPlan.TechnicalName"/>),
+    /// UC-SUB-004 (проверка существования плана перед добавлением оффера),
+    /// UC-SUB-007 (загрузка плана с составом грантов под <see cref="SubscriptionPlan.SetGrants"/>).
+    /// Витрина каталога (UC-SUB-040) — Phase C.
     /// </remarks>
     public interface ISubscriptionPlanRepository
     {
@@ -26,6 +27,31 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Repositories
         /// иначе <see langword="false"/>.
         /// </returns>
         Task<bool> TechnicalNameExistsAsync(string technicalName, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Возвращает план по идентификатору без загрузки связанных сущностей
+        /// (<c>Grants</c>, <c>PlanPrices</c>). Достаточно для проверки существования плана
+        /// (UC-SUB-004) без лишнего join-а.
+        /// </summary>
+        /// <param name="planId">Идентификатор плана.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// План, если найден; иначе <see langword="null"/>.
+        /// </returns>
+        Task<SubscriptionPlan?> GetByIdAsync(Guid planId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Возвращает план с загруженным составом грантов (<c>Grants</c>).
+        /// Загрузка нужна для UC-SUB-007 <see cref="SubscriptionPlan.SetGrants"/> —
+        /// метод внутри вызывает <c>_grants.Clear()</c>, и EF change tracker
+        /// должен видеть удаляемые <c>PlanGrant</c>-строки, иначе они «зависнут».
+        /// </summary>
+        /// <param name="planId">Идентификатор плана.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// План с <c>Grants</c>, если найден; иначе <see langword="null"/>.
+        /// </returns>
+        Task<SubscriptionPlan?> GetByIdWithGrantsAsync(Guid planId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Добавляет новый план в хранилище.

@@ -1,6 +1,7 @@
 using GastronomePlatform.Common.Domain.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Subscriptions.Application.Commands.CreateSubscriptionPlan;
+using GastronomePlatform.Modules.Subscriptions.Application.Commands.SetPlanGrants;
 using GastronomePlatform.Modules.Subscriptions.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -9,9 +10,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
 {
     /// <summary>
-    /// Контроллер каталога тарифных планов (UC-SUB-001..003, UC-SUB-040). Phase A
-    /// содержит только UC-SUB-001 (Create). Витрина каталога (UC-SUB-040), правка
-    /// (UC-SUB-002) и деактивация (UC-SUB-003) добавляются в Phase C.
+    /// Контроллер каталога тарифных планов (UC-SUB-001..003, UC-SUB-007, UC-SUB-040).
+    /// Phase A содержит UC-SUB-001 (Create) и UC-SUB-007 (SetGrants). Витрина
+    /// каталога (UC-SUB-040), правка (UC-SUB-002) и деактивация (UC-SUB-003)
+    /// добавляются в Phase C. Гранты остаются в этом контроллере, так как
+    /// не имеют самостоятельной идентичности (composite PK <c>PlanId + Grant</c>);
+    /// офферы вынесены в отдельный <c>PlanPricesController</c>.
     /// </summary>
     [ApiController]
     [Route("api/subscription-plans")]
@@ -39,6 +43,19 @@ namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
             DateTimeOffset? AvailableFrom,
             DateTimeOffset? AvailableUntil,
             string? InternalNotes);
+
+        /// <summary>
+        /// Данные для полной замены состава грантов плана (UC-SUB-007).
+        /// </summary>
+        /// <param name="Grants">Новый состав грантов. Пустой список = снять все гранты.</param>
+        public sealed record SetPlanGrantsRequest(IReadOnlyList<PlanGrantItemRequest> Grants);
+
+        /// <summary>
+        /// Спецификация одного гранта в запросе <see cref="SetPlanGrantsRequest"/>.
+        /// </summary>
+        /// <param name="Grant">Значение <see cref="FeatureGrant"/> (enum).</param>
+        /// <param name="Quantity">Квота права. Опционально; должно быть <see langword="null"/> для не-квотовых грантов.</param>
+        public sealed record PlanGrantItemRequest(FeatureGrant Grant, int? Quantity);
 
         #endregion
 
@@ -86,6 +103,37 @@ namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
             }
 
             return Created($"/api/subscription-plans/{result.Value.PlanId}", result.Value);
+        }
+
+        /// <summary>
+        /// Полностью заменяет состав грантов плана (UC-SUB-007). Пустой список
+        /// в теле — валидный запрос, снимает все гранты с плана.
+        /// </summary>
+        /// <param name="planId">Идентификатор плана (из маршрута).</param>
+        /// <param name="request">Новый состав грантов.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успешной замене;
+        /// <c>400 Bad Request</c> при ошибке валидации (в том числе
+        /// <c>SUBS.PLAN_GRANT_QUOTA_NOT_APPLICABLE</c>);
+        /// <c>401</c> / <c>403</c>;
+        /// <c>404 Not Found</c> (<c>SUBS.PLAN_NOT_FOUND</c>), если план не существует.
+        /// </returns>
+        [HttpPut("{planId:guid}/grants")]
+        [Authorize(Roles = PlatformRoles.ADMIN)]
+        public async Task<IActionResult> SetGrantsAsync(
+            [FromRoute] Guid planId,
+            [FromBody] SetPlanGrantsRequest request,
+            CancellationToken ct)
+        {
+            var grants = request.Grants
+                .Select(item => new PlanGrantSpec(item.Grant, item.Quantity))
+                .ToList();
+
+            var command = new SetPlanGrantsCommand(planId, grants);
+
+            Result result = await Sender.Send(command, ct);
+            return MapResult(result);
         }
     }
 }

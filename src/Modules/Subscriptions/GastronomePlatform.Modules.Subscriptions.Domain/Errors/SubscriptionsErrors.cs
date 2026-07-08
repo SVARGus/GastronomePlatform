@@ -14,6 +14,10 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Errors
         public static readonly Error NotFound =
             Error.NotFound("SUBS.NOT_FOUND", "Подписка не найдена.");
 
+        /// <summary>Тарифный план каталога не существует.</summary>
+        public static readonly Error PlanNotFound =
+            Error.NotFound("SUBS.PLAN_NOT_FOUND", "Тарифный план не найден.");
+
         #endregion
 
         #region Авторизация (POL-004)
@@ -64,6 +68,16 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Errors
             Error.Conflict("SUBS.TECHNICAL_NAME_TAKEN",
                 "План с таким системным именем уже существует.");
 
+        /// <summary>
+        /// Квота (<c>PlanGrant.Quantity</c>) задана для гранта, у которого
+        /// квотовая семантика не применяется. По Phase A квоту несёт только
+        /// <c>FeatureGrant.PromotionAdvanced</c>; остальным грантам
+        /// <c>Quantity</c> должен быть <see langword="null"/>.
+        /// </summary>
+        public static readonly Error PlanGrantQuotaNotApplicable =
+            Error.Validation("SUBS.PLAN_GRANT_QUOTA_NOT_APPLICABLE",
+                "Квота не применима к этому гранту — оставьте Quantity пустым.");
+
         #endregion
 
         #region Инварианты оффера (PlanPrice)
@@ -88,6 +102,22 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Errors
         public static readonly Error PriceNonRecurringCannotTransition =
             Error.Validation("SUBS.PRICE_NON_RECURRING_CANNOT_TRANSITION",
                 "У непродляющегося оффера не может быть переходов RenewsAs/Fallback.");
+
+        /// <summary>
+        /// Целевой оффер перехода (<c>RenewsAsPriceId</c> или <c>FallbackPriceId</c>)
+        /// не существует в каталоге.
+        /// </summary>
+        public static readonly Error TransitionPriceNotFound =
+            Error.Validation("SUBS.TRANSITION_PRICE_NOT_FOUND",
+                "Целевой оффер перехода не найден.");
+
+        /// <summary>
+        /// Целевой оффер перехода принадлежит другому плану — переход
+        /// между планами не поддерживается (domain-model §9, «цепочки внутри плана»).
+        /// </summary>
+        public static readonly Error TransitionPriceCrossPlan =
+            Error.Validation("SUBS.TRANSITION_PRICE_CROSS_PLAN",
+                "Целевой оффер перехода принадлежит другому плану.");
 
         #endregion
 

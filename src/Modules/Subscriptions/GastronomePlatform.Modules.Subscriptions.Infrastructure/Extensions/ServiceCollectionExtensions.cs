@@ -36,8 +36,9 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Extensions
             services.AddDbContext<SubscriptionsDbContext>(options =>
                 options.UseNpgsql(configuration.GetConnectionString("Database")));
 
-            // Репозитории (Phase A: минимальный набор под UC-SUB-001 и авторизацию POL-004).
+            // Репозитории (Phase A: минимальный набор под UC-SUB-001/004/007 и авторизацию POL-004).
             services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+            services.AddScoped<IPlanPriceRepository, PlanPriceRepository>();
             services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
 
             // Авторизация POL-004 (Application/Authorization/).
