@@ -1,4 +1,5 @@
 using GastronomePlatform.Common.Domain.Results;
+using GastronomePlatform.Modules.Subscriptions.Application.Commands.Cancel;
 using GastronomePlatform.Modules.Subscriptions.Application.Commands.Subscribe;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -8,8 +9,8 @@ namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
 {
     /// <summary>
     /// Контроллер операций пользователя над своими подписками (UC-SUB-020..025).
-    /// Phase A содержит только UC-SUB-020 (Subscribe). Просмотр, отмена, смена
-    /// способа оплаты и реактивация добавляются далее.
+    /// Phase A содержит UC-SUB-020 (Subscribe) и UC-SUB-022 (Cancel). Просмотр,
+    /// смена способа оплаты и реактивация добавляются далее.
     /// </summary>
     [ApiController]
     [Route("api/user-subscriptions")]
@@ -73,6 +74,37 @@ namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
             }
 
             return Created($"/api/user-subscriptions/{result.Value.SubscriptionId}", result.Value);
+        }
+
+        /// <summary>
+        /// Отменяет автопродление подписки (UC-SUB-022). Разрешено владельцу подписки
+        /// (<c>UserSubscription.UserId == ICurrentUserService.UserId</c>) либо
+        /// администратору (POL-004 §4.3). Доступ сохраняется до конца оплаченного
+        /// периода (<c>UserSubscription.CurrentPeriodEnd</c>) — фактическое истечение
+        /// выполняется фоновой задачей UC-SUB-203.
+        /// </summary>
+        /// <param name="id">Идентификатор отменяемой подписки.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>204 No Content</c> при успехе;
+        /// <c>400 Bad Request</c> при ошибке валидации формы запроса;
+        /// <c>401</c> без JWT;
+        /// <c>403 Forbidden</c> (<c>SUBS.FORBIDDEN_NOT_OWNER</c>), если актор не владелец и не Admin;
+        /// <c>404 Not Found</c> (<c>SUBS.NOT_FOUND</c>), если подписка не существует;
+        /// <c>409 Conflict</c> (<c>SUBS.CANNOT_CANCEL_IN_STATUS</c>), если подписка
+        /// уже отменена, истекла или находится в статусе, не допускающем отмену.
+        /// </returns>
+        [HttpPost("{id:guid}/cancel")]
+        [Authorize]
+        public async Task<IActionResult> CancelAsync(
+            [FromRoute] Guid id,
+            CancellationToken ct)
+        {
+            var command = new CancelSubscriptionCommand(SubscriptionId: id);
+
+            Result result = await Sender.Send(command, ct);
+
+            return MapResult(result);
         }
     }
 }
