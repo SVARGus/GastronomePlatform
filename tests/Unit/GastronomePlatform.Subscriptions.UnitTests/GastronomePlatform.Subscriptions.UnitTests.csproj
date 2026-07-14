@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Modules\Subscriptions\GastronomePlatform.Modules.Subscriptions.Application\GastronomePlatform.Modules.Subscriptions.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Subscriptions\GastronomePlatform.Modules.Subscriptions.Domain\GastronomePlatform.Modules.Subscriptions.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Modules\Subscriptions\GastronomePlatform.Modules.Subscriptions.Infrastructure\GastronomePlatform.Modules.Subscriptions.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

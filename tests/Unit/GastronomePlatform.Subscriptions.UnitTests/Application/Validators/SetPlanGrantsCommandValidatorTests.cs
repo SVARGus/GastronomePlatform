@@ -73,7 +73,9 @@ namespace GastronomePlatform.Subscriptions.UnitTests.Application.Validators
         [Fact]
         public void Grants_WhenNull_ShouldHaveError()
         {
-            SetPlanGrantsCommand command = CreateValidCommand(grants: null!);
+            // Собираем command напрямую, не через CreateValidCommand:
+            // helper использует `?? defaultList` для аргумента grants и заменил бы null дефолтом.
+            SetPlanGrantsCommand command = new(PlanId: Guid.NewGuid(), Grants: null!);
 
             _validator.TestValidate(command)
                 .ShouldHaveValidationErrorFor(c => c.Grants);
