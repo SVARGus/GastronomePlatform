@@ -1,6 +1,7 @@
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Subscriptions.Application.Commands.Cancel;
 using GastronomePlatform.Modules.Subscriptions.Application.Commands.Subscribe;
+using GastronomePlatform.Modules.Subscriptions.Application.Queries.GetSubscriptionById;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,8 +10,8 @@ namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
 {
     /// <summary>
     /// Контроллер операций пользователя над своими подписками (UC-SUB-020..025).
-    /// Phase A содержит UC-SUB-020 (Subscribe) и UC-SUB-022 (Cancel). Просмотр,
-    /// смена способа оплаты и реактивация добавляются далее.
+    /// Phase A содержит UC-SUB-020 (Subscribe), UC-SUB-021 (GetById) и UC-SUB-022 (Cancel).
+    /// Смена способа оплаты и реактивация добавляются далее.
     /// </summary>
     [ApiController]
     [Route("api/user-subscriptions")]
@@ -74,6 +75,34 @@ namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
             }
 
             return Created($"/api/user-subscriptions/{result.Value.SubscriptionId}", result.Value);
+        }
+
+        /// <summary>
+        /// Возвращает карточку подписки по идентификатору (UC-SUB-021). Разрешено
+        /// владельцу подписки (<c>UserSubscription.UserId == ICurrentUserService.UserId</c>)
+        /// либо администратору (POL-004 §4.1).
+        /// </summary>
+        /// <param name="id">Идентификатор запрашиваемой подписки.</param>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>200 OK</c> с телом <see cref="SubscriptionResponse"/> при успехе;
+        /// <c>400 Bad Request</c> при ошибке валидации формы запроса
+        /// (<c>SubscriptionId = Guid.Empty</c>);
+        /// <c>401</c> без JWT;
+        /// <c>403 Forbidden</c> (<c>SUBS.FORBIDDEN_NOT_OWNER</c>), если актор не владелец и не Admin;
+        /// <c>404 Not Found</c> (<c>SUBS.NOT_FOUND</c>), если подписка не существует.
+        /// </returns>
+        [HttpGet("{id:guid}")]
+        [Authorize]
+        public async Task<IActionResult> GetByIdAsync(
+            [FromRoute] Guid id,
+            CancellationToken ct)
+        {
+            var query = new GetSubscriptionByIdQuery(SubscriptionId: id);
+
+            Result<SubscriptionResponse> result = await Sender.Send(query, ct);
+
+            return MapResult(result);
         }
 
         /// <summary>
