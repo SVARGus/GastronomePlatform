@@ -157,5 +157,68 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Services
 
             return roles.AsReadOnly();
         }
+
+        /// <inheritdoc/>
+        public async Task<Result> AddUserToRoleAsync(Guid userId, string roleName, CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(roleName);
+
+            ApplicationUser? user = await _userManager.FindByIdAsync(userId.ToString());
+
+            if (user is null)
+            {
+                return AuthErrors.UserNotFound;
+            }
+
+            // Проверяем существование роли до вызова AddToRoleAsync —
+            // при отсутствии роли UserStore бросает InvalidOperationException.
+            string normalizedRoleName = roleName.ToUpperInvariant();
+            bool roleExists = await _authDbContext.Roles
+                .AnyAsync(r => r.NormalizedName == normalizedRoleName, cancellationToken);
+
+            if (!roleExists)
+            {
+                return AuthErrors.RoleNotFound;
+            }
+
+            // Идемпотентность: если роль уже назначена — тихий Success.
+            bool alreadyInRole = await _userManager.IsInRoleAsync(user, roleName);
+
+            if (alreadyInRole)
+            {
+                return Result.Success();
+            }
+
+            IdentityResult identityResult = await _userManager.AddToRoleAsync(user, roleName);
+
+            return identityResult.Succeeded ? Result.Success() : AuthErrors.RoleAssignmentFailed;
+        }
+
+        /// <inheritdoc/>
+        public async Task<Result> RemoveUserFromRoleAsync(Guid userId, string roleName, CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(roleName);
+
+            ApplicationUser? user = await _userManager.FindByIdAsync(userId.ToString());
+
+            if (user is null)
+            {
+                return AuthErrors.UserNotFound;
+            }
+
+            // Идемпотентность: если роли у пользователя нет — тихий Success.
+            // Побочно защищает от несуществующей роли: IsInRoleAsync для отсутствующей
+            // роли всегда вернёт false, и мы вернём Success без обращения к RemoveFromRoleAsync.
+            bool isInRole = await _userManager.IsInRoleAsync(user, roleName);
+
+            if (!isInRole)
+            {
+                return Result.Success();
+            }
+
+            IdentityResult identityResult = await _userManager.RemoveFromRoleAsync(user, roleName);
+
+            return identityResult.Succeeded ? Result.Success() : AuthErrors.RoleAssignmentFailed;
+        }
     }
 }

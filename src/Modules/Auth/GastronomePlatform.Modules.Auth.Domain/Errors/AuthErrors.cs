@@ -30,5 +30,11 @@ namespace GastronomePlatform.Modules.Auth.Domain.Errors
 
         public static readonly Error RegistrationFailed =
             Error.Failure("AUTH.REGISTRATION_FAILED", "Не удалось создать пользователя.");
+
+        public static readonly Error RoleNotFound =
+            Error.NotFound("AUTH.ROLE_NOT_FOUND", "Роль не найдена.");
+
+        public static readonly Error RoleAssignmentFailed =
+            Error.Failure("AUTH.ROLE_ASSIGNMENT_FAILED", "Не удалось изменить набор ролей пользователя.");
     }
 }

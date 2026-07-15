@@ -111,5 +111,43 @@ namespace GastronomePlatform.Modules.Auth.Domain.Contracts
         Task<IReadOnlyCollection<string>> GetUserRolesAsync(Guid userId, CancellationToken cancellationToken = default);
 
         #endregion
+
+        #region Role Management
+
+        /// <summary>
+        /// Добавляет пользователю указанную роль. Операция идемпотентна:
+        /// если роль уже назначена — возвращает <see cref="Result.Success()"/>
+        /// без обращения к Identity.
+        /// </summary>
+        /// <param name="userId">Идентификатор пользователя.</param>
+        /// <param name="roleName">Имя роли. Должно совпадать с одной из констант
+        /// <c>PlatformRoles</c>. Регистр значим.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> если роль назначена (либо уже была назначена);
+        /// <c>Result.Failure</c> с <c>AuthErrors.UserNotFound</c> если пользователь не существует;
+        /// <c>Result.Failure</c> с <c>AuthErrors.RoleNotFound</c> если роль отсутствует в системе;
+        /// <c>Result.Failure</c> с <c>AuthErrors.RoleAssignmentFailed</c> при иной ошибке Identity.
+        /// </returns>
+        Task<Result> AddUserToRoleAsync(Guid userId, string roleName, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Снимает с пользователя указанную роль. Операция идемпотентна:
+        /// если роли у пользователя нет — возвращает <see cref="Result.Success()"/>
+        /// без обращения к Identity.
+        /// </summary>
+        /// <param name="userId">Идентификатор пользователя.</param>
+        /// <param name="roleName">Имя роли. Должно совпадать с одной из констант
+        /// <c>PlatformRoles</c>. Регистр значим.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see cref="Result.Success()"/> если роль снята (либо её не было);
+        /// <c>Result.Failure</c> с <c>AuthErrors.UserNotFound</c> если пользователь не существует;
+        /// <c>Result.Failure</c> с <c>AuthErrors.RoleNotFound</c> если роль отсутствует в системе;
+        /// <c>Result.Failure</c> с <c>AuthErrors.RoleAssignmentFailed</c> при иной ошибке Identity.
+        /// </returns>
+        Task<Result> RemoveUserFromRoleAsync(Guid userId, string roleName, CancellationToken cancellationToken = default);
+
+        #endregion
     }
 }

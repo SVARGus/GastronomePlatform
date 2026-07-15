@@ -4,6 +4,7 @@
     <ProjectReference Include="..\GastronomePlatform.Modules.Users.Domain\GastronomePlatform.Modules.Users.Domain.csproj" />
     <ProjectReference Include="..\..\Auth\GastronomePlatform.Modules.Auth.Domain\GastronomePlatform.Modules.Auth.Domain.csproj" />
     <ProjectReference Include="..\..\Media\GastronomePlatform.Modules.Media.Application\GastronomePlatform.Modules.Media.Application.csproj" />
+    <ProjectReference Include="..\..\Subscriptions\GastronomePlatform.Modules.Subscriptions.Domain\GastronomePlatform.Modules.Subscriptions.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Abstractions\" />
