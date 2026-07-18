@@ -1,4 +1,6 @@
+using GastronomePlatform.Common.Application.Abstractions;
 using GastronomePlatform.Common.Application.Messaging;
+using GastronomePlatform.Common.Domain.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Snapshots;
 using GastronomePlatform.Modules.Dishes.Application.Snapshots.Dtos;
@@ -6,6 +8,8 @@ using GastronomePlatform.Modules.Dishes.Domain.Entities;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using GastronomePlatform.Modules.Dishes.Domain.Errors;
 using GastronomePlatform.Modules.Dishes.Domain.Repositories;
+using GastronomePlatform.Modules.Subscriptions.Domain.Contracts;
+using GastronomePlatform.Modules.Subscriptions.Domain.Enums;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetScaledRecipeIngredients
 {
@@ -20,6 +24,9 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetScaledRecipeI
     ///   <item>Загрузка корневого <see cref="Dish"/> по Id.</item>
     ///   <item><c>404</c>, если блюдо не найдено, <c>Archived</c> или
     ///         <c>PublishedVersionData IS NULL</c> — рецепт отдаётся только из snapshot.</item>
+    ///   <item>Для не-автора/не-admin — проверка Premium-гранта
+    ///         <c>FeatureGrant.PortionCalculator</c> через
+    ///         <see cref="ISubscriptionAccessService"/>. При отсутствии гранта — <c>403 (DISHES.PREMIUM_REQUIRED)</c>.</item>
     ///   <item>Парсинг jsonb через <see cref="IPublishedDishSnapshotReader"/>.</item>
     ///   <item>Расчёт множителя <c>Servings / ServingsDefault</c> и линейное масштабирование
     ///         <c>Quantity</c> каждой позиции.</item>
@@ -35,18 +42,26 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetScaledRecipeI
     {
         private readonly IDishRepository _dishRepository;
         private readonly IPublishedDishSnapshotReader _snapshotReader;
+        private readonly ICurrentUserService _currentUser;
+        private readonly ISubscriptionAccessService _subscriptionAccess;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="GetScaledRecipeIngredientsQueryHandler"/>.
         /// </summary>
         /// <param name="dishRepository">Репозиторий блюд.</param>
         /// <param name="snapshotReader">Парсер jsonb-снепшота.</param>
+        /// <param name="currentUser">Сервис текущего пользователя (для bypass-а Premium-гейта автору/admin).</param>
+        /// <param name="subscriptionAccess">Резолвер эффективных грантов подписки для Premium-гейта.</param>
         public GetScaledRecipeIngredientsQueryHandler(
             IDishRepository dishRepository,
-            IPublishedDishSnapshotReader snapshotReader)
+            IPublishedDishSnapshotReader snapshotReader,
+            ICurrentUserService currentUser,
+            ISubscriptionAccessService subscriptionAccess)
         {
             _dishRepository = dishRepository ?? throw new ArgumentNullException(nameof(dishRepository));
             _snapshotReader = snapshotReader ?? throw new ArgumentNullException(nameof(snapshotReader));
+            _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
+            _subscriptionAccess = subscriptionAccess ?? throw new ArgumentNullException(nameof(subscriptionAccess));
         }
 
         /// <inheritdoc/>
@@ -60,6 +75,22 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetScaledRecipeI
                 || dish.PublishedVersionData is null)
             {
                 return DishesErrors.DishNotFound;
+            }
+
+            // Автор блюда и admin проходят Premium-гейт без проверки.
+            Guid? currentUserId = _currentUser.UserId;
+            bool isOwner = currentUserId.HasValue && currentUserId.Value == dish.AuthorUserId;
+            bool isAdmin = _currentUser.IsInRole(PlatformRoles.ADMIN);
+
+            if (!isOwner && !isAdmin)
+            {
+                bool hasPortionCalculator = await _subscriptionAccess.HasFeatureAsync(
+                    currentUserId!.Value, FeatureGrant.PortionCalculator, cancellationToken);
+
+                if (!hasPortionCalculator)
+                {
+                    return DishesErrors.PremiumFeatureRequired;
+                }
             }
 
             PublishedDishSnapshot snapshot = _snapshotReader.Read(dish.PublishedVersionData);

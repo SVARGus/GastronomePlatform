@@ -14,6 +14,10 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Errors
             Error.Forbidden("DISHES.NOT_DISH_OWNER",
                 "Эту операцию может выполнить только автор блюда.");
 
+        public static readonly Error PremiumFeatureRequired =
+            Error.Forbidden("DISHES.PREMIUM_REQUIRED",
+                "Требуется активная Premium-подписка для доступа к этой возможности.");
+
         public static readonly Error DishAlreadyPublished =
             Error.Conflict("DISHES.DISH_ALREADY_PUBLISHED",
                 "Блюдо уже опубликовано, и в нём нет несохранённых изменений.");

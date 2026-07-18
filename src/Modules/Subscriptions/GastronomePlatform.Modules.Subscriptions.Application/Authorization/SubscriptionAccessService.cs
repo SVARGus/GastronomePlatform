@@ -1,4 +1,5 @@
 using GastronomePlatform.Common.Application.Abstractions;
+using GastronomePlatform.Modules.Subscriptions.Domain.Contracts;
 using GastronomePlatform.Modules.Subscriptions.Domain.Enums;
 using GastronomePlatform.Modules.Subscriptions.Domain.Repositories;
 

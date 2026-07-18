@@ -3,5 +3,6 @@
     <ProjectReference Include="..\..\..\Common\GastronomePlatform.Common.Application\GastronomePlatform.Common.Application.csproj" />
     <ProjectReference Include="..\GastronomePlatform.Modules.Dishes.Domain\GastronomePlatform.Modules.Dishes.Domain.csproj" />
     <ProjectReference Include="..\..\Media\GastronomePlatform.Modules.Media.Application\GastronomePlatform.Modules.Media.Application.csproj" />
+    <ProjectReference Include="..\..\Subscriptions\GastronomePlatform.Modules.Subscriptions.Domain\GastronomePlatform.Modules.Subscriptions.Domain.csproj" />
   </ItemGroup>
 </Project>

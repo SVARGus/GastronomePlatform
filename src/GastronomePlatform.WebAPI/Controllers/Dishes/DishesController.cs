@@ -516,8 +516,10 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// <c>IsPublishedVersion = false</c>. Остальным запрос отдаёт <c>404</c>.
         /// </para>
         /// <para>
-        /// Статус <c>Archived</c> всегда возвращает <c>404</c> на Этапе 2. Premium-проверка
-        /// через <c>ISubscriptionService</c> появится на Этапе 3+.
+        /// Просмотр публичного рецепта не-автором/не-admin требует Premium-гранта
+        /// <c>FeatureGrant.FullRecipes</c>; при его отсутствии — <c>403</c>
+        /// с кодом <c>DISHES.PREMIUM_REQUIRED</c>. Автор и admin проходят без проверки.
+        /// Статус <c>Archived</c> всегда возвращает <c>404</c>.
         /// </para>
         /// </remarks>
         /// <param name="id">Идентификатор блюда.</param>
@@ -526,6 +528,8 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// <c>200 OK</c> с <see cref="DishRecipeDto"/> при успехе;
         /// <c>400 Bad Request</c> при пустом идентификаторе;
         /// <c>401 Unauthorized</c>, если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.PREMIUM_REQUIRED</c>) при отсутствии
+        /// Premium-подписки у не-автора/не-admin;
         /// <c>404 Not Found</c>, если блюдо отсутствует, архивировано
         /// или недоступно текущему пользователю.
         /// </returns>
@@ -552,10 +556,16 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// или в статусе <c>Archived</c> — <c>404</c> всем (включая автора).
         /// </para>
         /// <para>
-        /// Реализация Этапа 2: линейное масштабирование <c>Quantity</c> по множителю
-        /// <c>Servings / ServingsDefault</c>; конвертация единиц (Mass ↔ Volume) пока
-        /// не выполняется. На Этапе 3+ через <c>ISubscriptionService</c> появится проверка
-        /// Premium-подписки.
+        /// Не-автору/не-admin требуется Premium-грант
+        /// <c>FeatureGrant.PortionCalculator</c>; при его отсутствии — <c>403</c>
+        /// с кодом <c>DISHES.PREMIUM_REQUIRED</c>. Автор блюда и admin проходят
+        /// без проверки.
+        /// </para>
+        /// <para>
+        /// Расчёт: линейное масштабирование <c>Quantity</c> по множителю
+        /// <c>Servings / ServingsDefault</c>. Конвертация единиц (Mass ↔ Volume через
+        /// <c>Ingredient.DensityApprox</c>) не выполняется — клиент получает тот же
+        /// <c>MeasureUnitId</c>, что в snapshot.
         /// </para>
         /// </remarks>
         /// <param name="id">Идентификатор блюда.</param>
@@ -565,6 +575,8 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// <c>200 OK</c> с <see cref="GetScaledRecipeIngredientsResult"/>;
         /// <c>400 Bad Request</c> при ошибке валидации;
         /// <c>401 Unauthorized</c>, если запрос не аутентифицирован;
+        /// <c>403 Forbidden</c> (<c>DISHES.PREMIUM_REQUIRED</c>) при отсутствии
+        /// Premium-подписки у не-автора/не-admin;
         /// <c>404 Not Found</c> (<c>DISHES.DISH_NOT_FOUND</c>), если блюдо не существует,
         /// архивировано или не опубликовано.
         /// </returns>

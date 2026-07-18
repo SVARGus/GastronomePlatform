@@ -8,6 +8,8 @@ using GastronomePlatform.Modules.Dishes.Domain.Entities;
 using GastronomePlatform.Modules.Dishes.Domain.Enums;
 using GastronomePlatform.Modules.Dishes.Domain.Errors;
 using GastronomePlatform.Modules.Dishes.Domain.Repositories;
+using GastronomePlatform.Modules.Subscriptions.Domain.Contracts;
+using GastronomePlatform.Modules.Subscriptions.Domain.Enums;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
 {
@@ -23,14 +25,19 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
     /// <list type="number">
     ///   <item>Загрузка блюда по Id (без <c>Recipe</c>).</item>
     ///   <item>404, если блюдо не найдено или <c>Status = Archived</c>.</item>
-    ///   <item>Если есть <c>PublishedVersionData</c> — парсится снепшот
+    ///   <item>Если есть <c>PublishedVersionData</c>: для не-автора/не-admin
+    ///         выполняется проверка Premium-гранта
+    ///         <c>FeatureGrant.FullRecipes</c> через
+    ///         <see cref="ISubscriptionAccessService"/>; при отсутствии гранта
+    ///         возвращается <c>403 (DISHES.PREMIUM_REQUIRED)</c>. Затем парсится снепшот
     ///         через <see cref="IPublishedDishSnapshotReader"/>, маппится в
     ///         <see cref="DishRecipeDto"/>; для автора/admin добавляется
     ///         флаг <c>HasUnsavedChanges</c>.</item>
     ///   <item>Если снепшота нет — доступ только автору/admin (иначе 404);
     ///         выполняется повторная загрузка с полным агрегатом через
     ///         <see cref="IDishRepository.GetByIdWithFullRecipeAsync"/>,
-    ///         маппится рабочая версия рецепта.</item>
+    ///         маппится рабочая версия рецепта. Premium-проверка в этой ветке
+    ///         не выполняется — она отсечена ролевым фильтром выше.</item>
     /// </list>
     /// <para>
     /// Параметр <c>?version=working</c> для явного запроса рабочей версии
@@ -42,6 +49,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
         private readonly IDishRepository _dishRepository;
         private readonly ICurrentUserService _currentUser;
         private readonly IPublishedDishSnapshotReader _snapshotReader;
+        private readonly ISubscriptionAccessService _subscriptionAccess;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="GetDishRecipeQueryHandler"/>.
@@ -49,14 +57,17 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
         /// <param name="dishRepository">Репозиторий блюд.</param>
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="snapshotReader">Парсер jsonb-снепшота публичной версии.</param>
+        /// <param name="subscriptionAccess">Резолвер эффективных грантов подписки для Premium-гейта.</param>
         public GetDishRecipeQueryHandler(
             IDishRepository dishRepository,
             ICurrentUserService currentUser,
-            IPublishedDishSnapshotReader snapshotReader)
+            IPublishedDishSnapshotReader snapshotReader,
+            ISubscriptionAccessService subscriptionAccess)
         {
             _dishRepository = dishRepository ?? throw new ArgumentNullException(nameof(dishRepository));
             _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
             _snapshotReader = snapshotReader ?? throw new ArgumentNullException(nameof(snapshotReader));
+            _subscriptionAccess = subscriptionAccess ?? throw new ArgumentNullException(nameof(subscriptionAccess));
         }
 
         /// <inheritdoc/>
@@ -77,6 +88,20 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
 
             if (dish.PublishedVersionData is not null)
             {
+                // Автор и admin проходят Premium-гейт мимо. Для остальных —
+                // проверка гранта FullRecipes; парсинг snapshot откладываем
+                // до подтверждения доступа, чтобы не тратить CPU при отказе.
+                if (!isOwnerOrAdmin)
+                {
+                    bool hasFullRecipes = await _subscriptionAccess.HasFeatureAsync(
+                        currentUserId!.Value, FeatureGrant.FullRecipes, cancellationToken);
+
+                    if (!hasFullRecipes)
+                    {
+                        return DishesErrors.PremiumFeatureRequired;
+                    }
+                }
+
                 PublishedDishSnapshot snapshot = _snapshotReader.Read(dish.PublishedVersionData);
 
                 bool? hasUnsavedChanges = isOwnerOrAdmin

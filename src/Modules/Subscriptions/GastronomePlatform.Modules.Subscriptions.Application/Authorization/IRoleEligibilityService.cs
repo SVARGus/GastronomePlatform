@@ -7,7 +7,7 @@ namespace GastronomePlatform.Modules.Subscriptions.Application.Authorization
     /// <remarks>
     /// <para>
     /// Отделён от <see cref="ISubscriptionAccessPolicy"/> и
-    /// <see cref="ISubscriptionAccessService"/> сознательно: покупочный гейт (порог
+    /// <c>ISubscriptionAccessService</c> сознательно: покупочный гейт (порог
     /// «не ниже роли») содержательно совпадает с KYC-проверкой (реальная реализация
     /// на Этапе 6, домены Users/verification).
     /// </para>

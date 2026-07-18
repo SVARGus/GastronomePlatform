@@ -1,6 +1,7 @@
 using FluentValidation;
 using GastronomePlatform.Modules.Subscriptions.Application.Authorization;
 using GastronomePlatform.Modules.Subscriptions.Application.Payments;
+using GastronomePlatform.Modules.Subscriptions.Domain.Contracts;
 using GastronomePlatform.Modules.Subscriptions.Domain.Repositories;
 using GastronomePlatform.Modules.Subscriptions.Infrastructure.Payments;
 using GastronomePlatform.Modules.Subscriptions.Infrastructure.Persistence;

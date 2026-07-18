@@ -1,6 +1,6 @@
 using GastronomePlatform.Modules.Subscriptions.Domain.Enums;
 
-namespace GastronomePlatform.Modules.Subscriptions.Application.Authorization
+namespace GastronomePlatform.Modules.Subscriptions.Domain.Contracts
 {
     /// <summary>
     /// Резолвер эффективных грантов пользователя — реализация POL-004 §4.4
@@ -8,14 +8,19 @@ namespace GastronomePlatform.Modules.Subscriptions.Application.Authorization
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Кросс-модульная точка входа: вызывается из других модулей (Dishes, Orders)
-    /// для проверки доступа к монетизированному функционалу.
+    /// Публичный контракт модуля Subscriptions для межмодульного взаимодействия.
+    /// Вызывается из других модулей (Dishes, Orders) для проверки доступа
+    /// к монетизированному функционалу.
     /// </para>
     /// <para>
     /// Phase A: эффективные гранты = union <c>PlanGrant.Grant</c> по всем активным
     /// подпискам пользователя (<see cref="SubscriptionStatus.Trialing"/> /
     /// <see cref="SubscriptionStatus.Active"/> / <see cref="SubscriptionStatus.PastDue"/> /
     /// <see cref="SubscriptionStatus.Canceled"/> с <c>CurrentPeriodEnd &gt; now</c>).
+    /// </para>
+    /// <para>
+    /// При переходе к микросервисам — реализация заменяется на HTTP-клиент
+    /// без изменений в коде модулей-потребителей.
     /// </para>
     /// <para>
     /// Не входит в Phase A (по решению сессии):
