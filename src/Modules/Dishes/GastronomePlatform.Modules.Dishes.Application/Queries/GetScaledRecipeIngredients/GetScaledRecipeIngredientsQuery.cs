@@ -9,8 +9,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetScaledRecipeI
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Этап 2: доступно всем авторизованным пользователям. На Этапе 3+ через
-    /// <c>ISubscriptionService</c> добавится проверка Premium-подписки или авторства.
+    /// Доступно авторизованным пользователям с грантом <c>PortionCalculator</c>
+    /// (POL-004); автор блюда и admin проходят без проверки подписки.
     /// </para>
     /// <para>
     /// Текущая реализация выполняет только линейное масштабирование <c>Quantity</c>:

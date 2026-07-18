@@ -1011,7 +1011,7 @@ public sealed class MediaOptions
 
 ```csharp
 // TODO: Подписка на Premium-контент — Этап 3
-//   Для RecipeStep-изображений проверять активную подписку через ISubscriptionService.
+//   Для RecipeStep-изображений проверять грант через ISubscriptionAccessService (POL-004).
 //   Сейчас: все файлы Ready-статуса отдаются всем авторизованным пользователям.
 
 // TODO: Rate limiting — Этап 4

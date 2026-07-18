@@ -23,7 +23,7 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Contracts
     /// без изменений в коде модулей-потребителей.
     /// </para>
     /// <para>
-    /// Не входит в Phase A (по решению сессии):
+    /// Не входит в текущую реализацию:
     /// <list type="bullet">
     ///   <item>Промо-оверлей (<c>PromotionGrant</c> add/remove) — Phase C.</item>
     ///   <item>Грантовый floor (базовый набор без активной Base) — Phase C.</item>

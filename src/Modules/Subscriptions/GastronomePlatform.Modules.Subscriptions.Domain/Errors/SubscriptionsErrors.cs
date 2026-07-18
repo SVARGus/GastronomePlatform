@@ -148,10 +148,15 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Errors
             Error.Conflict("SUBS.CANNOT_CANCEL_IN_STATUS",
                 "Отмена возможна только для подписки в статусе Trialing или Active.");
 
-        /// <summary>Истечение возможно только из статуса <c>Canceled</c> (Phase A подмножество).</summary>
+        /// <summary>
+        /// Истечение возможно из статусов <c>Trialing</c>, <c>Active</c> и <c>Canceled</c>.
+        /// Отклоняется для уже истёкшей подписки, а также для <c>PastDue</c>
+        /// и <c>Scheduled</c> — ветки dunning и отложенного старта появятся вместе
+        /// с этими статусами.
+        /// </summary>
         public static readonly Error CannotExpireInStatus =
             Error.Conflict("SUBS.CANNOT_EXPIRE_IN_STATUS",
-                "Истечение возможно только для подписки в статусе Canceled.");
+                "Истечение возможно только для подписки в статусе Trialing, Active или Canceled.");
 
         #endregion
 

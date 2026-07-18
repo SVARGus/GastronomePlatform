@@ -8,8 +8,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
     /// <remarks>
     /// <para>
     /// Эндпоинт защищён политикой <c>VALID_ACTOR</c> — гости получают <c>401</c>.
-    /// На Этапе 3+ доступ будет дополнительно ограничен по подписке через
-    /// <c>ISubscriptionService</c> (Premium+ для отдельных рецептов).
+    /// Просмотр опубликованного рецепта требует гранта <c>FullRecipes</c>
+    /// (POL-004); автор блюда и admin проходят без проверки.
     /// </para>
     /// <para>
     /// Видимость определяется так же, как в UC-DSH-050:
