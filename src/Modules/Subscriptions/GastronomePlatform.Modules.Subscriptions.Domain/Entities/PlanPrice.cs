@@ -330,6 +330,61 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Entities
 
         #endregion
 
+        #region Query Methods
+
+        /// <summary>
+        /// Проверяет, доступен ли оффер к покупке в указанный момент времени:
+        /// подняты флаги <see cref="IsPurchasable"/> и <see cref="IsActive"/>,
+        /// и момент попадает в окно <see cref="AvailableFrom"/>..<see cref="AvailableUntil"/>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Единственный источник истины для правила покупаемости. Им пользуются
+        /// и оформление подписки (отказ <c>SUBS.OFFER_NOT_PURCHASABLE</c>), и витрина
+        /// каталога (отбор показываемых офферов). Держать правило в одном месте
+        /// критично: расхождение между ними означало бы, что витрина показывает
+        /// оффер, покупка которого затем отклоняется.
+        /// </para>
+        /// <para>
+        /// Границы окна несимметричны: <see cref="AvailableFrom"/> включительно,
+        /// <see cref="AvailableUntil"/> исключительно. Оффер, доступный «до 1 марта»,
+        /// в полночь 1 марта уже не покупается.
+        /// </para>
+        /// <para>
+        /// Метод экземпляра, а не выражение: EF Core не транслирует его в SQL,
+        /// поэтому фильтрация выполняется в памяти после загрузки. Для каталога
+        /// это несущественно — планов единицы, офферов десятки. Частичное дублирование
+        /// условия в SQL «ради оптимизации» сознательно не делается: расхождение
+        /// такой копии с этим методом дало бы молча неверный результат.
+        /// </para>
+        /// </remarks>
+        /// <param name="utcNow">Момент времени, на который проверяется доступность.</param>
+        /// <returns>
+        /// <see langword="true"/>, если оффер можно купить в момент
+        /// <paramref name="utcNow"/>; иначе <see langword="false"/>.
+        /// </returns>
+        public bool IsPurchasableAt(DateTimeOffset utcNow)
+        {
+            if (!IsPurchasable || !IsActive)
+            {
+                return false;
+            }
+
+            if (AvailableFrom.HasValue && AvailableFrom.Value > utcNow)
+            {
+                return false;
+            }
+
+            if (AvailableUntil.HasValue && AvailableUntil.Value <= utcNow)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        #endregion
+
         /// <summary>
         /// Проверяет внутренние инварианты оффера. Общий источник для
         /// <see cref="Create"/> и <see cref="UpdateOffer"/>.

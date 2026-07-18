@@ -275,5 +275,52 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Entities
         }
 
         #endregion
+
+        #region Query Methods
+
+        /// <summary>
+        /// Проверяет, предлагается ли план в указанный момент времени: поднят флаг
+        /// <see cref="IsActive"/> и момент попадает в окно
+        /// <see cref="AvailableFrom"/>..<see cref="AvailableUntil"/>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Определяет видимость плана на витрине каталога. Границы окна несимметричны,
+        /// как и у оффера: <see cref="AvailableFrom"/> включительно,
+        /// <see cref="AvailableUntil"/> исключительно.
+        /// </para>
+        /// <para>
+        /// Не влияет на действующие подписки: снятие плана с продажи означает
+        /// «новых не продаём», а не «купленные перестают работать». По той же
+        /// причине оформление подписки этот метод не вызывает — покупаемость
+        /// определяется на уровне конкретного оффера.
+        /// </para>
+        /// </remarks>
+        /// <param name="utcNow">Момент времени, на который проверяется доступность.</param>
+        /// <returns>
+        /// <see langword="true"/>, если план предлагается в момент
+        /// <paramref name="utcNow"/>; иначе <see langword="false"/>.
+        /// </returns>
+        public bool IsAvailableAt(DateTimeOffset utcNow)
+        {
+            if (!IsActive)
+            {
+                return false;
+            }
+
+            if (AvailableFrom.HasValue && AvailableFrom.Value > utcNow)
+            {
+                return false;
+            }
+
+            if (AvailableUntil.HasValue && AvailableUntil.Value <= utcNow)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        #endregion
     }
 }

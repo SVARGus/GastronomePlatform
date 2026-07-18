@@ -27,6 +27,24 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Repositories
                 .FirstOrDefaultAsync(p => p.Id == priceId, cancellationToken);
 
         /// <inheritdoc/>
+        public async Task<IReadOnlyList<PlanPrice>> ListByPlanIdsAsync(
+            IReadOnlyCollection<Guid> planIds,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(planIds);
+
+            if (planIds.Count == 0)
+            {
+                return Array.Empty<PlanPrice>();
+            }
+
+            return await _context.PlanPrices
+                .AsNoTracking()
+                .Where(p => planIds.Contains(p.PlanId))
+                .ToListAsync(cancellationToken);
+        }
+
+        /// <inheritdoc/>
         public async Task AddAsync(PlanPrice price, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(price);

@@ -38,6 +38,13 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Repositories
                 .FirstOrDefaultAsync(p => p.Id == planId, cancellationToken);
 
         /// <inheritdoc/>
+        public async Task<IReadOnlyList<SubscriptionPlan>> ListWithGrantsAsync(CancellationToken cancellationToken = default)
+            => await _context.SubscriptionPlans
+                .AsNoTracking()
+                .Include(p => p.Grants)
+                .ToListAsync(cancellationToken);
+
+        /// <inheritdoc/>
         public async Task AddAsync(SubscriptionPlan plan, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(plan);

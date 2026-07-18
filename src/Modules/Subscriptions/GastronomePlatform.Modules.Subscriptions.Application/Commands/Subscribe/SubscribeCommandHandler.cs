@@ -96,7 +96,7 @@ namespace GastronomePlatform.Modules.Subscriptions.Application.Commands.Subscrib
                 return SubscriptionsErrors.PriceNotFound;
             }
 
-            if (!IsPurchasable(price, utcNow))
+            if (!price.IsPurchasableAt(utcNow))
             {
                 return SubscriptionsErrors.OfferNotPurchasable;
             }
@@ -181,29 +181,6 @@ namespace GastronomePlatform.Modules.Subscriptions.Application.Commands.Subscrib
             await _eventDispatcher.DispatchAsync(subscription, cancellationToken);
 
             return new SubscribeResult(subscription.Id);
-        }
-
-        /// <summary>
-        /// Проверяет покупаемость оффера: активные флаги и попадание в окно доступности.
-        /// </summary>
-        private static bool IsPurchasable(PlanPrice price, DateTimeOffset utcNow)
-        {
-            if (!price.IsPurchasable || !price.IsActive)
-            {
-                return false;
-            }
-
-            if (price.AvailableFrom.HasValue && price.AvailableFrom.Value > utcNow)
-            {
-                return false;
-            }
-
-            if (price.AvailableUntil.HasValue && price.AvailableUntil.Value <= utcNow)
-            {
-                return false;
-            }
-
-            return true;
         }
     }
 }

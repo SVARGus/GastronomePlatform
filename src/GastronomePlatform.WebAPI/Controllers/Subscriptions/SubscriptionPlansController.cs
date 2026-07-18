@@ -2,6 +2,7 @@ using GastronomePlatform.Common.Domain.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Subscriptions.Application.Commands.CreateSubscriptionPlan;
 using GastronomePlatform.Modules.Subscriptions.Application.Commands.SetPlanGrants;
+using GastronomePlatform.Modules.Subscriptions.Application.Queries.GetSubscriptionCatalog;
 using GastronomePlatform.Modules.Subscriptions.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -11,12 +12,18 @@ namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
 {
     /// <summary>
     /// Контроллер каталога тарифных планов (UC-SUB-001..003, UC-SUB-007, UC-SUB-040).
-    /// Phase A содержит UC-SUB-001 (Create) и UC-SUB-007 (SetGrants). Витрина
-    /// каталога (UC-SUB-040), правка (UC-SUB-002) и деактивация (UC-SUB-003)
-    /// добавляются в Phase C. Гранты остаются в этом контроллере, так как
-    /// не имеют самостоятельной идентичности (composite PK <c>PlanId + Grant</c>);
+    /// Реализованы витрина (UC-SUB-040), создание плана (UC-SUB-001) и настройка
+    /// грантов (UC-SUB-007); правка (UC-SUB-002) и деактивация (UC-SUB-003) —
+    /// в Phase C. Гранты остаются в этом контроллере, так как не имеют
+    /// самостоятельной идентичности (composite PK <c>PlanId + Grant</c>);
     /// офферы вынесены в отдельный <c>PlanPricesController</c>.
     /// </summary>
+    /// <remarks>
+    /// Права различаются на уровне метода, а не контроллера: чтение каталога
+    /// публично, изменение — только для роли <c>Admin</c>. Разделять витрину
+    /// и администрирование по разным контроллерам не стали — ресурс один и тот же,
+    /// и REST-разбиение по правам вместо ресурсов усложнило бы маршруты.
+    /// </remarks>
     [ApiController]
     [Route("api/subscription-plans")]
     public sealed class SubscriptionPlansController : ApiController
@@ -64,6 +71,38 @@ namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
         /// </summary>
         /// <param name="sender">Отправитель MediatR.</param>
         public SubscriptionPlansController(ISender sender) : base(sender) { }
+
+        /// <summary>
+        /// Возвращает витрину каталога подписок (UC-SUB-040): планы, доступные
+        /// к покупке, с составом услуг и вариантами оплаты.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Публичный эндпоинт — доступен гостям. Ответ не зависит от того, кто
+        /// спрашивает: витрина информирует, но не авторизует.
+        /// </para>
+        /// <para>
+        /// В выдачу попадают только планы, предлагаемые к покупке и имеющие хотя бы
+        /// один покупаемый оффер. План с заполненным <c>RequiredRole</c> показывается
+        /// всем — по этому полю клиент выводит пометку о необходимости подтвердить
+        /// статус; фактическая проверка права выполняется при оформлении (UC-SUB-020)
+        /// и может вернуть <c>403</c> (<c>SUBS.FORBIDDEN_ROLE_REQUIRED</c>).
+        /// </para>
+        /// </remarks>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>200 OK</c> со списком <see cref="SubscriptionCatalogPlanResponse"/>.
+        /// Пустой каталог — пустой список, а не <c>404</c>.
+        /// </returns>
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetCatalogAsync(CancellationToken ct)
+        {
+            Result<IReadOnlyList<SubscriptionCatalogPlanResponse>> result =
+                await Sender.Send(new GetSubscriptionCatalogQuery(), ct);
+
+            return MapResult(result);
+        }
 
         /// <summary>
         /// Создаёт новый тарифный план (UC-SUB-001). Состав грантов настраивается
