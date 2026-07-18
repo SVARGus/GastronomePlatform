@@ -109,6 +109,68 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Repositories
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Возвращает проекции подписок, у которых оплаченный период уже закончился,
+        /// но статус ещё не переведён в <see cref="SubscriptionStatus.Expired"/>.
+        /// Выборка фонового сборщика UC-SUB-203.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Кандидат = <see cref="UserSubscription.Status"/> ∈ {
+        /// <see cref="SubscriptionStatus.Trialing"/>, <see cref="SubscriptionStatus.Active"/>,
+        /// <see cref="SubscriptionStatus.Canceled"/> }
+        /// И <see cref="UserSubscription.CurrentPeriodEnd"/> &lt;= <paramref name="utcNow"/>.
+        /// Набор статусов совпадает с тем, который принимает <c>UserSubscription.Expire</c>;
+        /// <see cref="SubscriptionStatus.PastDue"/> исключён — ветка dunning появится
+        /// вместе со статусом в Phase B.
+        /// </para>
+        /// <para>
+        /// Обратите внимание на границу: здесь <c>&lt;=</c>, а в фильтре активности
+        /// (<see cref="ListActiveGrantsByUserAsync"/>) — <c>&gt;</c>. Условия
+        /// взаимодополняющие, поэтому подписка ровно в момент <c>CurrentPeriodEnd</c>
+        /// уже не даёт грантов и одновременно попадает в выборку на истечение.
+        /// </para>
+        /// <para>
+        /// Реализация — JOIN <c>UserSubscriptions</c> ⋈ <c>SubscriptionPlans</c> по
+        /// <c>PlanId</c> ради чтения <c>PlanKind</c> (нужен параметром доменному методу).
+        /// Результат упорядочен по <c>CurrentPeriodEnd</c> — самые давно истёкшие
+        /// обрабатываются первыми, поэтому при устойчивом переполнении батча очередь
+        /// разбирается, а не голодает.
+        /// </para>
+        /// </remarks>
+        /// <param name="utcNow">Текущее время UTC (граница истечения периода).</param>
+        /// <param name="batchSize">Максимальное количество проекций в результате.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// Список <see cref="ExpirationCandidate"/> размером не больше
+        /// <paramref name="batchSize"/>. Пустой список, если истёкших подписок нет.
+        /// </returns>
+        Task<IReadOnlyList<ExpirationCandidate>> ListExpirationCandidatesAsync(
+            DateTimeOffset utcNow,
+            int batchSize,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Загружает агрегаты <see cref="UserSubscription"/> по набору идентификаторов
+        /// одним запросом. Парная операция к
+        /// <see cref="ListExpirationCandidatesAsync"/>: проекция отбирает кандидатов,
+        /// этот метод поднимает их для мутации.
+        /// </summary>
+        /// <remarks>
+        /// Подколлекции <c>Payments</c>/<c>Agreements</c> не подгружаются — переход
+        /// в <c>Expired</c> их не затрагивает. Порядок результата не гарантируется,
+        /// отсутствующие идентификаторы молча пропускаются.
+        /// </remarks>
+        /// <param name="ids">Идентификаторы подписок.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// Список найденных агрегатов. Пустой список, если <paramref name="ids"/> пуст
+        /// или ни одна запись не найдена.
+        /// </returns>
+        Task<IReadOnlyList<UserSubscription>> ListByIdsAsync(
+            IReadOnlyCollection<Guid> ids,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Добавляет новую подписку в хранилище.
         /// </summary>
         /// <param name="subscription">Подписка для сохранения.</param>

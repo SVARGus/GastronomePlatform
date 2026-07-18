@@ -10,4 +10,8 @@
     <ProjectReference Include="..\..\..\Common\GastronomePlatform.Common.Infrastructure\GastronomePlatform.Common.Infrastructure.csproj" />
     <ProjectReference Include="..\GastronomePlatform.Modules.Subscriptions.Application\GastronomePlatform.Modules.Subscriptions.Application.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- BackgroundService и IOptions для фонового сборщика UC-SUB-203. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
 </Project>

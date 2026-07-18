@@ -73,6 +73,45 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Repositories
         }
 
         /// <inheritdoc/>
+        public async Task<IReadOnlyList<ExpirationCandidate>> ListExpirationCandidatesAsync(
+            DateTimeOffset utcNow,
+            int batchSize,
+            CancellationToken cancellationToken = default)
+        {
+            var query =
+                from subscription in _context.UserSubscriptions
+                where (subscription.Status == SubscriptionStatus.Trialing
+                       || subscription.Status == SubscriptionStatus.Active
+                       || subscription.Status == SubscriptionStatus.Canceled)
+                      && subscription.CurrentPeriodEnd <= utcNow
+                join plan in _context.SubscriptionPlans
+                    on subscription.PlanId equals plan.Id
+                orderby subscription.CurrentPeriodEnd
+                select new ExpirationCandidate(subscription.Id, plan.PlanKind);
+
+            return await query
+                .Take(batchSize)
+                .ToListAsync(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<UserSubscription>> ListByIdsAsync(
+            IReadOnlyCollection<Guid> ids,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(ids);
+
+            if (ids.Count == 0)
+            {
+                return Array.Empty<UserSubscription>();
+            }
+
+            return await _context.UserSubscriptions
+                .Where(s => ids.Contains(s.Id))
+                .ToListAsync(cancellationToken);
+        }
+
+        /// <inheritdoc/>
         public async Task AddAsync(UserSubscription subscription, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(subscription);

@@ -3,6 +3,7 @@ using GastronomePlatform.Modules.Subscriptions.Application.Authorization;
 using GastronomePlatform.Modules.Subscriptions.Application.Payments;
 using GastronomePlatform.Modules.Subscriptions.Domain.Contracts;
 using GastronomePlatform.Modules.Subscriptions.Domain.Repositories;
+using GastronomePlatform.Modules.Subscriptions.Infrastructure.BackgroundJobs;
 using GastronomePlatform.Modules.Subscriptions.Infrastructure.Payments;
 using GastronomePlatform.Modules.Subscriptions.Infrastructure.Persistence;
 using GastronomePlatform.Modules.Subscriptions.Infrastructure.Repositories;
@@ -55,7 +56,13 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Extensions
             // Phase B заменит реализацией через YooKassa + webhook UC-SUB-201.
             services.AddScoped<IPaymentGateway, MockPaymentGateway>();
 
-            // Hosted-сервис UC-SUB-200 (scheduler-скелет) — по мере появления UC-потребителей.
+            // Настройки фоновых задач модуля (секция Subscriptions:Scheduler).
+            services.Configure<SubscriptionSchedulerOptions>(
+                configuration.GetSection(SubscriptionSchedulerOptions.SECTION_NAME));
+
+            // Фоновый сборщик истёкших подписок UC-SUB-203.
+            // Hosted-сервис биллинга UC-SUB-200 — по мере появления UC-потребителей.
+            services.AddHostedService<SubscriptionExpirationBackgroundService>();
 
             return services;
         }

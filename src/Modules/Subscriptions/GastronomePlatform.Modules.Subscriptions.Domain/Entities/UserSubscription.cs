@@ -356,8 +356,9 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Entities
         /// <summary>
         /// Отменяет автопродление: переход в <see cref="SubscriptionStatus.Canceled"/>
         /// из <see cref="SubscriptionStatus.Trialing"/> или <see cref="SubscriptionStatus.Active"/>.
-        /// Доступ сохраняется до <see cref="CurrentPeriodEnd"/>. Событие смены роли
-        /// не порождает — оно пойдёт только при фактическом <see cref="Expire"/>.
+        /// Доступ сохраняется до <see cref="CurrentPeriodEnd"/>. Доменных событий
+        /// не порождает — факт бизнес-перехода фиксируется только при фактическом
+        /// истечении периода (<see cref="Expire"/>).
         /// </summary>
         /// <param name="utcNow">Текущее время UTC.</param>
         /// <returns>
@@ -383,27 +384,60 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Entities
         }
 
         /// <summary>
-        /// Истечение подписки: переход <see cref="SubscriptionStatus.Canceled"/> →
-        /// <see cref="SubscriptionStatus.Expired"/> при достижении
+        /// Истечение подписки: переход в <see cref="SubscriptionStatus.Expired"/>
+        /// из <see cref="SubscriptionStatus.Trialing"/>, <see cref="SubscriptionStatus.Active"/>
+        /// или <see cref="SubscriptionStatus.Canceled"/> при достижении
         /// <see cref="CurrentPeriodEnd"/> фоновым сборщиком (UC-SUB-203).
         /// Поднимает <see cref="SubscriptionExpiredEvent"/>.
         /// </summary>
-        /// <param name="planKind">Род плана для доменного события (нужен подписчику Users для смены роли).</param>
+        /// <remarks>
+        /// <para>
+        /// Истечение из <see cref="SubscriptionStatus.Trialing"/> и
+        /// <see cref="SubscriptionStatus.Active"/> — не аномалия: автопродления
+        /// в модели пока нет, поэтому подписка, которую не отменили явно, доходит
+        /// до конца оплаченного периода в исходном статусе. Без этой ветки такая
+        /// запись осталась бы <see cref="SubscriptionStatus.Active"/> навсегда.
+        /// </para>
+        /// <para>
+        /// На отсечение доступа переход не влияет: резолвер эффективных грантов
+        /// проверяет <see cref="CurrentPeriodEnd"/> отдельным guard-ом и перестаёт
+        /// отдавать гранты в момент истечения периода независимо от статуса. Метод
+        /// отвечает за корректность самого статуса, за <see cref="EndedAt"/>
+        /// и за эмиссию доменного события.
+        /// </para>
+        /// <para>
+        /// Рекуррент гасится вместе с переходом: <see cref="AutoRenew"/> снимается,
+        /// <see cref="NextBillingAt"/> обнуляется — иначе истёкшая запись осталась бы
+        /// видимой для биллингового сборщика, который отбирает кандидатов по
+        /// <see cref="NextBillingAt"/>. Причина проставляется только при отсутствии
+        /// ранее заданной: у отменённой подписки уже стоит
+        /// <see cref="Enums.RecurringDisabledReason.UserCanceled"/>, и она описывает
+        /// ситуацию точнее, чем факт окончания периода.
+        /// </para>
+        /// </remarks>
+        /// <param name="planKind">Род плана для доменного события.</param>
         /// <param name="utcNow">Текущее время UTC.</param>
         /// <returns>
         /// <see cref="Result.Success()"/> или
-        /// <see cref="SubscriptionsErrors.CannotExpireInStatus"/> (в Phase A истекать
-        /// может только отменённая подписка; для Phase B/C добавятся ветки из
-        /// <c>PastDue</c> и <c>Scheduled</c>).
+        /// <see cref="SubscriptionsErrors.CannotExpireInStatus"/> — для
+        /// <see cref="SubscriptionStatus.Expired"/> (повторное истечение),
+        /// а также <see cref="SubscriptionStatus.PastDue"/> и
+        /// <see cref="SubscriptionStatus.Scheduled"/>: ветки dunning и отложенного
+        /// старта появятся вместе с этими статусами в Phase B/C.
         /// </returns>
         public Result Expire(PlanKind planKind, DateTimeOffset utcNow)
         {
-            if (Status != SubscriptionStatus.Canceled)
+            if (Status is not (SubscriptionStatus.Trialing
+                or SubscriptionStatus.Active
+                or SubscriptionStatus.Canceled))
             {
                 return SubscriptionsErrors.CannotExpireInStatus;
             }
 
             Status = SubscriptionStatus.Expired;
+            AutoRenew = false;
+            NextBillingAt = null;
+            RecurringDisabledReason ??= Enums.RecurringDisabledReason.PeriodEnded;
             EndedAt = utcNow;
             UpdatedAt = utcNow;
 

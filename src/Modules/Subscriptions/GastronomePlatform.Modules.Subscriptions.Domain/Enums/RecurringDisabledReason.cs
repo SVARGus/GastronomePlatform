@@ -21,6 +21,14 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Enums
         AttemptsExhausted = 1,
 
         /// <summary>Отменён пользователем.</summary>
-        UserCanceled = 2
+        UserCanceled = 2,
+
+        /// <summary>
+        /// Оплаченный период закончился без продления — подписка переведена
+        /// в <c>Expired</c> фоновым сборщиком. Проставляется только тогда, когда
+        /// причина ещё не задана: у отменённой пользователем подписки сохраняется
+        /// <see cref="UserCanceled"/> как более точная.
+        /// </summary>
+        PeriodEnded = 3
     }
 }

@@ -128,6 +128,11 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Persistence.Co
 
             // Индекс для фонового сборщика UC-SUB-200.
             builder.HasIndex(x => x.NextBillingAt);
+
+            // Индекс для фонового сборщика истечения UC-SUB-203: выборка кандидатов
+            // идёт по статусу и границе оплаченного периода без привязки к пользователю,
+            // поэтому индекс (UserId, Status) выше для неё бесполезен.
+            builder.HasIndex(x => new { x.Status, x.CurrentPeriodEnd });
         }
     }
 }
