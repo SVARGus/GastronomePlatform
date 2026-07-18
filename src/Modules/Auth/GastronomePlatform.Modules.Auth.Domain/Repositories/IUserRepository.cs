@@ -82,16 +82,10 @@ namespace GastronomePlatform.Modules.Auth.Domain.Repositories
         /// </returns>
         Task<bool> CheckPasswordAsync(Guid userId, string password, CancellationToken cancellationToken = default);
 
-        /// <summary>
-        /// Возвращает первую роль пользователя.
-        /// Возвращает null если роли не назначены.
-        /// </summary>
-        /// <param name="userId">Идентификатор пользователя.</param>
-        /// <param name="cancellationToken">Токен отмены операции.</param>
-        /// <returns>
-        /// Название роли если найдена; иначе <see langword="null"/>.
-        /// </returns>
-        Task<string?> GetUserRoleAsync(Guid userId, CancellationToken cancellationToken = default);
+        // Получение ролей пользователя живёт в IAuthUserService.GetUserRolesAsync —
+        // единственной точке, возвращающей полный набор ролей. Прежний метод
+        // GetUserRoleAsync отдавал только первую роль и потому не годился для
+        // пользователей с несколькими ролями.
 
         /// <summary>
         /// Находит данные пользователя по идентификатору.

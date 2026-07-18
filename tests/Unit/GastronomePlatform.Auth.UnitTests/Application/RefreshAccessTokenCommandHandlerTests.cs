@@ -5,6 +5,7 @@ using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Auth.Application.Abstractions;
 using GastronomePlatform.Modules.Auth.Application.Commands.RefreshAccessToken;
 using GastronomePlatform.Modules.Auth.Application.DTOs;
+using GastronomePlatform.Modules.Auth.Domain.Contracts;
 using GastronomePlatform.Modules.Auth.Domain.Entities;
 using GastronomePlatform.Modules.Auth.Domain.Errors;
 using GastronomePlatform.Modules.Auth.Domain.Repositories;
@@ -18,6 +19,7 @@ namespace GastronomePlatform.Auth.UnitTests.Application
     public sealed class RefreshAccessTokenCommandHandlerTests
     {
         private readonly Mock<IUserRepository> _userRepositoryMock = new();
+        private readonly Mock<IAuthUserService> _authUserServiceMock = new();
         private readonly Mock<IJwtService> _jwtServiceMock = new();
         private readonly Mock<IRefreshTokenRepository> _refreshTokenRepositoryMock = new();
         private readonly Mock<IDateTimeProvider> _dateTimeProviderMock = new();
@@ -25,12 +27,13 @@ namespace GastronomePlatform.Auth.UnitTests.Application
 
         private static readonly Guid _userId = Guid.NewGuid();
         private const string EMAIL = "user@example.com";
-        private const string ROLE = "User";
         private const string OLD_REFRESH_TOKEN = "old-refresh-token";
         private const string NEW_ACCESS_TOKEN = "new-access-token";
         private const string NEW_REFRESH_TOKEN = "new-refresh-token";
         private const int ACCESS_EXPIRY_MINUTES = 15;
         private const int REFRESH_EXPIRY_DAYS = 30;
+        private static readonly IReadOnlyCollection<string> _singleRole = new[] { "User" };
+        private static readonly IReadOnlyCollection<string> _twoRoles = new[] { "User", "Premium" };
         private static readonly DateTimeOffset _now =
             new(2026, 4, 12, 12, 0, 0, TimeSpan.Zero);
 
@@ -38,6 +41,7 @@ namespace GastronomePlatform.Auth.UnitTests.Application
         {
             _handler = new RefreshAccessTokenCommandHandler(
                 _userRepositoryMock.Object,
+                _authUserServiceMock.Object,
                 _jwtServiceMock.Object,
                 _refreshTokenRepositoryMock.Object,
                 _dateTimeProviderMock.Object);
@@ -53,7 +57,7 @@ namespace GastronomePlatform.Auth.UnitTests.Application
         /// <summary>
         /// Настраивает моки на успешный сценарий.
         /// </summary>
-        private void SetupSuccessfulFlow(RefreshToken activeToken)
+        private void SetupSuccessfulFlow(RefreshToken activeToken, IReadOnlyCollection<string>? roles = null)
         {
             _refreshTokenRepositoryMock
                 .Setup(r => r.GetByTokenAsync(OLD_REFRESH_TOKEN, It.IsAny<CancellationToken>()))
@@ -61,13 +65,13 @@ namespace GastronomePlatform.Auth.UnitTests.Application
             _userRepositoryMock
                 .Setup(r => r.GetAuthUserInfoByIdAsync(_userId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new AuthUserInfo(_userId, EMAIL));
-            _userRepositoryMock
-                .Setup(r => r.GetUserRoleAsync(_userId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(ROLE);
+            _authUserServiceMock
+                .Setup(s => s.GetUserRolesAsync(_userId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(roles ?? _singleRole);
             _jwtServiceMock.SetupGet(j => j.AccessTokenExpiryMinutes).Returns(ACCESS_EXPIRY_MINUTES);
             _jwtServiceMock.SetupGet(j => j.RefreshTokenExpiryDays).Returns(REFRESH_EXPIRY_DAYS);
             _jwtServiceMock
-                .Setup(j => j.GenerateAccessToken(_userId, EMAIL, ROLE))
+                .Setup(j => j.GenerateAccessToken(_userId, EMAIL, It.IsAny<IReadOnlyCollection<string>>()))
                 .Returns(NEW_ACCESS_TOKEN);
             _jwtServiceMock
                 .Setup(j => j.GenerateRefreshToken())
@@ -84,16 +88,28 @@ namespace GastronomePlatform.Auth.UnitTests.Application
         public void Constructor_WithNullUserRepository_ShouldThrowArgumentNullException()
         {
             Action action = () => new RefreshAccessTokenCommandHandler(
-                null!, _jwtServiceMock.Object, _refreshTokenRepositoryMock.Object, _dateTimeProviderMock.Object);
+                null!, _authUserServiceMock.Object, _jwtServiceMock.Object,
+                _refreshTokenRepositoryMock.Object, _dateTimeProviderMock.Object);
 
             action.Should().Throw<ArgumentNullException>().WithParameterName("userRepository");
+        }
+
+        [Fact]
+        public void Constructor_WithNullAuthUserService_ShouldThrowArgumentNullException()
+        {
+            Action action = () => new RefreshAccessTokenCommandHandler(
+                _userRepositoryMock.Object, null!, _jwtServiceMock.Object,
+                _refreshTokenRepositoryMock.Object, _dateTimeProviderMock.Object);
+
+            action.Should().Throw<ArgumentNullException>().WithParameterName("authUserService");
         }
 
         [Fact]
         public void Constructor_WithNullJwtService_ShouldThrowArgumentNullException()
         {
             Action action = () => new RefreshAccessTokenCommandHandler(
-                _userRepositoryMock.Object, null!, _refreshTokenRepositoryMock.Object, _dateTimeProviderMock.Object);
+                _userRepositoryMock.Object, _authUserServiceMock.Object, null!,
+                _refreshTokenRepositoryMock.Object, _dateTimeProviderMock.Object);
 
             action.Should().Throw<ArgumentNullException>().WithParameterName("jwtService");
         }
@@ -102,7 +118,8 @@ namespace GastronomePlatform.Auth.UnitTests.Application
         public void Constructor_WithNullRefreshTokenRepository_ShouldThrowArgumentNullException()
         {
             Action action = () => new RefreshAccessTokenCommandHandler(
-                _userRepositoryMock.Object, _jwtServiceMock.Object, null!, _dateTimeProviderMock.Object);
+                _userRepositoryMock.Object, _authUserServiceMock.Object, _jwtServiceMock.Object,
+                null!, _dateTimeProviderMock.Object);
 
             action.Should().Throw<ArgumentNullException>().WithParameterName("refreshTokenRepository");
         }
@@ -111,7 +128,8 @@ namespace GastronomePlatform.Auth.UnitTests.Application
         public void Constructor_WithNullDateTimeProvider_ShouldThrowArgumentNullException()
         {
             Action action = () => new RefreshAccessTokenCommandHandler(
-                _userRepositoryMock.Object, _jwtServiceMock.Object, _refreshTokenRepositoryMock.Object, null!);
+                _userRepositoryMock.Object, _authUserServiceMock.Object, _jwtServiceMock.Object,
+                _refreshTokenRepositoryMock.Object, null!);
 
             action.Should().Throw<ArgumentNullException>().WithParameterName("dateTimeProvider");
         }
@@ -156,7 +174,7 @@ namespace GastronomePlatform.Auth.UnitTests.Application
                 oldToken.IsActive.Should().BeFalse();
 
                 _jwtServiceMock.Verify(
-                    j => j.GenerateAccessToken(_userId, EMAIL, ROLE),
+                    j => j.GenerateAccessToken(_userId, EMAIL, _singleRole),
                     Times.Once);
 
                 _refreshTokenRepositoryMock.Verify(
@@ -171,6 +189,37 @@ namespace GastronomePlatform.Auth.UnitTests.Application
                 // Один SaveChanges фиксирует и отзыв старого, и создание нового
                 _refreshTokenRepositoryMock.Verify(
                     r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
+                    Times.Once);
+            }
+        }
+
+        [Fact]
+        public async Task Handle_RecomputesRolesOnEveryRefresh_AndPassesAllOfThemToTokenAsync()
+        {
+            // Arrange — роль, выданная после выпуска предыдущего токена (например, Premium
+            // при активации подписки), должна подхватиться при обновлении пары.
+            SetupSuccessfulFlow(CreateActiveToken(), _twoRoles);
+
+            // Act
+            Result<LoginResponse> result = await _handler.Handle(CreateCommand(), CancellationToken.None);
+
+            // Assert
+            using (new AssertionScope())
+            {
+                result.IsSuccess.Should().BeTrue();
+
+                _authUserServiceMock.Verify(
+                    s => s.GetUserRolesAsync(_userId, It.IsAny<CancellationToken>()),
+                    Times.Once);
+
+                _jwtServiceMock.Verify(
+                    j => j.GenerateAccessToken(
+                        _userId,
+                        EMAIL,
+                        It.Is<IReadOnlyCollection<string>>(roles =>
+                            roles.Count == 2 &&
+                            roles.Contains("User") &&
+                            roles.Contains("Premium"))),
                     Times.Once);
             }
         }
@@ -265,7 +314,7 @@ namespace GastronomePlatform.Auth.UnitTests.Application
 
         #endregion
 
-        #region Failure — пользователь / роль
+        #region Failure — пользователь / роли
 
         [Fact]
         public async Task Handle_WhenUserNotFound_ReturnsUserNotFoundErrorAndDoesNotIssueTokensAsync()
@@ -287,11 +336,11 @@ namespace GastronomePlatform.Auth.UnitTests.Application
                 result.IsFailure.Should().BeTrue();
                 result.Error.Should().Be(AuthErrors.UserNotFound);
 
-                _userRepositoryMock.Verify(
-                    r => r.GetUserRoleAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+                _authUserServiceMock.Verify(
+                    s => s.GetUserRolesAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
                     Times.Never);
                 _jwtServiceMock.Verify(
-                    j => j.GenerateAccessToken(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>()),
+                    j => j.GenerateAccessToken(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<IReadOnlyCollection<string>>()),
                     Times.Never);
                 _refreshTokenRepositoryMock.Verify(
                     r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()),
@@ -300,18 +349,18 @@ namespace GastronomePlatform.Auth.UnitTests.Application
         }
 
         [Fact]
-        public async Task Handle_WhenRoleIsNull_ReturnsInvalidCredentialsAndDoesNotIssueTokensAsync()
+        public async Task Handle_WhenUserHasNoRoles_ReturnsUserHasNoRolesAndDoesNotIssueTokensAsync()
         {
-            // Arrange — пользователь найден, но роль отсутствует (битое состояние Identity)
+            // Arrange — пользователь найден, но ролей нет (битое состояние Identity)
             _refreshTokenRepositoryMock
                 .Setup(r => r.GetByTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(CreateActiveToken());
             _userRepositoryMock
                 .Setup(r => r.GetAuthUserInfoByIdAsync(_userId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new AuthUserInfo(_userId, EMAIL));
-            _userRepositoryMock
-                .Setup(r => r.GetUserRoleAsync(_userId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((string?)null);
+            _authUserServiceMock
+                .Setup(s => s.GetUserRolesAsync(_userId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<string>());
 
             // Act
             Result<LoginResponse> result = await _handler.Handle(CreateCommand(), CancellationToken.None);
@@ -320,10 +369,10 @@ namespace GastronomePlatform.Auth.UnitTests.Application
             using (new AssertionScope())
             {
                 result.IsFailure.Should().BeTrue();
-                result.Error.Should().Be(AuthErrors.InvalidCredentials);
+                result.Error.Should().Be(AuthErrors.UserHasNoRoles);
 
                 _jwtServiceMock.Verify(
-                    j => j.GenerateAccessToken(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>()),
+                    j => j.GenerateAccessToken(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<IReadOnlyCollection<string>>()),
                     Times.Never);
                 _refreshTokenRepositoryMock.Verify(
                     r => r.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()),

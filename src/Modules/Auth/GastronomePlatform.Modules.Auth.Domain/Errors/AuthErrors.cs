@@ -22,6 +22,16 @@ namespace GastronomePlatform.Modules.Auth.Domain.Errors
         public static readonly Error UserNotFound =
             Error.NotFound("AUTH.USER_NOT_FOUND", "Пользователь не найден.");
 
+        /// <summary>
+        /// Учётной записи не назначено ни одной роли. Аномалия данных: логин
+        /// и пароль верны, но выпустить осмысленный токен не из чего.
+        /// Отдельный код вместо <see cref="InvalidCredentials"/> — чтобы причина
+        /// была видна без доступа к логам сервера и не выглядела как забытый пароль.
+        /// </summary>
+        public static readonly Error UserHasNoRoles =
+            Error.Forbidden("AUTH.USER_HAS_NO_ROLES",
+                "Учётной записи не назначено ни одной роли. Обратитесь к администратору платформы.");
+
         public static readonly Error TokenExpired =
             Error.Failure("AUTH.TOKEN_EXPIRED", "Токен истёк.");
 

@@ -3,6 +3,7 @@ using GastronomePlatform.Common.Application.Messaging;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Auth.Application.Abstractions;
 using GastronomePlatform.Modules.Auth.Application.DTOs;
+using GastronomePlatform.Modules.Auth.Domain.Contracts;
 using GastronomePlatform.Modules.Auth.Domain.Entities;
 using GastronomePlatform.Modules.Auth.Domain.Errors;
 using GastronomePlatform.Modules.Auth.Domain.Repositories;
@@ -12,6 +13,7 @@ namespace GastronomePlatform.Modules.Auth.Application.Commands.Login
     public sealed class LoginCommandHandler : ICommandHandler<LoginCommand, LoginResponse>
     {
         private readonly IUserRepository _userRepository;
+        private readonly IAuthUserService _authUserService;
         private readonly IJwtService _jwtService;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly IDateTimeProvider _dateTimeProvider;
@@ -20,13 +22,16 @@ namespace GastronomePlatform.Modules.Auth.Application.Commands.Login
         /// Инициализирует новый экземпляр <see cref="LoginCommandHandler"/>.
         /// </summary>
         /// <param name="userRepository">Репозиторий пользователей.</param>
+        /// <param name="authUserService">Публичный контракт модуля — источник ролей пользователя.</param>
         /// <param name="refreshTokenRepository">Репозиторий refresh-токенов.</param>
         /// <param name="jwtService">Сервис генерации JWT-токенов.</param>
         /// <param name="dateTimeProvider">Провайдер текущего времени.</param>
-        public LoginCommandHandler(IUserRepository userRepository, IJwtService jwtService,
-            IRefreshTokenRepository refreshTokenRepository, IDateTimeProvider dateTimeProvider)
+        public LoginCommandHandler(IUserRepository userRepository, IAuthUserService authUserService,
+            IJwtService jwtService, IRefreshTokenRepository refreshTokenRepository,
+            IDateTimeProvider dateTimeProvider)
         {
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+            _authUserService = authUserService ?? throw new ArgumentNullException(nameof(authUserService));
             _jwtService = jwtService ?? throw new ArgumentNullException(nameof(jwtService));
             _refreshTokenRepository = refreshTokenRepository ?? throw new ArgumentNullException(nameof(refreshTokenRepository));
             _dateTimeProvider = dateTimeProvider ?? throw new ArgumentNullException(nameof(dateTimeProvider));
@@ -51,19 +56,23 @@ namespace GastronomePlatform.Modules.Auth.Application.Commands.Login
                 return AuthErrors.InvalidCredentials;
             }
 
-            // 3. Получить роль пользователя
-            string? role = await _userRepository.GetUserRoleAsync(userInfo.Id, cancellationToken);
+            // 3. Получить роли пользователя.
+            // Аккаунт без единой роли — аномалия данных, а не неверные учётные
+            // данные: пароль уже проверен. Отдельный код ошибки, чтобы причина
+            // не выглядела как забытый пароль.
+            IReadOnlyCollection<string> roles =
+                await _authUserService.GetUserRolesAsync(userInfo.Id, cancellationToken);
 
-            if (role is null)
+            if (roles.Count == 0)
             {
-                return AuthErrors.InvalidCredentials;
+                return AuthErrors.UserHasNoRoles;
             }
 
             // 4. Удалить неактивные токены — предотвращаем накопление мусора
             await _refreshTokenRepository.DeleteInactiveByUserIdAsync(userInfo.Id, cancellationToken);
 
             // 5. Сгенерировать access token
-            string accessToken = _jwtService.GenerateAccessToken(userInfo.Id, userInfo.Email, role);
+            string accessToken = _jwtService.GenerateAccessToken(userInfo.Id, userInfo.Email, roles);
 
             // 6. Сгенерировать refresh token
             string refreshTokenValue = _jwtService.GenerateRefreshToken();

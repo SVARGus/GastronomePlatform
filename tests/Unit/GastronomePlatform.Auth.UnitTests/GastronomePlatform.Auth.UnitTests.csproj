@@ -23,6 +23,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Modules\Auth\GastronomePlatform.Modules.Auth.Application\GastronomePlatform.Modules.Auth.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Modules\Auth\GastronomePlatform.Modules.Auth.Domain\GastronomePlatform.Modules.Auth.Domain.csproj" />
+    <!-- Infrastructure нужен точечно — под JwtService. Он единственный класс слоя,
+         не зависящий ни от UserManager, ни от DbContext: только IOptions<JwtSettings>.
+         Остальная Infrastructure по-прежнему покрывается integration-тестами. -->
+    <ProjectReference Include="..\..\..\src\Modules\Auth\GastronomePlatform.Modules.Auth.Infrastructure\GastronomePlatform.Modules.Auth.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

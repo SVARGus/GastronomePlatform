@@ -129,22 +129,6 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Repositories
         }
 
         /// <inheritdoc/>
-        public async Task<string?> GetUserRoleAsync(Guid userId, CancellationToken cancellationToken = default)
-        {
-            ApplicationUser? user = await _userManager.FindByIdAsync(userId.ToString());
-
-            if (user is null)
-            {
-                return null;
-            }
-
-            IList<string> roles = await _userManager.GetRolesAsync(user);
-
-            // Возвращаем первую роль — у пользователя одна роль в нашей системе
-            return roles.FirstOrDefault();
-        }
-
-        /// <inheritdoc/>
         public async Task<AuthUserInfo?> GetAuthUserInfoByIdAsync(Guid userId, CancellationToken cancellationToken = default)
         {
             return await _authDbContext.Users

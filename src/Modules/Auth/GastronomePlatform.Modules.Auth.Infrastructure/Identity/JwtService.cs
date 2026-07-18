@@ -31,8 +31,10 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Identity
         public int RefreshTokenExpiryDays => _jwtSettings.RefreshTokenExpiryDays;
 
         /// <inheritdoc/>
-        public string GenerateAccessToken(Guid userId, string email, string role)
+        public string GenerateAccessToken(Guid userId, string email, IReadOnlyCollection<string> roles)
         {
+            ArgumentNullException.ThrowIfNull(roles);
+
             // Ключ подписи — создаётся из секретной строки
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
 
@@ -43,13 +45,21 @@ namespace GastronomePlatform.Modules.Auth.Infrastructure.Identity
             // Все имена claim-ов — короткие, стандартные OIDC ("sub", "email", "role", "jti").
             // Раньше "role" клали через ClaimTypes.Role (long Microsoft URI) — это создавало
             // несогласованность с другими claim-ами и ломало чтение в CurrentUserService.
-            Claim[] claims =
-            [
+            var claims = new List<Claim>(roles.Count + 3)
+            {
                 new(JwtRegisteredClaimNames.Sub, userId.ToString()),
                 new(JwtRegisteredClaimNames.Email, email),
-                new("role", role),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            ];
+            };
+
+            // Каждая роль — отдельный claim "role". Именно так их читают
+            // CurrentUserService.Roles и [Authorize(Roles = ...)]:
+            // в Program.cs задан RoleClaimType = "role", поэтому несколько
+            // одноимённых claim-ов складываются в набор ролей принципала.
+            foreach (string role in roles)
+            {
+                claims.Add(new Claim("role", role));
+            }
 
             // Создание токена
             var token = new JwtSecurityToken(

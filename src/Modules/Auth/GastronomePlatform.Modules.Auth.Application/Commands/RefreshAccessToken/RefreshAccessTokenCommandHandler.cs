@@ -3,6 +3,7 @@ using GastronomePlatform.Common.Application.Messaging;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Auth.Application.Abstractions;
 using GastronomePlatform.Modules.Auth.Application.DTOs;
+using GastronomePlatform.Modules.Auth.Domain.Contracts;
 using GastronomePlatform.Modules.Auth.Domain.Entities;
 using GastronomePlatform.Modules.Auth.Domain.Errors;
 using GastronomePlatform.Modules.Auth.Domain.Repositories;
@@ -15,6 +16,7 @@ namespace GastronomePlatform.Modules.Auth.Application.Commands.RefreshAccessToke
     public sealed class RefreshAccessTokenCommandHandler : ICommandHandler<RefreshAccessTokenCommand, LoginResponse>
     {
         private readonly IUserRepository _userRepository;
+        private readonly IAuthUserService _authUserService;
         private readonly IJwtService _jwtService;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly IDateTimeProvider _dateTimeProvider;
@@ -23,13 +25,16 @@ namespace GastronomePlatform.Modules.Auth.Application.Commands.RefreshAccessToke
         /// Инициализирует новый экземпляр <see cref="RefreshAccessTokenCommandHandler"/>.
         /// </summary>
         /// <param name="userRepository">Репозиторий пользователей.</param>
+        /// <param name="authUserService">Публичный контракт модуля — источник ролей пользователя.</param>
         /// <param name="refreshTokenRepository">Репозиторий refresh-токенов.</param>
         /// <param name="jwtService">Сервис генерации JWT-токенов.</param>
         /// <param name="dateTimeProvider">Провайдер текущего времени.</param>
-        public RefreshAccessTokenCommandHandler(IUserRepository userRepository, IJwtService jwtService,
-            IRefreshTokenRepository refreshTokenRepository, IDateTimeProvider dateTimeProvider)
+        public RefreshAccessTokenCommandHandler(IUserRepository userRepository, IAuthUserService authUserService,
+            IJwtService jwtService, IRefreshTokenRepository refreshTokenRepository,
+            IDateTimeProvider dateTimeProvider)
         {
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+            _authUserService = authUserService ?? throw new ArgumentNullException(nameof(authUserService));
             _jwtService = jwtService ?? throw new ArgumentNullException(nameof(jwtService));
             _refreshTokenRepository = refreshTokenRepository ?? throw new ArgumentNullException(nameof(refreshTokenRepository));
             _dateTimeProvider = dateTimeProvider ?? throw new ArgumentNullException(nameof(dateTimeProvider));
@@ -60,12 +65,15 @@ namespace GastronomePlatform.Modules.Auth.Application.Commands.RefreshAccessToke
                 return AuthErrors.UserNotFound;
             }
 
-            // 4. Получить роль пользователя
-            string? role = await _userRepository.GetUserRoleAsync(refreshToken.UserId, cancellationToken);
+            // 4. Получить роли пользователя.
+            // Набор пересчитывается при каждом обновлении — роль, выданная
+            // или снятая после выпуска предыдущего токена, подхватится здесь.
+            IReadOnlyCollection<string> roles =
+                await _authUserService.GetUserRolesAsync(refreshToken.UserId, cancellationToken);
 
-            if (role is null)
+            if (roles.Count == 0)
             {
-                return AuthErrors.InvalidCredentials;
+                return AuthErrors.UserHasNoRoles;
             }
 
             // 5. Отозвать старый токен — доменная логика на объекте
@@ -73,7 +81,7 @@ namespace GastronomePlatform.Modules.Auth.Application.Commands.RefreshAccessToke
             refreshToken.Revoke(_dateTimeProvider.UtcNow);
 
             // 6. Гененрируем новую пару токенов
-            string newAccessToken = _jwtService.GenerateAccessToken(userInfo.Id, userInfo.Email, role);
+            string newAccessToken = _jwtService.GenerateAccessToken(userInfo.Id, userInfo.Email, roles);
             string newRefreshTokenValue = _jwtService.GenerateRefreshToken();
 
             // 7. Создать и сохранить новый RefreshToken
