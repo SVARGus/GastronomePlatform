@@ -78,59 +78,65 @@ namespace GastronomePlatform.Modules.Subscriptions.Application.Commands.ExpireDu
                     request.BatchSize,
                     cancellationToken);
 
-            if (candidates.Count == 0)
-            {
-                return new ExpireDueSubscriptionsResult(ExpiredCount: 0, FailedCount: 0);
-            }
-
-            Dictionary<Guid, PlanKind> planKindBySubscriptionId =
-                candidates.ToDictionary(c => c.SubscriptionId, c => c.PlanKind);
-
-            IReadOnlyList<UserSubscription> subscriptions =
-                await _userSubscriptionRepository.ListByIdsAsync(
-                    planKindBySubscriptionId.Keys.ToList(),
-                    cancellationToken);
-
-            var expired = new List<UserSubscription>(subscriptions.Count);
+            int expiredCount = 0;
             int failedCount = 0;
 
-            foreach (var subscription in subscriptions)
+            if (candidates.Count > 0)
             {
-                var planKind = planKindBySubscriptionId[subscription.Id];
+                Dictionary<Guid, PlanKind> planKindBySubscriptionId =
+                    candidates.ToDictionary(c => c.SubscriptionId, c => c.PlanKind);
 
-                Result expireResult = subscription.Expire(planKind, utcNow);
-                if (expireResult.IsFailure)
+                IReadOnlyList<UserSubscription> subscriptions =
+                    await _userSubscriptionRepository.ListByIdsAsync(
+                        planKindBySubscriptionId.Keys.ToList(),
+                        cancellationToken);
+
+                var expired = new List<UserSubscription>(subscriptions.Count);
+
+                foreach (var subscription in subscriptions)
                 {
-                    // Штатно недостижимо: выборка отбирает ровно те статусы, которые
-                    // принимает доменный метод. Срабатывание означает, что фильтр
-                    // выборки и доменный инвариант разошлись.
-                    failedCount++;
+                    var planKind = planKindBySubscriptionId[subscription.Id];
 
-                    _logger.LogWarning(
-                        "Подписка {SubscriptionId} не переведена в Expired. Код ошибки: {ErrorCode}. Сообщение: {ErrorMessage}.",
-                        subscription.Id, expireResult.Error.Code, expireResult.Error.Message);
+                    Result expireResult = subscription.Expire(planKind, utcNow);
+                    if (expireResult.IsFailure)
+                    {
+                        // Штатно недостижимо: выборка отбирает ровно те статусы, которые
+                        // принимает доменный метод. Срабатывание означает, что фильтр
+                        // выборки и доменный инвариант разошлись.
+                        failedCount++;
 
-                    continue;
+                        _logger.LogWarning(
+                            "Подписка {SubscriptionId} не переведена в Expired. Код ошибки: {ErrorCode}. Сообщение: {ErrorMessage}.",
+                            subscription.Id, expireResult.Error.Code, expireResult.Error.Message);
+
+                        continue;
+                    }
+
+                    expired.Add(subscription);
                 }
 
-                expired.Add(subscription);
-            }
-
-            if (expired.Count > 0)
-            {
-                await _userSubscriptionRepository.SaveChangesAsync(cancellationToken);
-
-                foreach (var subscription in expired)
+                if (expired.Count > 0)
                 {
-                    await _eventDispatcher.DispatchAsync(subscription, cancellationToken);
+                    await _userSubscriptionRepository.SaveChangesAsync(cancellationToken);
+
+                    foreach (var subscription in expired)
+                    {
+                        await _eventDispatcher.DispatchAsync(subscription, cancellationToken);
+                    }
                 }
+
+                expiredCount = expired.Count;
             }
 
+            // Лог пишется на каждой итерации, включая пустую. Нулевая строка —
+            // единственное свидетельство того, что таймер тикает и задача жива:
+            // без неё «сборщик работает и делать нечего» неотличимо от
+            // «сборщик не запускается».
             _logger.LogInformation(
                 "Истечение подписок: обработано {ExpiredCount}, отклонено {FailedCount}, отобрано кандидатов {CandidateCount}.",
-                expired.Count, failedCount, candidates.Count);
+                expiredCount, failedCount, candidates.Count);
 
-            return new ExpireDueSubscriptionsResult(expired.Count, failedCount);
+            return new ExpireDueSubscriptionsResult(expiredCount, failedCount);
         }
     }
 }
