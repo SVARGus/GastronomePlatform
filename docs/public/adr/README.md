@@ -27,6 +27,7 @@
 | [ADR-0015](./ADR-0015-publish-precheck-before-snapshot-build.md) | Pre-check инвариантов публикации до сборки jsonb-снепшота — `Dish.CheckCanPublish` | Accepted | 2026-06-06 | 2 | Dishes |
 | [ADR-0016](./ADR-0016-diet-conflicts-mask.md) | Источник конфликтов диетических меток — поле `Ingredient.DietConflictsMask` | Accepted | 2026-06-07 | 2 | Dishes |
 | [ADR-0017](./ADR-0017-recurring-payments-yookassa.md) | Рекуррентные платежи через ЮKassa — `IPaymentGateway`, суточный сборщик + webhook-обработчик, идемпотентность и reconciliation | Accepted | 2026-06-28 | 3 | Subscriptions |
+| [ADR-0018](./ADR-0018-web-frontend-stack.md) | Стек веб-интерфейса — React + TypeScript как SPA поверх существующего API | Accepted | 2026-07-19 | 4 | Web |
 
 ---
 
