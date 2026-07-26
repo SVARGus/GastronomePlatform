@@ -1,0 +1,124 @@
+/* GastronomePlatform — входная точка стилей.
+   Порядок: шрифты → токены дизайн-системы → Tailwind → маппинг токенов
+   в тему Tailwind → базовые стили. Токены (--gp-*) — источник истины
+   (docs/public/design/brand-book.md, Приложение B); тема Tailwind только
+   ссылается на них. */
+@import './tokens/fonts.css';
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/radius-shadow.css';
+@import './tokens/motion.css';
+
+@import 'tailwindcss';
+
+/* Маппинг токенов в тему Tailwind v4: классы вида bg-page, text-ink,
+   font-display, rounded-card, shadow-card начинают работать из коробки. */
+@theme inline {
+  /* Фоны и текст («скатерть и чернила») */
+  --color-page: var(--gp-bg-page);
+  --color-surface: var(--gp-bg-surface);
+  --color-sunken: var(--gp-bg-sunken);
+  --color-ink: var(--gp-text);
+  --color-ink-secondary: var(--gp-text-secondary);
+  --color-ink-muted: var(--gp-text-muted);
+  --color-ink-disabled: var(--gp-text-disabled);
+  --color-ink-inverse: var(--gp-text-inverse);
+  --color-line: var(--gp-border);
+  --color-line-strong: var(--gp-border-strong);
+
+  /* Бренд и действия */
+  --color-brand: var(--gp-color-brand);
+  --color-action: var(--gp-color-action);
+  --color-action-hover: var(--gp-color-action-hover);
+  --color-action-active: var(--gp-color-action-active);
+  --color-on-action: var(--gp-color-on-action);
+  --color-link: var(--gp-color-link);
+  --color-link-hover: var(--gp-color-link-hover);
+
+  /* Шкала «Шафран» — для редких случаев мимо алиасов */
+  --color-saffron-50: var(--gp-primary-50);
+  --color-saffron-100: var(--gp-primary-100);
+  --color-saffron-200: var(--gp-primary-200);
+  --color-saffron-300: var(--gp-primary-300);
+  --color-saffron-400: var(--gp-primary-400);
+  --color-saffron-500: var(--gp-primary-500);
+  --color-saffron-600: var(--gp-primary-600);
+  --color-saffron-700: var(--gp-primary-700);
+  --color-saffron-800: var(--gp-primary-800);
+  --color-saffron-900: var(--gp-primary-900);
+
+  /* Семантика */
+  --color-success: var(--gp-green-500);
+  --color-success-bg: var(--gp-green-50);
+  --color-success-text: var(--gp-green-700);
+  --color-success-border: var(--gp-green-100);
+  --color-gold: var(--gp-gold-500);
+  --color-gold-bg: var(--gp-gold-100);
+  --color-gold-text: var(--gp-gold-800);
+  --color-warning: var(--gp-warning-fill);
+  --color-warning-bg: var(--gp-warning-bg);
+  --color-warning-text: var(--gp-warning-text);
+  --color-danger: var(--gp-danger-fill);
+  --color-danger-bg: var(--gp-danger-bg);
+  --color-danger-text: var(--gp-danger-text);
+  --color-trust: var(--gp-trust-fill);
+  --color-trust-bg: var(--gp-trust-bg);
+  --color-trust-text: var(--gp-trust-text);
+
+  /* Типографика */
+  --font-display: var(--gp-font-display);
+  --font-body: var(--gp-font-body);
+
+  /* Радиусы: rounded-control (кнопки/поля), rounded-card, rounded-pill */
+  --radius-badge: var(--gp-radius-sm);
+  --radius-control: var(--gp-radius);
+  --radius-card: var(--gp-radius-lg);
+  --radius-pill: var(--gp-radius-pill);
+
+  /* Тёплые тени */
+  --shadow-chip: var(--gp-shadow-sm);
+  --shadow-card: var(--gp-shadow-md);
+  --shadow-lifted: var(--gp-shadow-lg);
+}
+
+/* Базовые стили */
+@layer base {
+  html {
+    font-family: var(--gp-font-body);
+    color: var(--gp-text);
+    background-color: var(--gp-bg-page);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-size: var(--gp-fs-body);
+    line-height: var(--gp-lh-body);
+  }
+
+  h1,
+  h2 {
+    font-family: var(--gp-font-display);
+  }
+
+  a {
+    color: var(--gp-color-link);
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: var(--gp-color-link-hover);
+  }
+
+  /* Видимый фокус с клавиатуры на любом фоне (бренд-бук §3.6) */
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--gp-focus-ring);
+  }
+
+  /* Цифры не «пляшут» в ценах, времени и таблицах (бренд-бук §4) */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

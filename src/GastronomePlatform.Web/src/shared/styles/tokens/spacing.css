@@ -1,0 +1,29 @@
+/* GastronomePlatform — spacing, layout & sizing tokens. Base-4 scale. */
+:root {
+  --gp-space-1: 4px;
+  --gp-space-2: 8px;
+  --gp-space-3: 12px;
+  --gp-space-4: 16px;
+  --gp-space-6: 24px;
+  --gp-space-8: 32px;
+  --gp-space-12: 48px;
+  --gp-space-16: 64px;
+
+  /* Layout: container 1200 max, 12 cols, gutter 24; breakpoints 640/960/1200 */
+  --gp-container-max: 1200px;
+  --gp-gutter: 24px;
+  --gp-card-gap: 24px;      /* between grid cards */
+  --gp-section-gap: 64px;   /* between page sections */
+  --gp-card-pad: 20px;      /* inside a card: 16–20 */
+
+  /* Control heights */
+  --gp-h-btn-lg: 52px;  /* hero CTA */
+  --gp-h-btn-md: 44px;  /* standard, touch minimum */
+  --gp-h-btn-sm: 36px;  /* inside cards */
+  --gp-h-input: 44px;
+
+  /* Avatars */
+  --gp-avatar-sm: 32px;
+  --gp-avatar-md: 44px;
+  --gp-avatar-lg: 96px;
+}

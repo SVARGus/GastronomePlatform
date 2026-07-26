@@ -1,0 +1,17 @@
+/* GastronomePlatform — radii, shadows, focus. Warm ink shadows, never black. */
+:root {
+  /* Radii */
+  --gp-radius-sm: 6px;    /* badges, checkboxes */
+  --gp-radius: 10px;      /* buttons, inputs */
+  --gp-radius-lg: 16px;   /* cards, modals */
+  --gp-radius-pill: 999px;/* tags, filter chips */
+  /* dish photos & avatars use 50% (perfect circles) */
+
+  /* Warm shadows cast from ink #2A211A */
+  --gp-shadow-sm: 0 1px 2px rgba(42,33,26,.06);  /* inputs, chips */
+  --gp-shadow-md: 0 2px 8px rgba(42,33,26,.08);  /* cards */
+  --gp-shadow-lg: 0 8px 24px rgba(42,33,26,.12); /* card hover ("plate served"), modals */
+
+  /* Focus ring — visible from keyboard on any bg */
+  --gp-focus-ring: 0 0 0 2px var(--gp-bg-surface), 0 0 0 4px var(--gp-primary-600);
+}

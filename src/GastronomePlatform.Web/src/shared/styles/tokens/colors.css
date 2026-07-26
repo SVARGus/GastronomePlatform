@@ -1,0 +1,77 @@
+/* GastronomePlatform — color tokens (Brand Book Appendix B).
+   Base palette scales + semantic aliases. Consume the SEMANTIC aliases
+   in components; the raw scales exist for edge cases only. */
+:root {
+  /* ── Brand «Шафран» (Saffron) ───────────────────────────── */
+  --gp-primary-50:  #FBEFE6;
+  --gp-primary-100: #F6DCC9;
+  --gp-primary-200: #EFBD98;
+  --gp-primary-300: #E69763;
+  --gp-primary-400: #DF7A42;
+  --gp-primary-500: #D9622B; /* brand mark / decor ONLY — fails AA as text on white */
+  --gp-primary-600: #C25423; /* button fill, active controls (text on it: #FFF8F1) */
+  --gp-primary-700: #B34D1F; /* button hover; link color */
+  --gp-primary-800: #9C4319; /* active / pressed */
+  --gp-primary-900: #4A1F0B; /* text on primary-50/100 tints */
+
+  /* ── Freshness «Базилик» (Basil / success) ──────────────── */
+  --gp-green-50:  #E7F0E9;
+  --gp-green-100: #C8DFCE;
+  --gp-green-300: #7FAE8D;
+  --gp-green-500: #3E7C4F;
+  --gp-green-700: #2C5A39;
+
+  /* ── Gold «Шафрановая нить» (Premium / rating only) ─────── */
+  --gp-gold-100: #F4EBD3;
+  --gp-gold-500: #C9A227;
+  --gp-gold-800: #6E5510;
+
+  /* ── Semantic roles ─────────────────────────────────────── */
+  --gp-warning-bg:   #FBF0DC;
+  --gp-warning-fill: #DD8B24;
+  --gp-warning-text: #7A5410;
+  --gp-warning-border:#EFD3A1;
+  --gp-danger-bg:    #FBEBEB;
+  --gp-danger-fill:  #C93A3A;
+  --gp-danger-text:  #99302E;
+  --gp-danger-border:#F0C5C5;
+  --gp-trust-bg:     #EDF2F6; /* Trust blue — payment/Business zones ONLY, never near food */
+  --gp-trust-fill:   #4A6B8A;
+  --gp-trust-text:   #3A566F;
+  --gp-trust-border: #D3DEE8;
+
+  /* ── Neutrals «Скатерть и чернила» (tablecloth & ink) ───── */
+  --gp-bg-page:      #FAF6EF; /* page bg — warm, NOT white */
+  --gp-bg-surface:   #FFFFFF; /* cards, modals, inputs */
+  --gp-bg-sunken:    #F3ECE0; /* filters, footer, alternating sections */
+  --gp-border:       #E8DFD2; /* default warm-beige border */
+  --gp-border-strong:#D6C9B8; /* hover borders, section dividers */
+  --gp-text:         #2A211A; /* primary ink (13:1) */
+  --gp-text-secondary:#6E6259;/* captions, metadata (7:1) */
+  --gp-text-muted:   #8A7B6E; /* hints, placeholder (4.6:1) */
+  --gp-text-disabled:#B8AFA5;
+  --gp-text-inverse: #FFF9F0; /* text on dark/brand fills */
+
+  /* ── Semantic aliases (prefer these in components) ──────── */
+  --gp-color-brand:        var(--gp-primary-500);
+  --gp-color-action:       var(--gp-primary-600);
+  --gp-color-action-hover: var(--gp-primary-700);
+  --gp-color-action-active:var(--gp-primary-800);
+  --gp-color-on-action:    #FFF8F1;
+  --gp-color-link:         var(--gp-primary-700);
+  --gp-color-link-hover:   var(--gp-primary-800);
+  --gp-color-success:      var(--gp-green-500);
+  --gp-color-focus-ring:   rgba(217,98,43,.18);
+
+  /* ── Theme slots: pastel bg + dark same-family text; photos never overlaid ── */
+  --gp-theme-east-bg:#F6E7D4; --gp-theme-east-text:#7A4E16;
+  --gp-theme-fresh-bg:#E2F1ED; --gp-theme-fresh-text:#1F5D51;
+  --gp-theme-healthy-bg:#ECF2DF; --gp-theme-healthy-text:#4A6320;
+  --gp-theme-dessert-bg:#F7E9F0; --gp-theme-dessert-text:#7C3A5C;
+}
+
+/* Dark theme is DEFERRED (Brand Book §3.9). Its [data-theme="dark"] override
+   block is intentionally NOT shipped yet: keeping it here caused hosts that
+   set data-theme from the OS preference to render dark-brown cards/inputs and
+   light-on-light text. When dark theme is scheduled, reintroduce the block
+   from Brand Book Appendix B. Until then the product is light-only. */

@@ -1,0 +1,18 @@
+/* GastronomePlatform — motion tokens.
+   Signatures: "plate served" (card lift) & "steam". Respect reduced-motion. */
+:root {
+  --gp-dur-fast: 120ms;
+  --gp-dur: 180ms;
+  --gp-dur-panel: 240ms;
+  --gp-dur-ceremony: 400ms;
+  --gp-ease: cubic-bezier(.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --gp-dur-fast: 0ms;
+    --gp-dur: 0ms;
+    --gp-dur-panel: 0ms;
+    --gp-dur-ceremony: 0ms;
+  }
+}

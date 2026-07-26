@@ -1,0 +1,25 @@
+/* GastronomePlatform — typography tokens.
+   Piazzolla = display/headings (H2+ ONLY; serif is too noisy < 20px).
+   Golos Text = everything else. Sentence case everywhere, never CAPS. */
+:root {
+  --gp-font-display: 'Piazzolla', Georgia, 'Times New Roman', serif;
+  --gp-font-body:    'Golos Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  /* Role sizes (px / line-height) */
+  --gp-fs-display: 44px; --gp-lh-display: 1.15; /* hero, Piazzolla 560, ls -0.5% */
+  --gp-fs-h1: 34px; --gp-lh-h1: 1.2;   /* Piazzolla 540 */
+  --gp-fs-h2: 26px; --gp-lh-h2: 1.25;  /* Piazzolla 520 */
+  --gp-fs-h3: 20px; --gp-lh-h3: 1.3;   /* Golos Text 600 */
+  --gp-fs-body: 16px; --gp-lh-body: 1.6;
+  --gp-fs-small: 14px; --gp-lh-small: 1.5;
+  --gp-fs-caption: 12px; --gp-lh-caption: 1.4;
+
+  /* Weights */
+  --gp-fw-display: 560;
+  --gp-fw-h1: 540;
+  --gp-fw-h2: 520;
+  --gp-fw-h3: 600;
+  --gp-fw-regular: 400;
+  --gp-fw-medium: 500;
+  --gp-fw-semibold: 600;
+}
