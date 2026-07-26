@@ -107,6 +107,26 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(DishesDbContext).Assembly);
 
             modelBuilder.HasDefaultSchema("dishes");
+
+            // Id всех сущностей модуля назначается доменом (Guid.NewGuid() в конструкторах),
+            // а не БД. Без явного ValueGenerated.Never EF считает Guid-ключи генерируемыми
+            // и при обнаружении новой дочерней сущности в коллекции уже отслеживаемого
+            // агрегата (DetectChanges через навигацию) трактует заполненный ключ как признак
+            // существующей записи — сущность помечается Modified вместо Added, и SaveChanges
+            // выполняет UPDATE несуществующей строки (DbUpdateConcurrencyException).
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                var primaryKey = entityType.FindPrimaryKey();
+                if (primaryKey is null)
+                {
+                    continue;
+                }
+
+                foreach (var property in primaryKey.Properties.Where(p => p.ClrType == typeof(Guid)))
+                {
+                    property.ValueGenerated = Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never;
+                }
+            }
         }
     }
 }
