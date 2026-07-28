@@ -76,3 +76,179 @@ export interface CategoryNodeDto {
   iconMediaId: string | null;
   children: CategoryNodeDto[];
 }
+
+export type DishStatus = 'Draft' | 'Published' | 'Unpublished' | 'Archived';
+export type OwnerType = 'User' | 'Chef' | 'Restaurant' | 'Brand';
+export type YieldUnit = 'Grams' | 'Kilograms' | 'Milliliters' | 'Liters' | 'Pieces' | 'Servings';
+export type NutritionCalcMethod = 'Per100g' | 'PerServing';
+export type MeasureUnitType = 'Mass' | 'Volume' | 'Count' | 'Pinch';
+
+/** Публичная карточка блюда (UC-DSH-050/051). Рецепта внутри нет — он за гейтом UC-DSH-052. */
+export interface DishDetailDto {
+  id: string;
+  authorUserId: string;
+  name: string;
+  slug: string;
+  shortDescription: string | null;
+  description: string | null;
+  historyText: string | null;
+  mainImageId: string | null;
+  status: DishStatus;
+  difficultyLevel: DifficultyLevel;
+  costEstimate: CostEstimate;
+  ownerType: OwnerType;
+  dietLabelsMask: DietLabelsMask;
+  allergensMask: string;
+  hasUnverifiedAllergens: boolean;
+  ratingAvg: number;
+  ratingCount: number;
+  viewsCount: number;
+  favoritesCount: number;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isPublishedVersion: boolean;
+  hasUnsavedChanges: boolean | null;
+}
+
+/** Времена этапов приготовления (UC-DSH-052). Обязателен только totalTimeMinutes. */
+export interface TimingViewDto {
+  prepTimeMinutes: number | null;
+  cookTimeMinutes: number | null;
+  restTimeMinutes: number | null;
+  activeTimeMinutes: number | null;
+  totalTimeMinutes: number;
+  isTotalManual: boolean;
+}
+
+/** Выход готового продукта и размер порции (UC-DSH-052). */
+export interface YieldViewDto {
+  quantityTotal: number;
+  yieldUnit: YieldUnit;
+  servingsCount: number;
+  gramsPerServing: number | null;
+}
+
+/** Пищевая ценность (UC-DSH-052). calcMethod определяет подпись «на 100 г» / «на порцию». */
+export interface NutritionViewDto {
+  calcMethod: NutritionCalcMethod;
+  calories: number;
+  proteins: number;
+  fats: number;
+  saturatedFats: number | null;
+  carbs: number;
+  sugar: number | null;
+  fiber: number | null;
+  salt: number | null;
+}
+
+/** Шаг рецепта (UC-DSH-052), упорядочен по order. */
+export interface RecipeStepViewDto {
+  id: string;
+  order: number;
+  title: string | null;
+  description: string;
+  imageMediaId: string | null;
+  videoUrl: string | null;
+  temperatureCelsius: number | null;
+  timerMinutes: number | null;
+}
+
+/** Общие поля позиции рецепта; природа — по дискриминатору type. */
+interface RecipeIngredientViewBase {
+  id: string;
+  order: number;
+  quantity: number;
+  measureUnitId: string;
+  isOptional: boolean;
+  preparationNote: string | null;
+}
+
+/** Позиция рецепта из справочника ингредиентов (type: "catalog"). */
+export interface CatalogRecipeIngredientViewDto extends RecipeIngredientViewBase {
+  type: 'catalog';
+  ingredientId: string;
+  ingredientSpecId: string | null;
+}
+
+/** Позиция рецепта свободным текстом (type: "freeform"). */
+export interface FreeformRecipeIngredientViewDto extends RecipeIngredientViewBase {
+  type: 'freeform';
+  freeformText: string;
+}
+
+/** Discriminated union позиций рецепта (ADR-0012/0014, поле type). */
+export type RecipeIngredientViewDto = CatalogRecipeIngredientViewDto | FreeformRecipeIngredientViewDto;
+
+/** Рецепт со всеми вложенными сущностями (UC-DSH-052). */
+export interface RecipeViewDto {
+  introductionText: string | null;
+  servingsDefault: number;
+  isAlcoholic: boolean;
+  authorTips: string | null;
+  servingSuggestions: string | null;
+  notes: string | null;
+  timing: TimingViewDto;
+  yield: YieldViewDto;
+  nutrition: NutritionViewDto | null;
+  steps: RecipeStepViewDto[];
+  ingredients: RecipeIngredientViewDto[];
+}
+
+/** Обёртка рецепта с метаданными слоя-источника (UC-DSH-052). */
+export interface DishRecipeDto {
+  dishId: string;
+  isPublishedVersion: boolean;
+  hasUnsavedChanges: boolean | null;
+  recipe: RecipeViewDto;
+}
+
+/** Позиция с пересчитанным количеством (UC-DSH-056) — плоский DTO, type: "catalog"|"freeform". */
+export interface ScaledIngredientDto {
+  id: string;
+  order: number;
+  type: 'catalog' | 'freeform';
+  ingredientId: string | null;
+  ingredientSpecId: string | null;
+  freeformText: string | null;
+  originalQuantity: number;
+  scaledQuantity: number;
+  measureUnitId: string;
+  isOptional: boolean;
+  preparationNote: string | null;
+}
+
+/** Результат пересчёта ингредиентов на N порций (UC-DSH-056). */
+export interface GetScaledRecipeIngredientsResult {
+  servingsDefault: number;
+  servingsRequested: number;
+  multiplier: number;
+  ingredients: ScaledIngredientDto[];
+}
+
+/** Единица измерения (UC-DSH-064) — справочник, кэшируется целиком. */
+export interface MeasureUnitDto {
+  id: string;
+  code: string;
+  nameRu: string;
+  type: MeasureUnitType;
+  conversionToBase: number;
+  isBase: boolean;
+}
+
+/** Ингредиент справочника (UC-DSH-063) — на карточке блюда нужен ради name. */
+export interface IngredientDto {
+  id: string;
+  name: string;
+  pluralName: string | null;
+  description: string | null;
+  imageMediaId: string | null;
+  isLiquid: boolean;
+  densityApprox: number | null;
+  isAllergen: boolean;
+  allergenType: string | null;
+  dietConflictsMask: string;
+  baseMeasureUnitId: string;
+  defaultNutritionId: string | null;
+  isActive: boolean;
+}

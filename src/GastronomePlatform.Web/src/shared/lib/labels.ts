@@ -1,4 +1,10 @@
-import type { CostEstimate, DifficultyLevel, DishSearchSortBy } from '../api/types/dishes';
+import type {
+  CostEstimate,
+  DifficultyLevel,
+  DishSearchSortBy,
+  NutritionCalcMethod,
+  YieldUnit,
+} from '../api/types/dishes';
 
 /**
  * Русские подписи enum-ов контракта. Сервер намеренно отдаёт значения enum,
@@ -55,4 +61,34 @@ export function pluralize(count: number, forms: [string, string, string]): strin
   if (last > 1 && last < 5) return forms[1];
   if (last === 1) return forms[0];
   return forms[2];
+}
+
+/** Единицы выхода рецепта (YieldUnit) — короткие подписи после числа. */
+export const yieldUnitLabels: Record<YieldUnit, string> = {
+  Grams: 'г',
+  Kilograms: 'кг',
+  Milliliters: 'мл',
+  Liters: 'л',
+  Pieces: 'шт.',
+  Servings: 'порц.',
+};
+
+/** Подпись способа расчёта КБЖУ. */
+export const nutritionCalcMethodLabels: Record<NutritionCalcMethod, string> = {
+  Per100g: 'на 100 г готового блюда',
+  PerServing: 'на одну порцию',
+};
+
+/** Минуты → «1 ч 30 мин» / «45 мин» / «2 ч». */
+export function formatMinutes(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes} мин`;
+  if (minutes === 0) return `${hours} ч`;
+  return `${hours} ч ${minutes} мин`;
+}
+
+/** Количество ингредиента: без хвостовых нулей, запятая как разделитель (ru-RU). */
+export function formatQuantity(quantity: number): string {
+  return quantity.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
 }
