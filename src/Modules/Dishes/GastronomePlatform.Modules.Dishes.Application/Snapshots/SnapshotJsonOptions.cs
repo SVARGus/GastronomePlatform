@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using GastronomePlatform.Modules.Dishes.Application.Snapshots.Dtos;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Snapshots
 {
@@ -46,6 +47,11 @@ namespace GastronomePlatform.Modules.Dishes.Application.Snapshots
             };
 
             options.Converters.Add(new JsonStringEnumConverter());
+
+            // Полиморфизм позиций рецепта — через конвертер, а не атрибуты:
+            // PostgreSQL канонизирует jsonb (пересортировывает ключи), а атрибутный
+            // полиморфизм .NET 8 требует дискриминатор "type" строго первым свойством.
+            options.Converters.Add(new PublishedRecipeIngredientDtoConverter());
 
             // В .NET 8 безпараметровая JsonSerializerOptions.MakeReadOnly() требует
             // уже установленного TypeInfoResolver, иначе бросает InvalidOperationException.
