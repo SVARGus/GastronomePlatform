@@ -1,28 +1,37 @@
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Logo } from '../../shared/ui/Logo';
 
 /**
  * Общий каркас страниц: шапка с навигацией, контент (Outlet), подвал.
- * Каркасная версия — вёрстка по макету (мобильное меню-«пар» и т. д.) впереди.
+ * На мобильном (< md) навигация и вход/регистрация сворачиваются в
+ * меню-«пар» — бургер из трёх линий пара, как хохолок логотипа
+ * (микросигнатура бренда, бриф v2.0 §Адаптив).
  */
 export function SiteLayout() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+
+  // Переход по любой ссылке закрывает мобильное меню.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname, location.search]);
+
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex h-[72px] w-full max-w-[1200px] items-center gap-8 px-6">
-          <Link to="/" className="flex items-center gap-3 text-ink hover:text-ink">
-            <Logo className="h-9 w-9" />
-            <span className="font-display text-xl font-[560]">GastronomePlatform</span>
+      <header className="relative border-b border-line bg-surface">
+        <div className="mx-auto flex h-[64px] w-full max-w-[1200px] items-center gap-6 px-4 md:h-[72px] md:gap-8 md:px-6">
+          <Link to="/" className="flex min-w-0 items-center gap-2.5 text-ink hover:text-ink md:gap-3">
+            <Logo className="h-8 w-8 shrink-0 md:h-9 md:w-9" />
+            <span className="truncate font-display text-lg font-[560] md:text-xl">GastronomePlatform</span>
           </Link>
-          <nav className="hidden items-center gap-6 md:flex">
-            <NavLink to="/catalog" className="text-ink hover:text-link-hover">
-              Каталог
-            </NavLink>
-            <NavLink to="/pricing" className="text-ink hover:text-link-hover">
-              Тарифы
-            </NavLink>
+
+          <nav className="hidden items-center gap-2 md:flex">
+            <HeaderNavLink to="/catalog">Каталог</HeaderNavLink>
+            <HeaderNavLink to="/pricing">Тарифы</HeaderNavLink>
           </nav>
-          <div className="ml-auto flex items-center gap-3">
+
+          <div className="ml-auto hidden items-center gap-3 md:flex">
             <Link to="/login" className="px-4 py-2 text-ink-secondary hover:text-ink">
               Войти
             </Link>
@@ -33,7 +42,37 @@ export function SiteLayout() {
               Регистрация
             </Link>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}
+            aria-expanded={menuOpen}
+            className="ml-auto rounded-control p-2 text-ink hover:bg-sunken md:hidden"
+          >
+            <SteamMenuIcon className="h-6 w-6" />
+          </button>
         </div>
+
+        {menuOpen && (
+          <div className="absolute inset-x-3 top-full z-50 mt-2 rounded-card border border-line bg-surface p-3 shadow-lifted md:hidden">
+            <nav className="flex flex-col">
+              <MobileMenuLink to="/catalog">Каталог</MobileMenuLink>
+              <MobileMenuLink to="/pricing">Тарифы</MobileMenuLink>
+            </nav>
+            <div className="mt-2 flex items-center gap-3 border-t border-line pt-3">
+              <Link to="/login" className="flex-1 rounded-control px-4 py-2.5 text-center font-medium text-ink-secondary hover:bg-sunken hover:text-ink">
+                Войти
+              </Link>
+              <Link
+                to="/register"
+                className="flex-1 rounded-pill border border-action px-4 py-2.5 text-center font-medium text-link hover:bg-saffron-50"
+              >
+                Регистрация
+              </Link>
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="flex-1">
@@ -46,5 +85,48 @@ export function SiteLayout() {
         </div>
       </footer>
     </div>
+  );
+}
+
+/** Пункт навигации шапки (десктоп): активная страница — пилюля с фоном. */
+function HeaderNavLink({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        isActive
+          ? 'rounded-pill bg-saffron-50 px-4 py-2 font-medium text-link hover:text-link'
+          : 'rounded-pill px-4 py-2 text-ink hover:bg-sunken hover:text-link-hover'
+      }
+    >
+      {children}
+    </NavLink>
+  );
+}
+
+/** Пункт мобильного меню: активная страница — та же пилюля с фоном. */
+function MobileMenuLink({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        isActive
+          ? 'rounded-pill bg-saffron-50 px-4 py-2.5 font-medium text-link hover:text-link'
+          : 'rounded-pill px-4 py-2.5 font-medium text-ink hover:bg-sunken'
+      }
+    >
+      {children}
+    </NavLink>
+  );
+}
+
+/** Бургер-«пар»: три волнистые линии — хохолок «Жар-птицы» (stroke 1.75). */
+function SteamMenuIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className={className} aria-hidden>
+      <path d="M7 20 C5.5 16.5, 8.5 14.5, 7 11" />
+      <path d="M12 21 C10.5 17, 13.5 15, 12 9.5" />
+      <path d="M17 20 C15.5 16.5, 18.5 14.5, 17 11" />
+    </svg>
   );
 }

@@ -66,3 +66,13 @@ export interface TagDto {
   usageCount: number;
   isVerified: boolean;
 }
+
+/** Узел дерева категорий (UC-DSH-057) — рекурсивный. */
+export interface CategoryNodeDto {
+  id: string;
+  name: string;
+  slug: string;
+  order: number;
+  iconMediaId: string | null;
+  children: CategoryNodeDto[];
+}

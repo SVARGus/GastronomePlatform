@@ -593,6 +593,28 @@ foreach ($d in $dishes) {
     }
 }
 
+# ─────────────── 4b. Верификация тегов (для tags/popular) ───────────────
+# Облако популярных тегов (UC-DSH-061) отдаёт только верифицированные
+# админом теги — без этого шага чипсы на главной и фильтр тегов пустые.
+# VerifyTag идемпотентен (повторный вызов — тоже 204).
+
+Write-Step '4b/6 Верификация тегов'
+$allTagNames = $dishes | ForEach-Object { $_.Tags } | Select-Object -Unique
+foreach ($tagName in $allTagNames) {
+    $found = @(Invoke-Api GET "/tags/search?query=$(Esc $tagName)&limit=10") |
+        Where-Object { $_.name -eq $tagName } | Select-Object -First 1
+    if (-not $found) {
+        Write-Host "  ! тег '$tagName' не найден" -ForegroundColor Yellow
+        continue
+    }
+    if ($found.isVerified) {
+        Write-Host "  = $tagName"
+        continue
+    }
+    Invoke-Api POST "/tags/$($found.id)/verify" -Token $adminToken | Out-Null
+    Write-Host "  + $tagName верифицирован"
+}
+
 # ─────────────────────── 5. Планы подписки и офферы ───────────────────────
 
 Write-Step '5/6 Тарифные планы'
