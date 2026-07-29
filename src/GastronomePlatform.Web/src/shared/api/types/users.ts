@@ -27,3 +27,23 @@ export interface UserProfileDto {
 export function userDisplayName(profile: UserProfileDto): string {
   return profile.displayName ?? profile.userName;
 }
+
+export type Gender = 'Male' | 'Female' | 'Other' | 'PreferNotToSay';
+
+/** Тело PUT /api/users/me/personal-info. null — очистить поле. */
+export interface UpdatePersonalInfoRequest {
+  firstName: string | null;
+  lastName: string | null;
+  middleName: string | null;
+  displayName: string | null;
+  bio: string | null;
+  gender: Gender | null;
+  dateOfBirth: string | null;
+}
+
+/** Тело PUT /api/users/me/location. */
+export interface UpdateLocationRequest {
+  country: string | null;
+  region: string | null;
+  city: string | null;
+}

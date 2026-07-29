@@ -24,8 +24,23 @@ export const subscriptionsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `user-subscriptions/${id}` }),
       providesTags: (_result, _error, id) => [{ type: 'Subscription', id }],
     }),
+    /** Все подписки текущего пользователя (UC-SUB-026) — раздел «Подписка» кабинета. */
+    mySubscriptions: build.query<SubscriptionResponse[], void>({
+      query: () => ({ url: 'user-subscriptions/my' }),
+      providesTags: [{ type: 'Subscription', id: 'my' }],
+    }),
+    /** Отмена автопродления (UC-SUB-022). Доступ — до конца оплаченного периода. */
+    cancelSubscription: build.mutation<void, string>({
+      query: (id) => ({ url: `user-subscriptions/${id}/cancel`, method: 'POST' }),
+      invalidatesTags: ['Subscription'],
+    }),
   }),
 });
 
-export const { useSubscriptionCatalogQuery, useSubscribeMutation, useSubscriptionByIdQuery } =
-  subscriptionsApi;
+export const {
+  useSubscriptionCatalogQuery,
+  useSubscribeMutation,
+  useSubscriptionByIdQuery,
+  useMySubscriptionsQuery,
+  useCancelSubscriptionMutation,
+} = subscriptionsApi;
