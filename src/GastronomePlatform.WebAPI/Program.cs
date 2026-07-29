@@ -188,6 +188,23 @@ try
 
     app.UseHttpsRedirection();
 
+    // === 4.1. Статика SPA (production-сборка Vite в wwwroot) ===
+    // Хэшированные ассеты (/assets/*.js|css) кэшируются агрессивно — имя файла
+    // меняется при каждой сборке; index.html не кэшируется, чтобы клиент сразу
+    // видел новую версию. До первого npm run build wwwroot пуст — конвейер
+    // работает как раньше (чистый API).
+    app.UseDefaultFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = context =>
+        {
+            bool isHashedAsset = context.Context.Request.Path.StartsWithSegments("/assets");
+            context.Context.Response.Headers.CacheControl = isHashedAsset
+                ? "public,max-age=31536000,immutable"
+                : "no-cache";
+        }
+    });
+
     app.UseAuthentication();
     app.UseAuthorization();
 
@@ -202,6 +219,16 @@ try
     {
         Predicate = _ => true   // Все зарегистрированные проверки
     });
+
+    // === 4.2. SPA-fallback ===
+    // Неизвестные /api-маршруты отвечают 404, а не index.html: catch-all ниже
+    // по специфичности любых контроллерных маршрутов и срабатывает только когда
+    // ни один из них не подошёл.
+    app.Map("/api/{**path}", () => Results.NotFound());
+
+    // Всё остальное (deep-link /dishes/plov, /account?tab=…) — маршруты SPA:
+    // отдаём index.html, дальше разбирается react-router.
+    app.MapFallbackToFile("index.html");
 
     app.Run();
 }

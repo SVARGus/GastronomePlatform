@@ -6,7 +6,7 @@ import {
   useMySubscriptionsQuery,
   useSubscriptionCatalogQuery,
 } from '../subscriptions/subscriptionsApi';
-import type { SubscriptionResponse, SubscriptionStatus } from '../../shared/api/types/subscriptions';
+import type { SubscriptionStatus } from '../../shared/api/types/subscriptions';
 import { Button } from '../../shared/ui/Button';
 
 /** Статусы, дающие доступ (фильтр POL-004 §4.4 — как на backend). */
