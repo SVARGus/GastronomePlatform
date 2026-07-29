@@ -10,7 +10,12 @@ export const usersApi = baseApi.injectEndpoints({
       providesTags: (_result, _error, id) => [{ type: 'Profile', id }],
       keepUnusedDataFor: 600,
     }),
+    /** Профиль текущего пользователя — имя и аватар в шапке. Требует токен. */
+    myProfile: build.query<UserProfileDto, void>({
+      query: () => ({ url: 'users/me' }),
+      providesTags: [{ type: 'Profile', id: 'me' }],
+    }),
   }),
 });
 
-export const { useUserProfileQuery } = usersApi;
+export const { useUserProfileQuery, useMyProfileQuery } = usersApi;

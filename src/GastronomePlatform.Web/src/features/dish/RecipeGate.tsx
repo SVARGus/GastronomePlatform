@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useDishRecipeQuery } from '../dishes/dishesApi';
 import { RecipeView } from './RecipeView';
 
@@ -10,6 +10,7 @@ import { RecipeView } from './RecipeView';
  */
 export function RecipeGate({ dishId }: { dishId: string }) {
   const { data, error, isLoading } = useDishRecipeQuery(dishId);
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -38,6 +39,7 @@ export function RecipeGate({ dishId }: { dishId: string }) {
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link
               to="/login"
+              state={{ from: `${location.pathname}${location.search}` }}
               className="inline-flex h-11 items-center justify-center rounded-control bg-action px-5 font-medium text-on-action hover:bg-action-hover hover:text-on-action"
             >
               Войти

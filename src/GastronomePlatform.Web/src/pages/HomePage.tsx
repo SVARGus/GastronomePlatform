@@ -1,7 +1,9 @@
 import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAppSelector } from '../app/hooks';
 import { usePopularTagsQuery, useSearchDishesQuery } from '../features/dishes/dishesApi';
+import { selectIsAuthenticated } from '../shared/api/authSlice';
 import { Button } from '../shared/ui/Button';
 import { ChipLink } from '../shared/ui/Chip';
 import { DishCard, DishCardSkeleton } from '../shared/ui/DishCard';
@@ -55,14 +57,15 @@ function Hero() {
 
   return (
     <section className="relative overflow-hidden">
-      {/* Фото-«тарелка»: нижний слой, прижато к правому краю и срезано им.
-          На промежуточных ширинах не перемещается и не перекрывает контент
-          (спека — бриф 1 §Адаптив). На мобильном показывается под текстом. */}
+      {/* Фото-«тарелка»: нижний слой, привязан к ЦЕНТРУ контента (не к краю окна):
+          на широком экране круг виден целиком, при сужении постепенно уходит
+          за правый край (overflow-hidden секции срезает без скролла).
+          На мобильном — тот же приём с меньшим кругом. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute top-1/2 -right-32 z-0 hidden -translate-y-1/2 sm:block"
+        className="pointer-events-none absolute top-1/2 left-[calc(50%+56px)] z-0 -translate-y-1/2 sm:left-[calc(50%+80px)]"
       >
-        <div className="h-[520px] w-[520px] rounded-full bg-surface p-5 shadow-lifted">
+        <div className="h-[300px] w-[300px] rounded-full bg-surface p-3 shadow-lifted sm:h-[360px] sm:w-[360px] sm:p-5 md:h-[440px] md:w-[440px]">
           <div className="h-full w-full rounded-full bg-saffron-400" />
         </div>
       </div>
@@ -107,12 +110,6 @@ function Hero() {
           </div>
         </div>
 
-        {/* Мобильная версия фото — под текстом, по центру */}
-        <div aria-hidden className="mt-10 flex justify-center sm:hidden">
-          <div className="h-64 w-64 rounded-full bg-surface p-4 shadow-lifted">
-            <div className="h-full w-full rounded-full bg-saffron-400" />
-          </div>
-        </div>
       </div>
     </section>
   );
@@ -219,7 +216,13 @@ function HowItWorks() {
   );
 }
 
+/**
+ * CTA-блок внизу главной. Гостю предлагает регистрацию; вошедшему
+ * пользователю регистрация не нужна — блок зовёт к подписке (тарифы).
+ */
 function ChefsCta() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+
   return (
     <section className="mx-auto w-full max-w-[1200px] px-6 pt-4 pb-16">
       <div className="flex flex-col items-start gap-5 rounded-card bg-surface p-8 shadow-card md:flex-row md:items-center md:justify-between">
@@ -228,10 +231,10 @@ function ChefsCta() {
           <p className="mt-2 text-ink-secondary">Публикуйте свои рецепты на платформе и находите тех, кто их полюбит.</p>
         </div>
         <Link
-          to="/register"
+          to={isAuthenticated ? '/pricing' : '/register'}
           className="inline-flex h-11 shrink-0 items-center rounded-control border border-action px-5 font-medium text-link hover:bg-saffron-50"
         >
-          Присоединиться
+          {isAuthenticated ? 'Посмотреть тарифы' : 'Присоединиться'}
         </Link>
       </div>
     </section>

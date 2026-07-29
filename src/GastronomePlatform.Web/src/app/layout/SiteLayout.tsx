@@ -1,21 +1,52 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useAppDispatch, useAppSelector } from '../hooks';
+import { useLogoutMutation } from '../../features/auth/authApi';
+import { useMyProfileQuery } from '../../features/users/usersApi';
+import { sessionEnded, selectIsAuthenticated } from '../../shared/api/authSlice';
+import { clearSession, getRefreshToken } from '../../shared/api/authStorage';
+import { baseApi } from '../../shared/api/baseApi';
+import { mediaThumbnailUrl } from '../../shared/api/media';
+import { userDisplayName } from '../../shared/api/types/users';
 import { Logo } from '../../shared/ui/Logo';
 
 /**
  * Общий каркас страниц: шапка с навигацией, контент (Outlet), подвал.
  * На мобильном (< md) навигация и вход/регистрация сворачиваются в
  * меню-«пар» — бургер из трёх линий пара, как хохолок логотипа
- * (микросигнатура бренда, бриф v2.0 §Адаптив).
+ * (микросигнатура бренда, бриф v2.0 §Адаптив). При активной сессии
+ * вместо «Войти/Регистрация» — аватар-кружок (в кабинет) и «Выйти».
  */
 export function SiteLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { data: me } = useMyProfileQuery(undefined, { skip: !isAuthenticated });
+  const [logout] = useLogoutMutation();
 
   // Переход по любой ссылке закрывает мобильное меню.
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname, location.search]);
+
+  /** Выход: отзыв refresh на сервере (best effort) + локальная очистка сессии и кэша. */
+  async function handleLogout() {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      try {
+        await logout(refreshToken).unwrap();
+      } catch {
+        // Токен мог быть уже отозван/истечь — локальный выход выполняем всё равно.
+      }
+    }
+    clearSession();
+    dispatch(sessionEnded());
+    dispatch(baseApi.util.resetApiState());
+    navigate('/');
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -32,15 +63,35 @@ export function SiteLayout() {
           </nav>
 
           <div className="ml-auto hidden items-center gap-3 md:flex">
-            <Link to="/login" className="px-4 py-2 text-ink-secondary hover:text-ink">
-              Войти
-            </Link>
-            <Link
-              to="/register"
-              className="rounded-pill border border-action px-[18px] py-[7px] font-medium text-link hover:bg-saffron-50"
-            >
-              Регистрация
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="cursor-pointer px-3 py-2 text-ink-secondary hover:text-ink"
+                >
+                  Выйти
+                </button>
+                <Link to="/account" aria-label="Кабинет" className="shrink-0">
+                  <HeaderAvatar
+                    avatarMediaId={me?.avatarMediaId ?? null}
+                    name={me ? userDisplayName(me) : ''}
+                  />
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="px-4 py-2 text-ink-secondary hover:text-ink">
+                  Войти
+                </Link>
+                <Link
+                  to="/register"
+                  className="rounded-pill border border-action px-[18px] py-[7px] font-medium text-link hover:bg-saffron-50"
+                >
+                  Регистрация
+                </Link>
+              </>
+            )}
           </div>
 
           <button
@@ -60,17 +111,40 @@ export function SiteLayout() {
               <MobileMenuLink to="/catalog">Каталог</MobileMenuLink>
               <MobileMenuLink to="/pricing">Тарифы</MobileMenuLink>
             </nav>
-            <div className="mt-2 flex items-center gap-3 border-t border-line pt-3">
-              <Link to="/login" className="flex-1 rounded-control px-4 py-2.5 text-center font-medium text-ink-secondary hover:bg-sunken hover:text-ink">
-                Войти
-              </Link>
-              <Link
-                to="/register"
-                className="flex-1 rounded-pill border border-action px-4 py-2.5 text-center font-medium text-link hover:bg-saffron-50"
-              >
-                Регистрация
-              </Link>
-            </div>
+            {isAuthenticated ? (
+              <div className="mt-2 border-t border-line pt-2">
+                <NavLink
+                  to="/account"
+                  className="flex items-center gap-3 rounded-pill px-4 py-2.5 font-medium text-ink hover:bg-sunken"
+                >
+                  <HeaderAvatar
+                    avatarMediaId={me?.avatarMediaId ?? null}
+                    name={me ? userDisplayName(me) : ''}
+                    small
+                  />
+                  Кабинет
+                </NavLink>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full cursor-pointer rounded-pill px-4 py-2.5 text-left font-medium text-ink-secondary hover:bg-sunken hover:text-ink"
+                >
+                  Выйти
+                </button>
+              </div>
+            ) : (
+              <div className="mt-2 flex items-center gap-3 border-t border-line pt-3">
+                <Link to="/login" className="flex-1 rounded-control px-4 py-2.5 text-center font-medium text-ink-secondary hover:bg-sunken hover:text-ink">
+                  Войти
+                </Link>
+                <Link
+                  to="/register"
+                  className="flex-1 rounded-pill border border-action px-4 py-2.5 text-center font-medium text-link hover:bg-saffron-50"
+                >
+                  Регистрация
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </header>
@@ -117,6 +191,36 @@ function MobileMenuLink({ to, children }: { to: string; children: React.ReactNod
     >
       {children}
     </NavLink>
+  );
+}
+
+/** Аватар-кружок шапки: фото профиля либо инициал на шафрановой подложке. */
+function HeaderAvatar({
+  avatarMediaId,
+  name,
+  small,
+}: {
+  avatarMediaId: string | null;
+  name: string;
+  small?: boolean;
+}) {
+  const sizeClasses = small ? 'h-8 w-8 text-sm' : 'h-10 w-10';
+  if (avatarMediaId) {
+    return (
+      <img
+        src={mediaThumbnailUrl(avatarMediaId)}
+        alt=""
+        className={`${sizeClasses} rounded-full object-cover`}
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      className={`flex ${sizeClasses} items-center justify-center rounded-full bg-saffron-100 font-medium text-action`}
+    >
+      {name ? name.charAt(0).toUpperCase() : '·'}
+    </span>
   );
 }
 

@@ -1,4 +1,4 @@
-import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, Search, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AppliedFilterChips } from '../features/catalog/AppliedFilterChips';
 import { FiltersSidebar } from '../features/catalog/FiltersSidebar';
@@ -33,6 +33,19 @@ export function CatalogPage() {
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<DishCardListItemDto[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Строка поиска: локальный черновик, применяется по Enter/кнопке/уходу фокуса.
+  // Синхронизируется с URL-фильтром (переход с главной, снятие чипса «Поиск»).
+  const [searchDraft, setSearchDraft] = useState(filters.text);
+  useEffect(() => {
+    setSearchDraft(filters.text);
+  }, [filters.text]);
+
+  function applySearch() {
+    if (searchDraft.trim() !== filters.text) {
+      setText(searchDraft.trim());
+    }
+  }
 
   // Смена любого фильтра начинает выдачу с первой страницы.
   const filtersKey = useMemo(() => JSON.stringify(filters), [filters]);
@@ -122,6 +135,33 @@ export function CatalogPage() {
           )}
         </button>
       </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          applySearch();
+        }}
+        className="mt-6 flex max-w-[560px] gap-3"
+      >
+        <label className="relative flex-1">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 text-ink-muted"
+            strokeWidth={1.75}
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            onBlur={applySearch}
+            placeholder="Найти блюдо или ингредиент"
+            className="h-11 w-full rounded-control border border-line bg-surface pr-4 pl-11 text-ink placeholder:text-ink-muted focus:border-action"
+          />
+        </label>
+        <Button type="submit" variant="primary">
+          Найти
+        </Button>
+      </form>
 
       <div className="mt-6 items-start gap-8 md:flex">
         <aside className="hidden w-[280px] shrink-0 md:block">{sidebar}</aside>
