@@ -171,6 +171,25 @@ namespace GastronomePlatform.Modules.Subscriptions.Domain.Repositories
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Возвращает все подписки пользователя, отсортированные от новых к старым
+        /// (UC-SUB-026 GetMySubscriptions).
+        /// </summary>
+        /// <remarks>
+        /// Подколлекции <c>Payments</c>/<c>Agreements</c> не подгружаются — кабинету
+        /// достаточно корневых полей. Фильтрация «текущая/истёкшие» выполняется
+        /// потребителем: история нужна кабинету целиком.
+        /// </remarks>
+        /// <param name="userId">Идентификатор пользователя.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// Список подписок пользователя (может быть пустым), упорядоченный
+        /// по <c>CreatedAt</c> по убыванию.
+        /// </returns>
+        Task<IReadOnlyList<UserSubscription>> ListByUserAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Добавляет новую подписку в хранилище.
         /// </summary>
         /// <param name="subscription">Подписка для сохранения.</param>

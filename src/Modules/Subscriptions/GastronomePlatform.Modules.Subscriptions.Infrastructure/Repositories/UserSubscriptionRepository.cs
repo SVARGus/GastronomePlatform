@@ -73,6 +73,15 @@ namespace GastronomePlatform.Modules.Subscriptions.Infrastructure.Repositories
         }
 
         /// <inheritdoc/>
+        public async Task<IReadOnlyList<UserSubscription>> ListByUserAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default)
+            => await _context.UserSubscriptions
+                .Where(s => s.UserId == userId)
+                .OrderByDescending(s => s.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+        /// <inheritdoc/>
         public async Task<IReadOnlyList<ExpirationCandidate>> ListExpirationCandidatesAsync(
             DateTimeOffset utcNow,
             int batchSize,

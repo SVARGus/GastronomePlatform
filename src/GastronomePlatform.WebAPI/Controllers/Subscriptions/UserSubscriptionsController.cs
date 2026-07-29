@@ -1,6 +1,7 @@
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Subscriptions.Application.Commands.Cancel;
 using GastronomePlatform.Modules.Subscriptions.Application.Commands.Subscribe;
+using GastronomePlatform.Modules.Subscriptions.Application.Queries.GetMySubscriptions;
 using GastronomePlatform.Modules.Subscriptions.Application.Queries.GetSubscriptionById;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -9,8 +10,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
 {
     /// <summary>
-    /// Контроллер операций пользователя над своими подписками (UC-SUB-020..025).
-    /// Phase A содержит UC-SUB-020 (Subscribe), UC-SUB-021 (GetById) и UC-SUB-022 (Cancel).
+    /// Контроллер операций пользователя над своими подписками (UC-SUB-020..026).
+    /// Phase A содержит UC-SUB-020 (Subscribe), UC-SUB-021 (GetById), UC-SUB-022 (Cancel)
+    /// и UC-SUB-026 (GetMy — список своих подписок для кабинета).
     /// Смена способа оплаты и реактивация добавляются далее.
     /// </summary>
     [ApiController]
@@ -75,6 +77,33 @@ namespace GastronomePlatform.WebAPI.Controllers.Subscriptions
             }
 
             return Created($"/api/user-subscriptions/{result.Value.SubscriptionId}", result.Value);
+        }
+
+        /// <summary>
+        /// Возвращает все подписки текущего пользователя (UC-SUB-026) —
+        /// от новых к старым. Идентификатор пользователя берётся из JWT,
+        /// чужие подписки недостижимы по построению.
+        /// </summary>
+        /// <remarks>
+        /// Кабинет выбирает «текущую» подписку на клиенте: активная =
+        /// статус ∈ {Trialing, Active, PastDue, Canceled} и
+        /// <c>CurrentPeriodEnd</c> в будущем (тот же фильтр, что в POL-004 §4.4);
+        /// остальные записи — история.
+        /// </remarks>
+        /// <param name="ct">Токен отмены операции.</param>
+        /// <returns>
+        /// <c>200 OK</c> со списком <see cref="SubscriptionResponse"/>
+        /// (пустой список — валидный ответ, подписок не было);
+        /// <c>401</c> без JWT.
+        /// </returns>
+        [HttpGet("my")]
+        [Authorize]
+        public async Task<IActionResult> GetMyAsync(CancellationToken ct)
+        {
+            Result<IReadOnlyList<SubscriptionResponse>> result =
+                await Sender.Send(new GetMySubscriptionsQuery(), ct);
+
+            return MapResult(result);
         }
 
         /// <summary>
