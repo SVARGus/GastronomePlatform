@@ -596,16 +596,20 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         }
 
         /// <summary>
-        /// Возвращает постраничный список черновиков текущего пользователя (UC-DSH-053).
+        /// Возвращает постраничный список непубличных блюд текущего пользователя
+        /// по статусу (UC-DSH-053): черновики (<c>Draft</c>, по умолчанию) либо
+        /// снятые с публикации (<c>Unpublished</c>) — вкладки раздела «Мои блюда».
         /// Отсортировано по дате последнего изменения (свежие сверху).
         /// </summary>
         /// <param name="page">Номер страницы, начиная с 1. По умолчанию 1.</param>
         /// <param name="pageSize">Количество элементов на странице (1–25). По умолчанию 5.</param>
+        /// <param name="status">Статус выборки: <c>Draft</c> (по умолчанию) или <c>Unpublished</c>.</param>
         /// <param name="ct">Токен отмены операции.</param>
         /// <returns>
         /// <c>200 OK</c> с <see cref="GetMyDraftsResult"/> при успешном запросе
         /// (пустой список <c>Items</c> — допустимый ответ);
-        /// <c>400 Bad Request</c> при ошибке валидации параметров пагинации;
+        /// <c>400 Bad Request</c> при ошибке валидации параметров пагинации
+        /// или недопустимом статусе выборки;
         /// <c>401 Unauthorized</c> если запрос не аутентифицирован.
         /// </returns>
         [HttpGet("my-drafts")]
@@ -613,9 +617,10 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         public async Task<IActionResult> GetMyDraftsAsync(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 5,
+            [FromQuery] DishStatus status = DishStatus.Draft,
             CancellationToken ct = default)
         {
-            GetMyDraftsQuery query = new(Page: page, PageSize: pageSize);
+            GetMyDraftsQuery query = new(Page: page, PageSize: pageSize, Status: status);
 
             Result<GetMyDraftsResult> result = await Sender.Send(query, ct);
             return MapResult(result);

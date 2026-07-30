@@ -49,6 +49,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts
             // в сигнатуру репозиторного метода ListDraftsByAuthorAsync.
             (IReadOnlyList<Dish> items, int totalCount) = await _dishRepository.ListDraftsByAuthorAsync(
                 authorUserId,
+                request.Status,
                 request.Page,
                 request.PageSize,
                 cancellationToken);

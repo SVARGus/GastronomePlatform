@@ -9,6 +9,7 @@ using GastronomePlatform.Modules.Users.Application.Commands.UpdateLocation;
 using GastronomePlatform.Modules.Users.Application.Commands.UpdatePersonalInfo;
 using GastronomePlatform.Modules.Users.Application.DTOs;
 using GastronomePlatform.Modules.Users.Application.Queries.GetProfile;
+using GastronomePlatform.Modules.Users.Application.Queries.GetPublicProfile;
 using GastronomePlatform.Modules.Users.Application.Queries.GetUserRoles;
 using GastronomePlatform.Modules.Users.Domain.Enums;
 using MediatR;
@@ -132,19 +133,27 @@ namespace GastronomePlatform.WebAPI.Controllers.Users
         /// <summary>
         /// Возвращает публичный профиль пользователя по идентификатору.
         /// </summary>
+        /// <remarks>
+        /// Анонимный эндпоинт отдаёт урезанное <see cref="PublicUserProfileDto"/>:
+        /// контактные и чувствительные данные (email, телефон, дата рождения, пол,
+        /// ФИО) наружу не отдаются никогда — полный профиль доступен только
+        /// владельцу через <c>GET /api/users/me</c>. У скрытого профиля
+        /// (<c>IsPublic = false</c>) дополнительно обнуляются описание
+        /// и местоположение; имя, аватар и дата регистрации отдаются всегда.
+        /// </remarks>
         /// <param name="id">Идентификатор пользователя.</param>
         /// <param name="ct">Токен отмены операции.</param>
         /// <returns>
-        /// <c>200 OK</c> с <see cref="UserProfileDto"/>;
+        /// <c>200 OK</c> с <see cref="PublicUserProfileDto"/>;
         /// <c>404 Not Found</c> если профиль не найден.
         /// </returns>
         [HttpGet("{id}")]
         [AllowAnonymous]
         public async Task<IActionResult> GetProfileByIdAsync(Guid id, CancellationToken ct)
         {
-            var query = new GetProfileQuery(id);
+            var query = new GetPublicProfileQuery(id);
 
-            Result<UserProfileDto> result = await Sender.Send(query, ct);
+            Result<PublicUserProfileDto> result = await Sender.Send(query, ct);
 
             return MapResult(result);
         }

@@ -1,4 +1,5 @@
 using FluentValidation;
+using GastronomePlatform.Modules.Dishes.Domain.Enums;
 
 namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts
 {
@@ -22,6 +23,10 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetMyDrafts
                 .WithMessage("Размер страницы должен быть не меньше 1.")
                 .LessThanOrEqualTo(MAX_PAGE_SIZE)
                 .WithMessage($"Размер страницы не должен превышать {MAX_PAGE_SIZE}.");
+
+            RuleFor(x => x.Status)
+                .Must(status => status is DishStatus.Draft or DishStatus.Unpublished)
+                .WithMessage("Допустимые статусы выборки: Draft или Unpublished.");
         }
     }
 }

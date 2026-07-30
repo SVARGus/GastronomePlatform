@@ -30,7 +30,7 @@
 POL-001 (DishOwnership) здесь **не применяется** — он рассчитан на операции с конкретным `Dish`, а не на выборку списка.
 
 ### State Constraints (Ограничения по состоянию)
-- Возвращаются только блюда с `Status = Draft`. Опубликованные (`Published`), снятые (`Unpublished`) и архивные (`Archived`) — не входят в выборку.
+- Возвращаются блюда в статусе из параметра `status`: `Draft` (по умолчанию) либо `Unpublished` (вкладка «Снятые с публикации» раздела «Мои блюда», добавлено на Этапе 4). Опубликованные (`Published`) отдаёт UC-DSH-055; архивные (`Archived`) автору недоступны — запрос со статусом вне пары Draft/Unpublished отклоняется валидатором (`400`).
 
 ---
 
@@ -47,6 +47,7 @@ GET /api/dishes/my-drafts
 Query Parameters:
 - `page` — номер страницы, начиная с 1. По умолчанию `1`.
 - `pageSize` — количество элементов на странице. Допустимый диапазон `1..25`. По умолчанию `5`.
+- `status` — статус выборки: `Draft` (по умолчанию) или `Unpublished`. Прочие значения — `400 VALIDATION.ERROR`.
 
 Headers:
 - `Authorization: Bearer <JWT>` — обязательный.
@@ -106,11 +107,11 @@ Body: отсутствует.
 ---
 
 ## Main Flow (Основной поток)
-1. Контроллер собирает `GetMyDraftsQuery(Page, PageSize)` из query-параметров и отправляет через MediatR.
-2. `ValidationBehavior` запускает `GetMyDraftsQueryValidator` — проверка диапазонов `Page` и `PageSize`. При нарушении — `Result.Failure(VALIDATION.ERROR)`, Handler не вызывается.
+1. Контроллер собирает `GetMyDraftsQuery(Page, PageSize, Status)` из query-параметров и отправляет через MediatR.
+2. `ValidationBehavior` запускает `GetMyDraftsQueryValidator` — проверка диапазонов `Page`/`PageSize` и допустимости `Status` (Draft | Unpublished). При нарушении — `Result.Failure(VALIDATION.ERROR)`, Handler не вызывается.
 3. `GetMyDraftsQueryHandler` получает идентификатор автора через `ICurrentUserService.UserId` (гарантирован политикой `VALID_ACTOR`).
-4. Handler вызывает `IDishRepository.ListDraftsByAuthorAsync(authorUserId, page, pageSize, ct)`. Репозиторий выполняет два запроса в одной сессии:
-   - `COUNT(*) WHERE AuthorUserId = @userId AND Status = Draft`.
+4. Handler вызывает `IDishRepository.ListDraftsByAuthorAsync(authorUserId, status, page, pageSize, ct)`. Репозиторий выполняет два запроса в одной сессии:
+   - `COUNT(*) WHERE AuthorUserId = @userId AND Status = @status`.
    - `SELECT ... ORDER BY UpdatedAt DESC OFFSET ((page - 1) * pageSize) LIMIT pageSize`. Используется `AsNoTracking()`. Подколлекции (`Recipe`, `Categories`, `Tags`) не подгружаются.
 5. Handler маппит каждую сущность `Dish` в `DishDraftListItemDto` и возвращает `GetMyDraftsResult`.
 6. Контроллер через базовый `MapResult<T>` отдаёт `200 OK` с телом ответа.
