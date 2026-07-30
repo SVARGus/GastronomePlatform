@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { SiteLayout } from './layout/SiteLayout';
 import { HomePage } from '../pages/HomePage';
+import { AuthorPage } from '../pages/AuthorPage';
 import { CatalogPage } from '../pages/CatalogPage';
 import { DishPage } from '../pages/DishPage';
 import { LoginPage } from '../pages/LoginPage';
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
       { path: '/', element: <HomePage /> },
       { path: '/catalog', element: <CatalogPage /> },
       { path: '/dishes/:slug', element: <DishPage /> },
+      { path: '/authors/:userId', element: <AuthorPage /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
       { path: '/pricing', element: <PricingPage /> },

@@ -44,6 +44,38 @@ export interface SearchDishesResult {
   pageSize: number;
 }
 
+/** Постраничный список публичных блюд автора (UC-DSH-055) — та же карточка. */
+export interface GetDishesByAuthorResult {
+  items: DishCardListItemDto[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+/** Превью непубличного блюда в «Моих блюдах» (UC-DSH-053) — без рейтинга/просмотров. */
+export interface DishDraftListItemDto {
+  id: string;
+  slug: string;
+  name: string;
+  shortDescription: string | null;
+  mainImageId: string | null;
+  difficultyLevel: DifficultyLevel;
+  costEstimate: CostEstimate;
+  dietLabelsMask: DietLabelsMask;
+  allergensMask: string;
+  hasUnverifiedAllergens: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Постраничный результат UC-DSH-053 (черновики либо снятые — по параметру status). */
+export interface GetMyDraftsResult {
+  items: DishDraftListItemDto[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
 /** Параметры GET /api/dishes/search. Все фильтры опциональны. */
 export interface SearchDishesParams {
   text?: string;

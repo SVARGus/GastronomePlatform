@@ -4,6 +4,9 @@ import type {
   CategoryNodeDto,
   DishDetailDto,
   DishRecipeDto,
+  DishStatus,
+  GetDishesByAuthorResult,
+  GetMyDraftsResult,
   GetScaledRecipeIngredientsResult,
   IngredientDto,
   MeasureUnitDto,
@@ -66,6 +69,35 @@ export const dishesApi = baseApi.injectEndpoints({
     incrementViews: build.mutation<void, string>({
       query: (dishId) => ({ url: `dishes/${dishId}/views`, method: 'POST' }),
     }),
+    /** Публичные блюда автора (UC-DSH-055). Анонимный; свежие публикации сверху. */
+    dishesByAuthor: build.query<GetDishesByAuthorResult, { authorUserId: string; page?: number; pageSize?: number }>({
+      query: ({ authorUserId, page = 1, pageSize = 12 }) => ({
+        url: `dishes/by-author/${authorUserId}${toQueryString({ page, pageSize })}`,
+      }),
+      providesTags: ['Dishes'],
+    }),
+    /** Непубличные блюда текущего пользователя по статусу (UC-DSH-053). */
+    myDrafts: build.query<GetMyDraftsResult, { status: Extract<DishStatus, 'Draft' | 'Unpublished'>; page?: number; pageSize?: number }>({
+      query: ({ status, page = 1, pageSize = 25 }) => ({
+        url: `dishes/my-drafts${toQueryString({ status, page, pageSize })}`,
+      }),
+      providesTags: ['Dishes'],
+    }),
+    /** Публикация блюда (UC-DSH-004). 409 — доменные проверки полноты. */
+    publishDish: build.mutation<void, string>({
+      query: (dishId) => ({ url: `dishes/${dishId}/publish`, method: 'POST' }),
+      invalidatesTags: ['Dishes'],
+    }),
+    /** Снятие с публикации (UC-DSH-005): блюдо уходит во вкладку «Снятые». */
+    unpublishDish: build.mutation<void, string>({
+      query: (dishId) => ({ url: `dishes/${dishId}/unpublish`, method: 'POST' }),
+      invalidatesTags: ['Dishes'],
+    }),
+    /** Архивирование (UC-DSH-006): необратимо для автора. */
+    archiveDish: build.mutation<void, string>({
+      query: (dishId) => ({ url: `dishes/${dishId}/archive`, method: 'POST' }),
+      invalidatesTags: ['Dishes'],
+    }),
   }),
 });
 
@@ -79,4 +111,9 @@ export const {
   useMeasureUnitsQuery,
   useIngredientByIdQuery,
   useIncrementViewsMutation,
+  useDishesByAuthorQuery,
+  useMyDraftsQuery,
+  usePublishDishMutation,
+  useUnpublishDishMutation,
+  useArchiveDishMutation,
 } = dishesApi;

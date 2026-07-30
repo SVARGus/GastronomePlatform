@@ -1,5 +1,6 @@
 import { baseApi } from '../../shared/api/baseApi';
 import type {
+  PublicUserProfileDto,
   UpdateLocationRequest,
   UpdatePersonalInfoRequest,
   UserProfileDto,
@@ -8,8 +9,8 @@ import type {
 /** Эндпоинты модуля Users: профиль автора на витрине + кабинет (просмотр и правки). */
 export const usersApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    /** Публичный профиль пользователя (анонимный) — имя и аватар автора. */
-    userProfile: build.query<UserProfileDto, string>({
+    /** Публичный профиль пользователя (анонимный) — страница автора, подпись на карточке. */
+    userProfile: build.query<PublicUserProfileDto, string>({
       query: (id) => ({ url: `users/${id}` }),
       providesTags: (_result, _error, id) => [{ type: 'Profile', id }],
       keepUnusedDataFor: 600,

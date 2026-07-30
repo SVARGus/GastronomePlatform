@@ -160,30 +160,38 @@ export function DishPage() {
   );
 }
 
-/** Строка автора: аватар + «Рецепт от N». Страница автора — приоритет 2, пока без ссылки. */
+/** Строка автора: аватар + «Рецепт от N» — ссылка на публичную страницу автора. */
 function AuthorLine({ authorUserId }: { authorUserId: string }) {
   const { data: author } = useUserProfileQuery(authorUserId);
   if (!author) return null;
 
   return (
-    <p className="mt-3 flex items-center justify-center gap-2.5 md:justify-start">
-      {author.avatarMediaId ? (
-        <img
-          src={mediaThumbnailUrl(author.avatarMediaId)}
-          alt=""
-          className="h-11 w-11 rounded-full object-cover"
-        />
-      ) : (
-        <span
-          aria-hidden
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-saffron-100 font-medium text-action"
-        >
-          {userDisplayName(author).charAt(0).toUpperCase()}
+    <p className="mt-3 flex items-center justify-center md:justify-start">
+      <Link
+        to={`/authors/${authorUserId}`}
+        className="group flex items-center gap-2.5 text-ink-secondary hover:text-ink-secondary"
+      >
+        {author.avatarMediaId ? (
+          <img
+            src={mediaThumbnailUrl(author.avatarMediaId)}
+            alt=""
+            className="h-11 w-11 rounded-full object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-saffron-100 font-medium text-action"
+          >
+            {userDisplayName(author).charAt(0).toUpperCase()}
+          </span>
+        )}
+        <span>
+          Рецепт от{' '}
+          <span className="font-medium text-link group-hover:text-link-hover">
+            {userDisplayName(author)}
+          </span>
         </span>
-      )}
-      <span className="text-ink-secondary">
-        Рецепт от <span className="font-medium text-ink">{userDisplayName(author)}</span>
-      </span>
+      </Link>
     </p>
   );
 }

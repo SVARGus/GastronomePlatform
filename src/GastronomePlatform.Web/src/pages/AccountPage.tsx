@@ -1,7 +1,8 @@
-import { CreditCard, UserRound } from 'lucide-react';
+import { CookingPot, CreditCard, UserRound } from 'lucide-react';
 import { useEffect } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
+import { MyDishesSection } from '../features/account/MyDishesSection';
 import { ProfileSection } from '../features/account/ProfileSection';
 import { SubscriptionSection } from '../features/account/SubscriptionSection';
 import { useMyProfileQuery } from '../features/users/usersApi';
@@ -9,7 +10,13 @@ import { selectIsAuthenticated } from '../shared/api/authSlice';
 import { mediaThumbnailUrl } from '../shared/api/media';
 import { userDisplayName } from '../shared/api/types/users';
 
-type AccountTab = 'profile' | 'subscription';
+type AccountTab = 'profile' | 'subscription' | 'dishes';
+
+const TAB_TITLES: Record<AccountTab, string> = {
+  profile: 'Профиль',
+  subscription: 'Подписка',
+  dishes: 'Мои блюда',
+};
 
 /**
  * Личный кабинет (приоритет 1, макет AccountPages 4a–4e): сайдбар-меню
@@ -22,7 +29,9 @@ export function AccountPage() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const [searchParams] = useSearchParams();
 
-  const tab: AccountTab = searchParams.get('tab') === 'subscription' ? 'subscription' : 'profile';
+  const tabParam = searchParams.get('tab');
+  const tab: AccountTab =
+    tabParam === 'subscription' ? 'subscription' : tabParam === 'dishes' ? 'dishes' : 'profile';
 
   const { data: me } = useMyProfileQuery(undefined, { skip: !isAuthenticated });
 
@@ -62,6 +71,10 @@ export function AccountPage() {
               <CreditCard className="h-[19px] w-[19px]" strokeWidth={1.75} aria-hidden />
               Подписка
             </AccountMenuLink>
+            <AccountMenuLink to="/account?tab=dishes" active={tab === 'dishes'}>
+              <CookingPot className="h-[19px] w-[19px]" strokeWidth={1.75} aria-hidden />
+              Мои блюда
+            </AccountMenuLink>
           </nav>
         </aside>
 
@@ -73,13 +86,18 @@ export function AccountPage() {
           <AccountTabLink to="/account?tab=subscription" active={tab === 'subscription'}>
             Подписка
           </AccountTabLink>
+          <AccountTabLink to="/account?tab=dishes" active={tab === 'dishes'}>
+            Мои блюда
+          </AccountTabLink>
         </div>
 
-        <div className="min-w-0 max-w-[640px] flex-1">
+        <div className={`min-w-0 flex-1 ${tab === 'dishes' ? 'max-w-[840px]' : 'max-w-[640px]'}`}>
           <h1 className="mb-6 text-[30px] font-[560] leading-[1.2] md:text-[34px]">
-            {tab === 'profile' ? 'Профиль' : 'Подписка'}
+            {TAB_TITLES[tab]}
           </h1>
-          {tab === 'profile' ? <ProfileSection /> : <SubscriptionSection />}
+          {tab === 'profile' && <ProfileSection />}
+          {tab === 'subscription' && <SubscriptionSection />}
+          {tab === 'dishes' && <MyDishesSection />}
         </div>
       </div>
     </div>

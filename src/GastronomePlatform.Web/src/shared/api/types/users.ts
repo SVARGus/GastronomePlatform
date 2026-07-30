@@ -23,8 +23,26 @@ export interface UserProfileDto {
   createdAt: string;
 }
 
-/** Имя для витрины: displayName, иначе никнейм. */
-export function userDisplayName(profile: UserProfileDto): string {
+/**
+ * Публичный профиль (GET /api/users/{id}, анонимно) — урезанный контракт:
+ * контактных и чувствительных данных нет никогда; bio и местоположение
+ * заполнены только при isPublic.
+ */
+export interface PublicUserProfileDto {
+  userId: string;
+  userName: string;
+  displayName: string | null;
+  avatarMediaId: string | null;
+  isPublic: boolean;
+  bio: string | null;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  createdAt: string;
+}
+
+/** Имя для витрины: displayName, иначе никнейм (подходит обоим DTO профиля). */
+export function userDisplayName(profile: { displayName: string | null; userName: string }): string {
   return profile.displayName ?? profile.userName;
 }
 

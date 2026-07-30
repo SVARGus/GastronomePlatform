@@ -9,6 +9,8 @@
 interface ApiErrorBody {
   code?: string;
   errorCode?: string;
+  message?: string;
+  detail?: string;
   errors?: Record<string, string[]>;
 }
 
@@ -31,4 +33,10 @@ export function getErrorCode(error: unknown): string | null {
 /** Первое сообщение валидации по PascalCase-имени поля или null. */
 export function getValidationError(error: unknown, field: string): string | null {
   return getBody(error)?.errors?.[field]?.[0] ?? null;
+}
+
+/** Человекочитаемое сообщение доменной ошибки (русский текст backend) или null. */
+export function getErrorMessage(error: unknown): string | null {
+  const body = getBody(error);
+  return body?.message ?? body?.detail ?? null;
 }
