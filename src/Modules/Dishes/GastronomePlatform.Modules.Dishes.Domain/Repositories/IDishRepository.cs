@@ -38,9 +38,17 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         /// <summary>
         /// Находит блюдо с полностью загруженным агрегатом: <see cref="Dish.Recipe"/>,
         /// его 1:1-связки и подколлекции (<c>RecipeStep</c>, <c>RecipeIngredient</c>),
-        /// плюс связки тегов и категорий. Используется в UC-DSH-004 (Publish) для проверки
-        /// инвариантов и сборки JSON-снепшота, а также в полной карточке для редактирования.
+        /// связки тегов и категорий, а также снепшот-связки
+        /// <see cref="Dish.CategoriesPublished"/> / <see cref="Dish.TagsPublished"/>.
+        /// Используется в UC-DSH-004 (Publish) для проверки инвариантов и сборки
+        /// JSON-снепшота, а также в полной карточке для редактирования.
         /// </summary>
+        /// <remarks>
+        /// Снепшот-связки обязаны быть загружены: <c>Dish.Publish</c> выполняет их
+        /// полную замену через <c>Clear()</c> + <c>Add(...)</c>, и на незагруженной
+        /// коллекции EF Core не отследит удаление существующих строк — повторная
+        /// публикация после снятия упадёт нарушением первичного ключа.
+        /// </remarks>
         /// <param name="id">Идентификатор блюда.</param>
         /// <param name="cancellationToken">Токен отмены операции.</param>
         /// <returns>
@@ -48,6 +56,20 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         /// иначе <see langword="null"/>.
         /// </returns>
         Task<Dish?> GetByIdWithFullRecipeAsync(Guid id, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Находит блюдо с подгруженными снепшот-связками
+        /// <see cref="Dish.CategoriesPublished"/> / <see cref="Dish.TagsPublished"/>
+        /// (без <c>Recipe</c> и рабочих связок). Используется в lifecycle-командах
+        /// UC-DSH-005 (Unpublish) и UC-DSH-006 (Archive): их Domain-методы очищают
+        /// снепшот-связки, и без явной подгрузки EF Core не отследит удаление строк.
+        /// </summary>
+        /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="cancellationToken">Токен отмены операции.</param>
+        /// <returns>
+        /// <see cref="Dish"/> со снепшот-связками, если запись найдена; иначе <see langword="null"/>.
+        /// </returns>
+        Task<Dish?> GetByIdWithPublishedLinksAsync(Guid id, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Находит блюдо с подгруженной коллекцией <see cref="Dish.Categories"/>
@@ -92,21 +114,25 @@ namespace GastronomePlatform.Modules.Dishes.Domain.Repositories
         Task<Dish?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Возвращает постраничный список черновиков (<c>Status = Draft</c>) указанного автора,
-        /// отсортированный по <see cref="Dish.UpdatedAt"/> по убыванию. Подколлекции
-        /// <c>Recipe</c>, <c>Categories</c>, <c>Tags</c> не загружаются. Используется
-        /// в UC-DSH-053 (GetMyDrafts).
+        /// Возвращает постраничный список непубличных блюд указанного автора
+        /// в заданном статусе (<c>Draft</c> — черновики, <c>Unpublished</c> — снятые
+        /// с публикации), отсортированный по <see cref="Dish.UpdatedAt"/> по убыванию.
+        /// Подколлекции <c>Recipe</c>, <c>Categories</c>, <c>Tags</c> не загружаются.
+        /// Используется в UC-DSH-053 (GetMyDrafts).
         /// </summary>
         /// <param name="authorUserId">Идентификатор автора (текущий пользователь).</param>
+        /// <param name="status">Статус выборки: ожидаются <c>Draft</c> либо <c>Unpublished</c>
+        /// (ограничение обеспечивает валидатор Application-слоя).</param>
         /// <param name="page">Номер страницы, начиная с 1.</param>
         /// <param name="pageSize">Количество элементов на странице.</param>
         /// <param name="cancellationToken">Токен отмены операции.</param>
         /// <returns>
         /// Кортеж: <c>Items</c> — элементы запрошенной страницы (может быть пустым),
-        /// <c>TotalCount</c> — общее количество черновиков автора без учёта пагинации.
+        /// <c>TotalCount</c> — общее количество блюд автора в статусе без учёта пагинации.
         /// </returns>
         Task<(IReadOnlyList<Dish> Items, int TotalCount)> ListDraftsByAuthorAsync(
             Guid authorUserId,
+            DishStatus status,
             int page,
             int pageSize,
             CancellationToken cancellationToken = default);

@@ -49,6 +49,18 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
                 .Include(d => d.Recipe).ThenInclude(r => r.Ingredients)
                 .Include(d => d.Categories)
                 .Include(d => d.Tags)
+                // *Published обязаны быть загружены: Dish.Publish делает Clear()
+                // по этим коллекциям, и на незагруженной коллекции старые строки
+                // выживают в БД — повторная публикация падает дубликатом PK.
+                .Include(d => d.CategoriesPublished)
+                .Include(d => d.TagsPublished)
+                .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+
+        /// <inheritdoc/>
+        public async Task<Dish?> GetByIdWithPublishedLinksAsync(Guid id, CancellationToken cancellationToken = default)
+            => await _context.Dishes
+                .Include(d => d.CategoriesPublished)
+                .Include(d => d.TagsPublished)
                 .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 
         /// <inheritdoc/>
@@ -70,15 +82,17 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
         /// <inheritdoc/>
         public async Task<(IReadOnlyList<Dish> Items, int TotalCount)> ListDraftsByAuthorAsync(
             Guid authorUserId,
+            DishStatus status,
             int page,
             int pageSize,
             CancellationToken cancellationToken = default)
         {
             // Базовый фильтр для двух запросов (Count + Items). Не материализуется
-            // — это IQueryable.
+            // — это IQueryable. Статус ограничен Draft/Unpublished валидатором
+            // Application-слоя.
             IQueryable<Dish> query = _context.Dishes
                 .AsNoTracking()
-                .Where(d => d.AuthorUserId == authorUserId && d.Status == DishStatus.Draft);
+                .Where(d => d.AuthorUserId == authorUserId && d.Status == status);
 
             int totalCount = await query.CountAsync(cancellationToken);
 

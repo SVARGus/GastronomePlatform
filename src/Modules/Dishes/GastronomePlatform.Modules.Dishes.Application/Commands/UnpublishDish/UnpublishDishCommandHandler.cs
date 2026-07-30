@@ -14,10 +14,12 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UnpublishDish
     /// <remarks>
     /// Поток выполнения:
     /// <list type="number">
-    ///   <item>Загрузка корневого <see cref="Dish"/> через
-    ///         <c>IDishRepository.GetByIdAsync</c> — <c>Recipe</c> и подколлекции
-    ///         не нужны: операция меняет только статус и очищает <c>*Published</c>-связки,
-    ///         которые EF Core загружает по факту обращения к коллекциям.</item>
+    ///   <item>Загрузка <see cref="Dish"/> через
+    ///         <c>IDishRepository.GetByIdWithPublishedLinksAsync</c> — снепшот-связки
+    ///         <c>CategoriesPublished</c>/<c>TagsPublished</c> обязаны быть подгружены:
+    ///         <c>Dish.Unpublish</c> очищает их, а lazy loading в проекте не используется —
+    ///         на незагруженной коллекции <c>Clear()</c> не удалит строки из БД,
+    ///         и повторная публикация упадёт нарушением первичного ключа.</item>
     ///   <item>Проверка владения (POL-001 DishOwnership): автор блюда или Admin —
     ///         иначе <see cref="DishesErrors.NotDishOwner"/>.</item>
     ///   <item>Делегирование Domain: <c>dish.Unpublish(utcNow)</c> — содержит инвариант
@@ -59,7 +61,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.UnpublishDish
         /// <inheritdoc/>
         public async Task<Result> Handle(UnpublishDishCommand request, CancellationToken cancellationToken)
         {
-            Dish? dish = await _dishRepository.GetByIdAsync(request.DishId, cancellationToken);
+            Dish? dish = await _dishRepository.GetByIdWithPublishedLinksAsync(request.DishId, cancellationToken);
             if (dish is null)
             {
                 return DishesErrors.DishNotFound;

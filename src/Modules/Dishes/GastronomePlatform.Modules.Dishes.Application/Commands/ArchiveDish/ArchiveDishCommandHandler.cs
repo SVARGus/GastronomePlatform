@@ -16,9 +16,12 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.ArchiveDish
     /// Поток выполнения:
     /// </para>
     /// <list type="number">
-    ///   <item>Загрузка корневого <see cref="Dish"/> через
-    ///         <c>IDishRepository.GetByIdAsync</c> — <c>Recipe</c> не требуется,
-    ///         операция меняет только статус и очищает <c>*Published</c>-связки.</item>
+    ///   <item>Загрузка <see cref="Dish"/> через
+    ///         <c>IDishRepository.GetByIdWithPublishedLinksAsync</c> — <c>Recipe</c>
+    ///         не требуется, но снепшот-связки <c>CategoriesPublished</c>/<c>TagsPublished</c>
+    ///         обязаны быть подгружены: <c>Dish.Archive</c> очищает их, а lazy loading
+    ///         в проекте не используется — на незагруженной коллекции <c>Clear()</c>
+    ///         не удалит строки из БД.</item>
     ///   <item>Проверка владения (POL-001 DishOwnership): автор блюда или Admin —
     ///         иначе <see cref="DishesErrors.NotDishOwner"/>.</item>
     ///   <item>Делегирование Domain: <c>dish.Archive(utcNow)</c> — содержит инвариант
@@ -64,7 +67,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Commands.ArchiveDish
         /// <inheritdoc/>
         public async Task<Result> Handle(ArchiveDishCommand request, CancellationToken cancellationToken)
         {
-            Dish? dish = await _dishRepository.GetByIdAsync(request.DishId, cancellationToken);
+            Dish? dish = await _dishRepository.GetByIdWithPublishedLinksAsync(request.DishId, cancellationToken);
             if (dish is null)
             {
                 return DishesErrors.DishNotFound;
