@@ -1,9 +1,12 @@
 import { baseApi } from '../../shared/api/baseApi';
 import { toQueryString } from '../../shared/api/query';
 import type {
+  AddCatalogIngredientRequest,
+  AddFreeformIngredientRequest,
   CategoryNodeDto,
   CreateDishDraftRequest,
   CreateDishDraftResult,
+  CreatedIdResult,
   DishDetailDto,
   DishRecipeDto,
   DishStatus,
@@ -12,11 +15,29 @@ import type {
   GetScaledRecipeIngredientsResult,
   IngredientDto,
   MeasureUnitDto,
+  RecipeStepRequest,
   SearchDishesParams,
   SearchDishesResult,
+  SetNutritionRequest,
+  SetTimingRequest,
+  SetYieldRequest,
   TagDto,
   UpdateDishCardRequest,
+  UpdateRecipeIngredientRequest,
+  UpdateRecipeRequest,
 } from '../../shared/api/types/dishes';
+
+/**
+ * Теги кэша, которые сбрасывает любая мутация рецепта: сам рецепт и карточка
+ * блюда — сервер после правок состава пересчитывает маски аллергенов/диет
+ * (ADR-0016), а чек-лист готовности к публикации зависит от обоих.
+ */
+function recipeTags(dishId: string): Array<{ type: 'Dishes'; id: string }> {
+  return [
+    { type: 'Dishes', id: `recipe-${dishId}` },
+    { type: 'Dishes', id: dishId },
+  ];
+}
 
 /**
  * Эндпоинты модуля Dishes, задействованные на главной и в каталоге.
@@ -50,9 +71,11 @@ export const dishesApi = baseApi.injectEndpoints({
      * без подписки, 200 — подписчик/автор/admin. Ошибки не ретраятся — это
      * ожидаемые состояния страницы, а не сбои.
      */
-    dishRecipe: build.query<DishRecipeDto, string>({
-      query: (dishId) => ({ url: `dishes/${dishId}/recipe` }),
-      providesTags: (_result, _error, dishId) => [{ type: 'Dishes', id: `recipe-${dishId}` }],
+    dishRecipe: build.query<DishRecipeDto, { dishId: string; version?: 'working' }>({
+      query: ({ dishId, version }) => ({
+        url: `dishes/${dishId}/recipe${version ? `?version=${version}` : ''}`,
+      }),
+      providesTags: (_result, _error, { dishId }) => [{ type: 'Dishes', id: `recipe-${dishId}` }],
     }),
     /** Пересчёт ингредиентов на N порций (UC-DSH-056). Единицы не конвертируются. */
     scaledIngredients: build.query<GetScaledRecipeIngredientsResult, { dishId: string; servings: number }>({
@@ -101,10 +124,13 @@ export const dishesApi = baseApi.injectEndpoints({
       query: (dishId) => ({ url: `dishes/${dishId}/archive`, method: 'POST' }),
       invalidatesTags: ['Dishes'],
     }),
-    /** Карточка блюда по id (UC-DSH-050): автору отдаётся рабочая версия — источник редактора. */
-    dishById: build.query<DishDetailDto, string>({
-      query: (id) => ({ url: `dishes/${id}` }),
-      providesTags: (_result, _error, id) => [{ type: 'Dishes', id }],
+    /**
+     * Карточка блюда по id (UC-DSH-050). version: 'working' — рабочая версия
+     * даже при опубликованном блюде (только автор/admin) — источник редакторов.
+     */
+    dishById: build.query<DishDetailDto, { id: string; version?: 'working' }>({
+      query: ({ id, version }) => ({ url: `dishes/${id}${version ? `?version=${version}` : ''}` }),
+      providesTags: (_result, _error, { id }) => [{ type: 'Dishes', id }],
     }),
     /** Автокомплит тегов (UC-DSH-060) — подсказки в chips-вводе редактора. */
     tagSearch: build.query<TagDto[], string>({
@@ -165,6 +191,108 @@ export const dishesApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { dishId }) => ['Dishes', { type: 'Dishes', id: dishId }],
     }),
+    /** Автокомплит справочника ингредиентов (UC-DSH-062) — ILIKE-префикс, ≤50. */
+    ingredientSearch: build.query<IngredientDto[], string>({
+      query: (query) => ({ url: `ingredients/search${toQueryString({ query })}` }),
+    }),
+    /** Общие поля рецепта (UC-DSH-011): полная замена. */
+    updateRecipe: build.mutation<void, { dishId: string } & UpdateRecipeRequest>({
+      query: ({ dishId, ...body }) => ({ url: `dishes/${dishId}/recipe`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Тайминг рецепта (UC-DSH-040). */
+    setRecipeTiming: build.mutation<void, { dishId: string } & SetTimingRequest>({
+      query: ({ dishId, ...body }) => ({ url: `dishes/${dishId}/recipe/timing`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Выход и порции (UC-DSH-041). */
+    setRecipeYield: build.mutation<void, { dishId: string } & SetYieldRequest>({
+      query: ({ dishId, ...body }) => ({ url: `dishes/${dishId}/recipe/yield`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** КБЖУ (UC-DSH-042): создаёт или перезаписывает. */
+    setRecipeNutrition: build.mutation<void, { dishId: string } & SetNutritionRequest>({
+      query: ({ dishId, ...body }) => ({ url: `dishes/${dishId}/recipe/nutrition`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Добавление шага (UC-DSH-020): порядок назначает сервер. */
+    addRecipeStep: build.mutation<CreatedIdResult, { dishId: string } & RecipeStepRequest>({
+      query: ({ dishId, ...body }) => ({ url: `dishes/${dishId}/recipe/steps`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Обновление шага (UC-DSH-021): null в опциональных полях — очистить. */
+    updateRecipeStep: build.mutation<void, { dishId: string; stepId: string } & RecipeStepRequest>({
+      query: ({ dishId, stepId, ...body }) => ({
+        url: `dishes/${dishId}/recipe/steps/${stepId}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Удаление шага (UC-DSH-022): сервер перенумеровывает оставшиеся. */
+    removeRecipeStep: build.mutation<void, { dishId: string; stepId: string }>({
+      query: ({ dishId, stepId }) => ({
+        url: `dishes/${dishId}/recipe/steps/${stepId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Переупорядочивание шагов (UC-DSH-023): полный список id без дублей. */
+    reorderRecipeSteps: build.mutation<void, { dishId: string; orderedStepIds: string[] }>({
+      query: ({ dishId, orderedStepIds }) => ({
+        url: `dishes/${dishId}/recipe/steps/order`,
+        method: 'PUT',
+        body: { orderedStepIds },
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Позиция из справочника (UC-DSH-030, catalog). */
+    addCatalogIngredient: build.mutation<CreatedIdResult, { dishId: string } & AddCatalogIngredientRequest>({
+      query: ({ dishId, ...body }) => ({
+        url: `dishes/${dishId}/recipe/ingredients/catalog`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Позиция свободным текстом (UC-DSH-030, freeform): блюдо получит hasUnverifiedAllergens. */
+    addFreeformIngredient: build.mutation<CreatedIdResult, { dishId: string } & AddFreeformIngredientRequest>({
+      query: ({ dishId, ...body }) => ({
+        url: `dishes/${dishId}/recipe/ingredients/freeform`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Обновление позиции (UC-DSH-031): допускает смену природы catalog↔freeform. */
+    updateRecipeIngredient: build.mutation<
+      void,
+      { dishId: string; recipeIngredientId: string } & UpdateRecipeIngredientRequest
+    >({
+      query: ({ dishId, recipeIngredientId, ...body }) => ({
+        url: `dishes/${dishId}/recipe/ingredients/${recipeIngredientId}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Удаление позиции (UC-DSH-032). */
+    removeRecipeIngredient: build.mutation<void, { dishId: string; recipeIngredientId: string }>({
+      query: ({ dishId, recipeIngredientId }) => ({
+        url: `dishes/${dishId}/recipe/ingredients/${recipeIngredientId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
+    /** Переупорядочивание позиций (UC-DSH-033): полный список id без дублей. */
+    reorderRecipeIngredients: build.mutation<void, { dishId: string; orderedIngredientIds: string[] }>({
+      query: ({ dishId, orderedIngredientIds }) => ({
+        url: `dishes/${dishId}/recipe/ingredients/order`,
+        method: 'PUT',
+        body: { orderedIngredientIds },
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => recipeTags(dishId),
+    }),
   }),
 });
 
@@ -192,4 +320,18 @@ export const {
   useSetDishDietLabelsMutation,
   useSetDishHistoryMutation,
   useChangeMainImageMutation,
+  useLazyIngredientSearchQuery,
+  useUpdateRecipeMutation,
+  useSetRecipeTimingMutation,
+  useSetRecipeYieldMutation,
+  useSetRecipeNutritionMutation,
+  useAddRecipeStepMutation,
+  useUpdateRecipeStepMutation,
+  useRemoveRecipeStepMutation,
+  useReorderRecipeStepsMutation,
+  useAddCatalogIngredientMutation,
+  useAddFreeformIngredientMutation,
+  useUpdateRecipeIngredientMutation,
+  useRemoveRecipeIngredientMutation,
+  useReorderRecipeIngredientsMutation,
 } = dishesApi;

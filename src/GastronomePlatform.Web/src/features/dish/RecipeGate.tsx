@@ -9,7 +9,7 @@ import { RecipeView } from './RecipeView';
  * Публичная часть страницы от состояния не зависит.
  */
 export function RecipeGate({ dishId }: { dishId: string }) {
-  const { data, error, isLoading } = useDishRecipeQuery(dishId);
+  const { data, error, isLoading } = useDishRecipeQuery({ dishId });
   const location = useLocation();
 
   if (isLoading) {

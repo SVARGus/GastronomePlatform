@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, Info } from 'lucide-react';
+import { ArrowLeft, ChefHat, ExternalLink, Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
@@ -178,7 +178,9 @@ function CreateMode() {
 
 /** Режим редактирования: заголовок со статусом + шесть независимых секций. */
 function EditMode({ dishId }: { dishId: string }) {
-  const { data: dish, isLoading, error } = useDishByIdQuery(dishId);
+  // Редактор всегда правит рабочий слой — его же и показываем (для
+  // опубликованного блюда снепшот остаётся витрине).
+  const { data: dish, isLoading, error } = useDishByIdQuery({ id: dishId, version: 'working' });
 
   if (isLoading) {
     return (
@@ -206,6 +208,13 @@ function EditMode({ dishId }: { dishId: string }) {
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <h1 className="min-w-0 text-[30px] font-[560] leading-[1.2] md:text-[34px]">{dish.name}</h1>
         <EditorStatusBadge status={dish.status} />
+        <Link
+          to={`/account/dishes/${dish.id}/recipe`}
+          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-control border border-line-strong px-3.5 text-[15px] font-medium text-ink hover:bg-sunken hover:text-ink"
+        >
+          <ChefHat className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
+          Рецепт
+        </Link>
       </div>
 
       {dish.status === 'Published' && (

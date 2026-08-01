@@ -34,6 +34,8 @@ export interface DishCardListItemDto {
   favoritesCount: number;
   publishedAt: string | null;
   createdAt: string;
+  /** Владельцу/admin: в рабочем слое есть правки, не попавшие на витрину. Остальным null. */
+  hasUnsavedChanges: boolean | null;
 }
 
 /** Постраничный результат поиска (UC-DSH-054). */
@@ -100,6 +102,95 @@ export interface UpdateDishCardRequest {
   costEstimate: CostEstimate;
   shortDescription: string | null;
   description: string | null;
+}
+
+/** Тело PUT /api/dishes/{id}/recipe (UC-DSH-011) — общие поля рецепта, полная замена. */
+export interface UpdateRecipeRequest {
+  introductionText: string | null;
+  servingsDefault: number;
+  isAlcoholic: boolean;
+  authorTips: string | null;
+  servingSuggestions: string | null;
+  notes: string | null;
+}
+
+/**
+ * Тело PUT /api/dishes/{id}/recipe/timing (UC-DSH-040). При isTotalManual=false
+ * сервер сам считает Total = Prep + Cook + Rest, присланное totalTimeMinutes игнорирует.
+ */
+export interface SetTimingRequest {
+  prepTimeMinutes: number | null;
+  cookTimeMinutes: number | null;
+  restTimeMinutes: number | null;
+  activeTimeMinutes: number | null;
+  totalTimeMinutes: number;
+  isTotalManual: boolean;
+}
+
+/** Тело PUT /api/dishes/{id}/recipe/yield (UC-DSH-041). */
+export interface SetYieldRequest {
+  quantityTotal: number;
+  yieldUnit: YieldUnit;
+  servingsCount: number;
+  gramsPerServing: number | null;
+}
+
+/** Тело PUT /api/dishes/{id}/recipe/nutrition (UC-DSH-042): SaturatedFats ≤ Fats, Sugar ≤ Carbs. */
+export interface SetNutritionRequest {
+  calcMethod: NutritionCalcMethod;
+  calories: number;
+  proteins: number;
+  fats: number;
+  saturatedFats: number | null;
+  carbs: number;
+  sugar: number | null;
+  fiber: number | null;
+  salt: number | null;
+}
+
+/** Тело POST/PUT шага рецепта (UC-DSH-020/021): описание 10–4000, °C −30…300, таймер 1–1440. */
+export interface RecipeStepRequest {
+  description: string;
+  title: string | null;
+  imageMediaId: string | null;
+  videoUrl: string | null;
+  temperatureCelsius: number | null;
+  timerMinutes: number | null;
+}
+
+/** Тело POST …/recipe/ingredients/catalog (UC-DSH-030): позиция из справочника. */
+export interface AddCatalogIngredientRequest {
+  ingredientId: string;
+  ingredientSpecId: string | null;
+  quantity: number;
+  measureUnitId: string;
+  isOptional: boolean;
+  preparationNote: string | null;
+}
+
+/** Тело POST …/recipe/ingredients/freeform (UC-DSH-030): свободный текст 1–200. */
+export interface AddFreeformIngredientRequest {
+  freeformText: string;
+  quantity: number;
+  measureUnitId: string;
+  isOptional: boolean;
+  preparationNote: string | null;
+}
+
+/** Тело PUT …/recipe/ingredients/{id} (UC-DSH-031): ровно один из ingredientId/freeformText. */
+export interface UpdateRecipeIngredientRequest {
+  ingredientId: string | null;
+  ingredientSpecId: string | null;
+  freeformText: string | null;
+  quantity: number;
+  measureUnitId: string;
+  isOptional: boolean;
+  preparationNote: string | null;
+}
+
+/** Результат 201 Created для шага/позиции рецепта. */
+export interface CreatedIdResult {
+  id: string;
 }
 
 /** Параметры GET /api/dishes/search. Все фильтры опциональны. */
