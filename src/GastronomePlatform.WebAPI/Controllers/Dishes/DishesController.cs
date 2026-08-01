@@ -349,6 +349,10 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// </para>
         /// </remarks>
         /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="version">
+        /// <c>working</c> — запрос рабочей версии вместо снепшота (только автор/admin;
+        /// остальным параметр игнорируется). Источник данных редактора карточки.
+        /// </param>
         /// <param name="ct">Токен отмены операции.</param>
         /// <returns>
         /// <c>200 OK</c> с <see cref="DishDetailDto"/> при успехе;
@@ -359,9 +363,12 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetByIdAsync(
             Guid id,
+            [FromQuery] string? version,
             CancellationToken ct)
         {
-            GetDishByIdQuery query = new(DishId: id);
+            GetDishByIdQuery query = new(
+                DishId: id,
+                PreferWorkingVersion: string.Equals(version, "working", StringComparison.OrdinalIgnoreCase));
 
             Result<DishDetailDto> result = await Sender.Send(query, ct);
             return MapResult(result);
@@ -523,6 +530,10 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         /// </para>
         /// </remarks>
         /// <param name="id">Идентификатор блюда.</param>
+        /// <param name="version">
+        /// <c>working</c> — запрос рабочей версии рецепта вместо снепшота (только
+        /// автор/admin; остальным параметр игнорируется). Источник данных редактора рецепта.
+        /// </param>
         /// <param name="ct">Токен отмены операции.</param>
         /// <returns>
         /// <c>200 OK</c> с <see cref="DishRecipeDto"/> при успехе;
@@ -537,9 +548,12 @@ namespace GastronomePlatform.WebAPI.Controllers.Dishes
         [Authorize(Policy = AuthorizationPolicies.VALID_ACTOR)]
         public async Task<IActionResult> GetRecipeAsync(
             Guid id,
+            [FromQuery] string? version,
             CancellationToken ct)
         {
-            GetDishRecipeQuery query = new(DishId: id);
+            GetDishRecipeQuery query = new(
+                DishId: id,
+                PreferWorkingVersion: string.Equals(version, "working", StringComparison.OrdinalIgnoreCase));
 
             Result<DishRecipeDto> result = await Sender.Send(query, ct);
             return MapResult(result);
