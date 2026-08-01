@@ -99,7 +99,9 @@ export function MyDishesSection() {
           <Plus className="mr-2 h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
           Создать блюдо
         </Link>
-        <div className="flex gap-2 overflow-x-auto">
+        {/* Вкладки переносятся на новую строку, а не прокручиваются: скрытую
+            за краем экрана вкладку пользователь может просто не найти. */}
+        <div className="flex flex-wrap gap-2">
           {(Object.keys(TAB_LABELS) as DishesTab[]).map((key) => (
             <button
               key={key}
@@ -157,6 +159,8 @@ export function MyDishesSection() {
               <PublishedRow
                 key={dish.id}
                 dish={dish}
+                error={publishErrors[dish.id] || null}
+                onPublishChanges={() => handlePublish(dish.id)}
                 onUnpublish={() => setPending({ kind: 'unpublish', dishId: dish.id, dishName: dish.name })}
                 onArchive={() => setPending({ kind: 'archive', dishId: dish.id, dishName: dish.name })}
               />
@@ -260,21 +264,25 @@ function DraftRow({
 }) {
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-4 rounded-card border border-line bg-surface p-4 shadow-card">
-        <RowThumbnail mainImageId={dish.mainImageId} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="font-medium">{dish.name}</span>
-            {badge}
+      <div className="rounded-card border border-line bg-surface p-4 shadow-card">
+        <div className="flex items-center gap-4">
+          <RowThumbnail mainImageId={dish.mainImageId} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="font-medium">{dish.name}</span>
+              {badge}
+            </div>
+            {dish.shortDescription && (
+              <p className="mt-0.5 truncate text-sm text-ink-muted">{dish.shortDescription}</p>
+            )}
+            <p className="tabular mt-0.5 text-[13px] text-ink-secondary">
+              {dateLabel} · {difficultyLabels[dish.difficultyLevel]} · {costLabels[dish.costEstimate]}
+            </p>
           </div>
-          {dish.shortDescription && (
-            <p className="mt-0.5 truncate text-sm text-ink-muted">{dish.shortDescription}</p>
-          )}
-          <p className="tabular mt-0.5 text-[13px] text-ink-secondary">
-            {dateLabel} · {difficultyLabels[dish.difficultyLevel]} · {costLabels[dish.costEstimate]}
-          </p>
         </div>
-        <div className="flex items-center gap-2">{actions}</div>
+        {/* Действия всегда отдельной строкой под описанием — единообразно
+            на любой ширине, текст не сжимается кнопками. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">{actions}</div>
       </div>
       {error && (
         <p className="mt-2 flex items-start gap-2.5 rounded-control bg-warning-bg p-3 text-sm text-warning-text">
@@ -289,45 +297,74 @@ function DraftRow({
 /** Строка опубликованного блюда — со статистикой и переходом на витрину. */
 function PublishedRow({
   dish,
+  error,
+  onPublishChanges,
   onUnpublish,
   onArchive,
 }: {
   dish: DishCardListItemDto;
+  error: string | null;
+  onPublishChanges: () => void;
   onUnpublish: () => void;
   onArchive: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-card border border-line bg-surface p-4 shadow-card">
-      <RowThumbnail mainImageId={dish.mainImageId} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="font-medium">{dish.name}</span>
-          <StatusBadge kind="published" />
+    <div>
+      <div className="rounded-card border border-line bg-surface p-4 shadow-card">
+        <div className="flex items-center gap-4">
+          <RowThumbnail mainImageId={dish.mainImageId} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="font-medium">{dish.name}</span>
+              <StatusBadge kind="published" />
+              {dish.hasUnsavedChanges === true && (
+                <span
+                  className="whitespace-nowrap rounded-pill bg-warning-bg px-2.5 py-0.5 text-[13px] font-medium text-warning-text"
+                  title="Правки сохранены в рабочей версии — на витрину попадут после повторной публикации"
+                >
+                  есть неопубликованные правки
+                </span>
+              )}
+            </div>
+            {dish.shortDescription && (
+              <p className="mt-0.5 truncate text-sm text-ink-muted">{dish.shortDescription}</p>
+            )}
+            <p className="tabular mt-0.5 text-[13px] text-ink-secondary">
+              {dish.ratingCount > 0 && `★ ${dish.ratingAvg.toFixed(1)} (${dish.ratingCount}) · `}
+              {dish.viewsCount.toLocaleString('ru-RU')}{' '}
+              {pluralize(dish.viewsCount, ['просмотр', 'просмотра', 'просмотров'])}
+              {dish.publishedAt && ` · опубликовано ${new Date(dish.publishedAt).toLocaleDateString('ru-RU')}`}
+            </p>
+          </div>
         </div>
-        {dish.shortDescription && (
-          <p className="mt-0.5 truncate text-sm text-ink-muted">{dish.shortDescription}</p>
-        )}
-        <p className="tabular mt-0.5 text-[13px] text-ink-secondary">
-          {dish.ratingCount > 0 && `★ ${dish.ratingAvg.toFixed(1)} (${dish.ratingCount}) · `}
-          {dish.viewsCount.toLocaleString('ru-RU')}{' '}
-          {pluralize(dish.viewsCount, ['просмотр', 'просмотра', 'просмотров'])}
-          {dish.publishedAt && ` · опубликовано ${new Date(dish.publishedAt).toLocaleDateString('ru-RU')}`}
+        {/* Действия всегда отдельной строкой под описанием — единообразно
+            на любой ширине, текст не сжимается кнопками. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Link
+            to={`/dishes/${dish.slug}`}
+            className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap px-2.5 text-[15px] font-medium"
+          >
+            Открыть
+            <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+          </Link>
+          <EditLink dishId={dish.id} />
+          {dish.hasUnsavedChanges === true && (
+            <Button variant="secondary" size="sm" onClick={onPublishChanges}>
+              Опубликовать правки
+            </Button>
+          )}
+          <Button variant="secondary" size="sm" onClick={onUnpublish}>
+            Снять с публикации
+          </Button>
+          <ArchiveButton onClick={onArchive} />
+        </div>
+      </div>
+      {error && (
+        <p className="mt-2 flex items-start gap-2.5 rounded-control bg-warning-bg p-3 text-sm text-warning-text">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+          {error}
         </p>
-      </div>
-      <div className="flex items-center gap-2">
-        <Link
-          to={`/dishes/${dish.slug}`}
-          className="inline-flex h-9 items-center gap-1.5 px-2.5 text-[15px] font-medium"
-        >
-          Открыть
-          <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
-        </Link>
-        <EditLink dishId={dish.id} />
-        <Button variant="secondary" size="sm" onClick={onUnpublish}>
-          Снять с публикации
-        </Button>
-        <ArchiveButton onClick={onArchive} />
-      </div>
+      )}
     </div>
   );
 }

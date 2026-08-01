@@ -31,14 +31,26 @@ export function TagsInput({ value, onChange }: TagsInputProps) {
 
   const limitReached = value.length >= MAX_TAGS;
 
+  // Принимает и одиночный тег, и строку с запятыми («плов, казан») — каждый
+  // фрагмент становится отдельным чипсом. Так вставка списка из буфера и
+  // ввод без Enter работают одинаково.
   function addTag(raw: string) {
-    const name = raw.trim().slice(0, MAX_TAG_LENGTH);
-    if (!name || limitReached) return;
-    if (value.some((t) => t.toLowerCase() === name.toLowerCase())) {
-      setDraft('');
+    const names = raw
+      .split(',')
+      .map((part) => part.trim().slice(0, MAX_TAG_LENGTH))
+      .filter(Boolean);
+    if (names.length === 0) {
       return;
     }
-    onChange([...value, name]);
+    const next = [...value];
+    for (const name of names) {
+      if (next.length >= MAX_TAGS) break;
+      if (next.some((t) => t.toLowerCase() === name.toLowerCase())) continue;
+      next.push(name);
+    }
+    if (next.length !== value.length) {
+      onChange(next);
+    }
     setDraft('');
   }
 
@@ -74,9 +86,24 @@ export function TagsInput({ value, onChange }: TagsInputProps) {
         <input
           type="text"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            const text = e.target.value;
+            // Запятая коммитит тег сразу, не дожидаясь Enter.
+            if (text.includes(',')) {
+              addTag(text);
+            } else {
+              setDraft(text);
+            }
+          }}
           onFocus={() => setFocused(true)}
-          onBlur={() => window.setTimeout(() => setFocused(false), 150)}
+          onBlur={() => {
+            // Набранный, но не закоммиченный текст не должен теряться: иначе
+            // «Сохранить» с replace-семантикой молча уносит пустой список.
+            if (draft.trim()) {
+              addTag(draft);
+            }
+            window.setTimeout(() => setFocused(false), 150);
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
@@ -107,7 +134,8 @@ export function TagsInput({ value, onChange }: TagsInputProps) {
       </div>
 
       <p className="mt-3 text-[13px] text-ink-muted">
-        До {MAX_TAGS} тегов, Enter добавляет. Новые теги создадутся автоматически и попадут в поиск
+        До {MAX_TAGS} тегов. Enter или запятая добавляет тег — можно вставить сразу несколько через
+        запятую («плов, казан, баранина»). Новые теги создадутся автоматически и попадут в поиск
         после проверки модератором.
       </p>
     </div>

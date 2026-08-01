@@ -10,7 +10,7 @@ import {
   useUpdateDishCardMutation,
 } from '../dishes/dishesApi';
 import { useUploadFileMutation } from '../media/mediaApi';
-import { mediaThumbnailUrl } from '../../shared/api/media';
+import { mediaFileUrl, mediaThumbnailUrl } from '../../shared/api/media';
 import type {
   CategoryNodeDto,
   CostEstimate,
@@ -173,11 +173,19 @@ export function PhotoSection({ dish }: { dish: DishDetailDto }) {
     <SectionCard title="Главное фото">
       <div className="flex flex-wrap items-center gap-5">
         {dish.mainImageId ? (
-          <img
-            src={mediaThumbnailUrl(dish.mainImageId)}
-            alt=""
-            className="h-[132px] w-[132px] shrink-0 rounded-full object-cover shadow-chip ring-[6px] ring-surface"
-          />
+          <a
+            href={mediaFileUrl(dish.mainImageId)}
+            target="_blank"
+            rel="noreferrer"
+            title="Открыть оригинал в новой вкладке"
+            className="shrink-0"
+          >
+            <img
+              src={mediaThumbnailUrl(dish.mainImageId)}
+              alt=""
+              className="h-[132px] w-[132px] rounded-full object-cover shadow-chip ring-[6px] ring-surface"
+            />
+          </a>
         ) : (
           <span aria-hidden className="h-[132px] w-[132px] shrink-0 rounded-full bg-saffron-100" />
         )}
