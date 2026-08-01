@@ -1,6 +1,6 @@
 # UC-DSH-050: Получить публичную карточку блюда по ID
 
-**Version:** 1.1 (snapshot-ветка реализована через `IPublishedDishSnapshotReader`) | **Date:** 2026-06-07
+**Version:** 1.2 (в DTO добавлены `categoryIds`/`tagNames` — текущие наборы для редактора карточки) | **Date:** 2026-07-31
 
 ---
 
@@ -90,6 +90,8 @@ Body: отсутствует.
 | `dietLabelsMask` | `DietLabels` | Битовая маска диетических меток. |
 | `allergensMask` | `AllergenType` | Битовая маска аллергенов. |
 | `hasUnverifiedAllergens` | `bool` | `true`, если есть freeform-ингредиенты. |
+| `categoryIds` | `Guid[]` | Идентификаторы категорий блюда. Из снепшота (ветка «есть снепшот») либо из связок рабочего слоя. Нужны редактору: `PUT /categories` (UC-DSH-007) имеет replace-семантику — клиент обязан видеть текущий набор. |
+| `tagNames` | `string[]` | Имена тегов блюда. UC-DSH-008 принимает имена (find-or-create) — DTO отдаёт их же, чтобы редактор возвращал набор без пересборки. Идентификаторы из снепшота/связок резолвятся в имена через справочник `dishes.Tags`. |
 | `ratingAvg` | `decimal` | Средний рейтинг (0–5). |
 | `ratingCount` | `int` | Количество оценок. |
 | `viewsCount` | `long` | Количество просмотров. |
@@ -136,7 +138,7 @@ Body: отсутствует.
    2. Делегирует через `ISender.Send(query, ct)`.
 4. **Валидация.** `ValidationBehavior` запускает `GetDishByIdQueryValidator` — проверка `DishId.NotEmpty()`.
 5. **Handler — `GetDishByIdQueryHandler.Handle(...)`:**
-   1. **Загрузка.** `Dish? dish = await _dishRepository.GetByIdAsync(request.DishId, ct)` — без `Recipe`.
+   1. **Загрузка.** `Dish? dish = await _dishRepository.GetByIdWithLinksAsync(request.DishId, ct)` — c `Include` связок `Categories`/`Tags` (для `categoryIds`/`tagNames`), но без `Recipe`.
    2. **NotFound / Archived.** Если `dish is null || dish.Status == DishStatus.Archived` → `return DishesErrors.DishNotFound` → `404`.
    3. **Определение пользователя.**
       - `currentUserId = _currentUser.UserId` (может быть `null`).
@@ -146,10 +148,11 @@ Body: отсутствует.
    4. **Ветка «есть снепшот».** Если `dish.PublishedVersionData is not null`:
       - `PublishedDishSnapshot snapshot = _snapshotReader.Read(dish.PublishedVersionData)` — десериализация jsonb через `IPublishedDishSnapshotReader` (симметричный `IPublishedDishSnapshotBuilder`).
       - `hasUnsavedChanges = isOwnerOrAdmin ? (dish.PublishedAt.HasValue && dish.UpdatedAt > dish.PublishedAt.Value) : null`.
-      - Возврат `MapFromSnapshot(dish, snapshot, hasUnsavedChanges)`. Публичные поля карточки (`Name`, `Slug`, `ShortDescription`, `Description`, `HistoryText`, `MainImageId`, `DifficultyLevel`, `CostEstimate`, `OwnerType`, `DietLabelsMask`, `AllergensMask`, `HasUnverifiedAllergens`) берутся из снепшота. Lifecycle-метаданные (`Status`, `CreatedAt`, `UpdatedAt`, `PublishedAt`) и runtime-счётчики (`RatingAvg`, `RatingCount`, `ViewsCount`, `FavoritesCount`) — из самой записи `Dish` (в снепшот они не включаются по дизайну, см. `PublishedDishSnapshot`).
+      - Идентификаторы тегов снепшота резолвятся в имена через `ITagRepository.ListByIdsAsync` (один batch-SELECT).
+      - Возврат `MapFromSnapshot(dish, snapshot, hasUnsavedChanges, tagNames)`. Публичные поля карточки (`Name`, `Slug`, `ShortDescription`, `Description`, `HistoryText`, `MainImageId`, `DifficultyLevel`, `CostEstimate`, `OwnerType`, `DietLabelsMask`, `AllergensMask`, `HasUnverifiedAllergens`, `CategoryIds`) берутся из снепшота. Lifecycle-метаданные (`Status`, `CreatedAt`, `UpdatedAt`, `PublishedAt`) и runtime-счётчики (`RatingAvg`, `RatingCount`, `ViewsCount`, `FavoritesCount`) — из самой записи `Dish` (в снепшот они не включаются по дизайну, см. `PublishedDishSnapshot`).
    5. **Ветка «нет снепшота».**
       - Если `!isOwnerOrAdmin` → `return DishesErrors.DishNotFound` → `404` (намеренно — не утечка существования черновика чужому пользователю).
-      - Иначе возврат `MapFromWorking(dish)` — все поля карточки берутся напрямую из агрегата.
+      - Иначе возврат `MapFromWorking(dish, tagNames)` — все поля карточки берутся напрямую из агрегата; `CategoryIds`/`TagNames` — из загруженных связок (теги также резолвятся в имена через `ITagRepository.ListByIdsAsync`).
 6. **Маппинг ответа.** `ApiController.MapResult<DishDetailDto>(Result<DishDetailDto>)` → `200 OK` с телом.
 
 ---
@@ -186,7 +189,7 @@ Body: отсутствует.
 
 - **Idempotency.** Полностью идемпотентен — повторный вызов при неизменном состоянии возвращает идентичный результат.
 - **Rate Limit.** Не реализован на Этапе 2. Endpoint публичный — в будущем потребует общего HTTP-уровневого ограничения для защиты от scraping.
-- **Performance.** Целевое < 50 мс. Один SELECT по PK с `AsNoTracking` (через `GetByIdAsync`). После реализации UC-DSH-004 — добавится парсинг JSON-снепшота, что добавит ~1–5 мс на крупных рецептах.
+- **Performance.** Целевое < 50 мс. SELECT по PK с `Include` двух коллекций связок (`GetByIdWithLinksAsync`) + batch-SELECT имён тегов; для опубликованных — дополнительно парсинг JSON-снепшота (~1–5 мс на крупных рецептах).
 - **Consistency.** Read committed (стандарт PostgreSQL). Без блокировок.
 - **Audit.** Стандартное HTTP-логирование (Serilog). Отдельно факт чтения карточки не логируется.
 

@@ -38,6 +38,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishBySlug
     public sealed class GetDishBySlugQueryHandler : IQueryHandler<GetDishBySlugQuery, DishDetailDto>
     {
         private readonly IDishRepository _dishRepository;
+        private readonly ITagRepository _tagRepository;
         private readonly ICurrentUserService _currentUser;
         private readonly IPublishedDishSnapshotReader _snapshotReader;
 
@@ -45,14 +46,17 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishBySlug
         /// Инициализирует новый экземпляр <see cref="GetDishBySlugQueryHandler"/>.
         /// </summary>
         /// <param name="dishRepository">Репозиторий блюд.</param>
+        /// <param name="tagRepository">Репозиторий тегов (резолв имён для DTO).</param>
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="snapshotReader">Парсер jsonb-снепшота публичной версии.</param>
         public GetDishBySlugQueryHandler(
             IDishRepository dishRepository,
+            ITagRepository tagRepository,
             ICurrentUserService currentUser,
             IPublishedDishSnapshotReader snapshotReader)
         {
             _dishRepository = dishRepository ?? throw new ArgumentNullException(nameof(dishRepository));
+            _tagRepository = tagRepository ?? throw new ArgumentNullException(nameof(tagRepository));
             _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
             _snapshotReader = snapshotReader ?? throw new ArgumentNullException(nameof(snapshotReader));
         }
@@ -81,7 +85,14 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishBySlug
                 ? (dish.PublishedAt.HasValue && dish.UpdatedAt > dish.PublishedAt.Value)
                 : null;
 
-            return MapFromSnapshot(dish, snapshot, hasUnsavedChanges);
+            // Имена тегов по идентификаторам снепшота: UC-DSH-008 принимает имена,
+            // поэтому DTO отдаёт их же (симметрично UC-DSH-050).
+            IReadOnlyList<Guid> tagIds = snapshot.Tags.Select(t => t.Id).ToList();
+            IReadOnlyList<string> tagNames = tagIds.Count == 0
+                ? Array.Empty<string>()
+                : (await _tagRepository.ListByIdsAsync(tagIds, cancellationToken)).Select(t => t.Name).ToList();
+
+            return MapFromSnapshot(dish, snapshot, hasUnsavedChanges, tagNames);
         }
 
         // Snapshot-ветка — идентично UC-DSH-050.MapFromSnapshot. Дублирование
@@ -90,7 +101,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishBySlug
         private static DishDetailDto MapFromSnapshot(
             Dish dish,
             PublishedDishSnapshot snapshot,
-            bool? hasUnsavedChanges) => new(
+            bool? hasUnsavedChanges,
+            IReadOnlyList<string> tagNames) => new(
                 Id: dish.Id,
                 AuthorUserId: dish.AuthorUserId,
                 Name: snapshot.Name,
@@ -106,6 +118,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishBySlug
                 DietLabelsMask: snapshot.DietLabelsMask,
                 AllergensMask: snapshot.AllergensMask,
                 HasUnverifiedAllergens: snapshot.HasUnverifiedAllergens,
+                CategoryIds: snapshot.Categories.Select(c => c.Id).ToList(),
+                TagNames: tagNames,
                 RatingAvg: dish.RatingAvg,
                 RatingCount: dish.RatingCount,
                 ViewsCount: dish.ViewsCount,

@@ -1,6 +1,6 @@
 # UC-DSH-051: Получить публичную карточку блюда по slug
 
-**Version:** 1.0 | **Date:** 2026-06-14
+**Version:** 1.1 (в `DishDetailDto` добавлены `categoryIds`/`tagNames` — см. UC-DSH-050 v1.2) | **Date:** 2026-07-31
 
 ---
 
@@ -61,6 +61,7 @@ GET /api/dishes/by-slug/{slug}
 - Поля:
   - `IsPublishedVersion = true` — всегда (snapshot-only ветка).
   - `HasUnsavedChanges` — `true|false` для автора/admin при наличии правок в рабочем слое; `null` для прочих.
+  - `CategoryIds` — из снепшота; `TagNames` — идентификаторы тегов снепшота резолвятся в имена через справочник `dishes.Tags` (см. UC-DSH-050 v1.2).
 
 ### Errors
 
@@ -98,6 +99,7 @@ GET /api/dishes/by-slug/{slug}
    - Если null / `Archived` / `PublishedVersionData IS NULL` → `404`.
    - Парсит snapshot через `IPublishedDishSnapshotReader`.
    - Рассчитывает `HasUnsavedChanges` для автора/admin.
+   - Резолвит имена тегов снепшота через `ITagRepository.ListByIdsAsync`.
    - Возвращает `DishDetailDto` (`MapFromSnapshot`).
 6. Контроллер возвращает `200` с DTO.
 

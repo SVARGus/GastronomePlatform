@@ -39,6 +39,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
     public sealed class GetDishByIdQueryHandler : IQueryHandler<GetDishByIdQuery, DishDetailDto>
     {
         private readonly IDishRepository _dishRepository;
+        private readonly ITagRepository _tagRepository;
         private readonly ICurrentUserService _currentUser;
         private readonly IPublishedDishSnapshotReader _snapshotReader;
 
@@ -46,14 +47,17 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
         /// Инициализирует новый экземпляр <see cref="GetDishByIdQueryHandler"/>.
         /// </summary>
         /// <param name="dishRepository">Репозиторий блюд.</param>
+        /// <param name="tagRepository">Репозиторий тегов (резолв имён для DTO).</param>
         /// <param name="currentUser">Сервис текущего пользователя.</param>
         /// <param name="snapshotReader">Парсер jsonb-снепшота публичной версии (UC-DSH-052).</param>
         public GetDishByIdQueryHandler(
             IDishRepository dishRepository,
+            ITagRepository tagRepository,
             ICurrentUserService currentUser,
             IPublishedDishSnapshotReader snapshotReader)
         {
             _dishRepository = dishRepository ?? throw new ArgumentNullException(nameof(dishRepository));
+            _tagRepository = tagRepository ?? throw new ArgumentNullException(nameof(tagRepository));
             _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
             _snapshotReader = snapshotReader ?? throw new ArgumentNullException(nameof(snapshotReader));
         }
@@ -63,7 +67,10 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
             GetDishByIdQuery request,
             CancellationToken cancellationToken)
         {
-            Dish? dish = await _dishRepository.GetByIdAsync(request.DishId, cancellationToken);
+            // Связки Categories/Tags загружаются сразу: working-ветка отдаёт их
+            // редактору карточки (replace-семантика UC-DSH-007/008 требует видеть
+            // текущий набор перед сохранением).
+            Dish? dish = await _dishRepository.GetByIdWithLinksAsync(request.DishId, cancellationToken);
             if (dish is null || dish.Status == DishStatus.Archived)
             {
                 return DishesErrors.DishNotFound;
@@ -82,7 +89,10 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
                     ? (dish.PublishedAt.HasValue && dish.UpdatedAt > dish.PublishedAt.Value)
                     : null;
 
-                return MapFromSnapshot(dish, snapshot, hasUnsavedChanges);
+                IReadOnlyList<Guid> snapshotTagIds = snapshot.Tags.Select(t => t.Id).ToList();
+                IReadOnlyList<string> tagNames = await ResolveTagNamesAsync(snapshotTagIds, cancellationToken);
+
+                return MapFromSnapshot(dish, snapshot, hasUnsavedChanges, tagNames);
             }
 
             // Снепшота нет — это Draft или Unpublished. Видеть может только автор/admin.
@@ -91,7 +101,25 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
                 return DishesErrors.DishNotFound;
             }
 
-            return MapFromWorking(dish);
+            IReadOnlyList<Guid> workingTagIds = dish.Tags.Select(t => t.TagId).ToList();
+            IReadOnlyList<string> workingTagNames = await ResolveTagNamesAsync(workingTagIds, cancellationToken);
+
+            return MapFromWorking(dish, workingTagNames);
+        }
+
+        // Имена тегов по идентификаторам связок: UC-DSH-008 принимает имена,
+        // поэтому DTO отдаёт их же — редактор шлёт набор обратно без пересборки.
+        private async Task<IReadOnlyList<string>> ResolveTagNamesAsync(
+            IReadOnlyList<Guid> tagIds,
+            CancellationToken cancellationToken)
+        {
+            if (tagIds.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var tags = await _tagRepository.ListByIdsAsync(tagIds, cancellationToken);
+            return tags.Select(t => t.Name).ToList();
         }
 
         // Snapshot-ветка: публичные поля карточки берутся из jsonb-снепшота, а
@@ -100,7 +128,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
         private static DishDetailDto MapFromSnapshot(
             Dish dish,
             PublishedDishSnapshot snapshot,
-            bool? hasUnsavedChanges) => new(
+            bool? hasUnsavedChanges,
+            IReadOnlyList<string> tagNames) => new(
                 Id: dish.Id,
                 AuthorUserId: dish.AuthorUserId,
                 Name: snapshot.Name,
@@ -116,6 +145,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
                 DietLabelsMask: snapshot.DietLabelsMask,
                 AllergensMask: snapshot.AllergensMask,
                 HasUnverifiedAllergens: snapshot.HasUnverifiedAllergens,
+                CategoryIds: snapshot.Categories.Select(c => c.Id).ToList(),
+                TagNames: tagNames,
                 RatingAvg: dish.RatingAvg,
                 RatingCount: dish.RatingCount,
                 ViewsCount: dish.ViewsCount,
@@ -128,7 +159,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
 
         // Working-ветка: все поля карточки берутся напрямую из агрегата. Доступна
         // только автору/admin при отсутствии PublishedVersionData.
-        private static DishDetailDto MapFromWorking(Dish dish) => new(
+        private static DishDetailDto MapFromWorking(Dish dish, IReadOnlyList<string> tagNames) => new(
             Id: dish.Id,
             AuthorUserId: dish.AuthorUserId,
             Name: dish.Name,
@@ -144,6 +175,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
             DietLabelsMask: dish.DietLabelsMask,
             AllergensMask: dish.AllergensMask,
             HasUnverifiedAllergens: dish.HasUnverifiedAllergens,
+            CategoryIds: dish.Categories.Select(c => c.CategoryId).ToList(),
+            TagNames: tagNames,
             RatingAvg: dish.RatingAvg,
             RatingCount: dish.RatingCount,
             ViewsCount: dish.ViewsCount,

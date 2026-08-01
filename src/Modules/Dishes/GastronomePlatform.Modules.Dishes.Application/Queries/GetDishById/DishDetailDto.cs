@@ -34,6 +34,15 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
     /// <see langword="true"/>, если в рецепте есть freeform-ингредиенты и
     /// <see cref="AllergensMask"/> может быть неполной.
     /// </param>
+    /// <param name="CategoryIds">
+    /// Идентификаторы категорий блюда (0–3). Из снепшота для публичной версии,
+    /// из рабочих связок — для автора/admin. Нужны редактору карточки:
+    /// UC-DSH-007 работает заменой всего набора.
+    /// </param>
+    /// <param name="TagNames">
+    /// Имена тегов блюда (0–20) — именно имена, потому что UC-DSH-008 принимает
+    /// имена (find-or-create). Источник симметричен <see cref="CategoryIds"/>.
+    /// </param>
     /// <param name="RatingAvg">Средний рейтинг блюда (0–5).</param>
     /// <param name="RatingCount">Количество оценок.</param>
     /// <param name="ViewsCount">Количество просмотров карточки.</param>
@@ -69,6 +78,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
         DietLabels DietLabelsMask,
         AllergenType AllergensMask,
         bool HasUnverifiedAllergens,
+        IReadOnlyList<Guid> CategoryIds,
+        IReadOnlyList<string> TagNames,
         decimal RatingAvg,
         int RatingCount,
         long ViewsCount,
