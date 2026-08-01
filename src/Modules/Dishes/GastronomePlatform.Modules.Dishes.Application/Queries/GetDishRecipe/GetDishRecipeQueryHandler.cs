@@ -40,8 +40,9 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
     ///         не выполняется — она отсечена ролевым фильтром выше.</item>
     /// </list>
     /// <para>
-    /// Параметр <c>?version=working</c> для явного запроса рабочей версии
-    /// автором при опубликованном блюде отложен до Этапа 5+ (см. UC-DSH-083).
+    /// Параметр <c>?version=working</c> (частичная реализация UC-DSH-083):
+    /// автор/admin получает рабочую версию рецепта даже при наличии снепшота —
+    /// источник данных редактора рецепта. Для остальных параметр игнорируется.
     /// </para>
     /// </remarks>
     public sealed class GetDishRecipeQueryHandler : IQueryHandler<GetDishRecipeQuery, DishRecipeDto>
@@ -86,7 +87,13 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
             bool isAdmin = _currentUser.IsInRole(PlatformRoles.ADMIN);
             bool isOwnerOrAdmin = isOwner || isAdmin;
 
-            if (dish.PublishedVersionData is not null)
+            // Явный запрос рабочей версии учитывается только для автора/admin —
+            // редактор рецепта опубликованного блюда правит рабочий слой и должен
+            // его же и видеть (частичная реализация отложенного UC-DSH-083).
+            bool useWorking = dish.PublishedVersionData is null
+                || (request.PreferWorkingVersion && isOwnerOrAdmin);
+
+            if (!useWorking)
             {
                 // Автор и admin проходят Premium-гейт мимо. Для остальных —
                 // проверка гранта FullRecipes; парсинг snapshot откладываем
@@ -102,7 +109,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
                     }
                 }
 
-                PublishedDishSnapshot snapshot = _snapshotReader.Read(dish.PublishedVersionData);
+                PublishedDishSnapshot snapshot = _snapshotReader.Read(dish.PublishedVersionData!);
 
                 bool? hasUnsavedChanges = isOwnerOrAdmin
                     ? (dish.PublishedAt.HasValue && dish.UpdatedAt > dish.PublishedAt.Value)
@@ -115,7 +122,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
                     hasUnsavedChanges: hasUnsavedChanges);
             }
 
-            // Снепшота нет — это Draft или Unpublished. Видеть может только автор/admin.
+            // Рабочий слой видит только автор/admin (для Draft/Unpublished — единственный слой).
             if (!isOwnerOrAdmin)
             {
                 return DishesErrors.DishNotFound;
@@ -131,7 +138,8 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
             return MapFromWorking(
                 dish: withRecipe,
                 isPublishedVersion: false,
-                hasUnsavedChanges: false);
+                hasUnsavedChanges: withRecipe.PublishedAt.HasValue
+                    && withRecipe.UpdatedAt > withRecipe.PublishedAt.Value);
         }
 
         private static DishRecipeDto MapFromSnapshot(

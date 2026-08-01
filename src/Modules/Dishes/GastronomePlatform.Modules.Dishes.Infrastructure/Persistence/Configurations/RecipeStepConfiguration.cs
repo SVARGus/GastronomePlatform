@@ -66,9 +66,13 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Configura
                 .HasForeignKey(s => s.RecipeId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // UNIQUE (RecipeId, Order) — порядок уникален в рамках рецепта.
-            builder.HasIndex(s => new { s.RecipeId, s.Order })
-                .IsUnique();
+            // Уникальность (RecipeId, Order) обеспечивается constraint-ом
+            // UNIQUE ... DEFERRABLE INITIALLY DEFERRED, добавленным raw SQL-ом
+            // в миграции: проверка в конце транзакции позволяет переставлять
+            // Order местами одним SaveChanges (UC-DSH-023). В модели EF
+            // уникального индекса нет намеренно — иначе EF строит циклические
+            // зависимости UPDATE-ов при swap. Constraint сам создаёт индекс,
+            // пригодный для выборок по (RecipeId, Order).
         }
     }
 }

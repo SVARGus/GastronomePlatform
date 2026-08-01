@@ -21,8 +21,18 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
     ///         пользователь → <c>404</c>.</item>
     ///   <item><c>Status = Archived</c> → <c>404</c> всем (admin-доступ
     ///         к архиву появится на Этапе 8+).</item>
+    ///   <item><paramref name="PreferWorkingVersion"/> = <see langword="true"/> и
+    ///         текущий пользователь — автор/admin → отдаётся рабочая версия даже
+    ///         при наличии снепшота (источник данных для редакторов). Для
+    ///         остальных пользователей параметр игнорируется.</item>
     /// </list>
     /// </remarks>
     /// <param name="DishId">Идентификатор блюда.</param>
-    public sealed record GetDishByIdQuery(Guid DishId) : IQuery<DishDetailDto>;
+    /// <param name="PreferWorkingVersion">
+    /// Запрос рабочей версии вместо снепшота (частичная реализация отложенного
+    /// UC-DSH-083). Учитывается только для автора/admin.
+    /// </param>
+    public sealed record GetDishByIdQuery(
+        Guid DishId,
+        bool PreferWorkingVersion = false) : IQuery<DishDetailDto>;
 }

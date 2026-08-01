@@ -81,9 +81,15 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
             bool isAdmin = _currentUser.IsInRole(PlatformRoles.ADMIN);
             bool isOwnerOrAdmin = isOwner || isAdmin;
 
-            if (dish.PublishedVersionData is not null)
+            // Явный запрос рабочей версии (?version=working) учитывается только
+            // для автора/admin — источник данных редакторов при опубликованном
+            // блюде (частичная реализация отложенного UC-DSH-083).
+            bool useWorking = dish.PublishedVersionData is null
+                || (request.PreferWorkingVersion && isOwnerOrAdmin);
+
+            if (!useWorking)
             {
-                PublishedDishSnapshot snapshot = _snapshotReader.Read(dish.PublishedVersionData);
+                PublishedDishSnapshot snapshot = _snapshotReader.Read(dish.PublishedVersionData!);
 
                 bool? hasUnsavedChanges = isOwnerOrAdmin
                     ? (dish.PublishedAt.HasValue && dish.UpdatedAt > dish.PublishedAt.Value)
@@ -95,7 +101,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
                 return MapFromSnapshot(dish, snapshot, hasUnsavedChanges, tagNames);
             }
 
-            // Снепшота нет — это Draft или Unpublished. Видеть может только автор/admin.
+            // Рабочий слой видит только автор/admin (для Draft/Unpublished — единственный слой).
             if (!isOwnerOrAdmin)
             {
                 return DishesErrors.DishNotFound;
@@ -104,7 +110,10 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
             IReadOnlyList<Guid> workingTagIds = dish.Tags.Select(t => t.TagId).ToList();
             IReadOnlyList<string> workingTagNames = await ResolveTagNamesAsync(workingTagIds, cancellationToken);
 
-            return MapFromWorking(dish, workingTagNames);
+            bool workingHasUnsavedChanges =
+                dish.PublishedAt.HasValue && dish.UpdatedAt > dish.PublishedAt.Value;
+
+            return MapFromWorking(dish, workingTagNames, workingHasUnsavedChanges);
         }
 
         // Имена тегов по идентификаторам связок: UC-DSH-008 принимает имена,
@@ -158,8 +167,12 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
                 HasUnsavedChanges: hasUnsavedChanges);
 
         // Working-ветка: все поля карточки берутся напрямую из агрегата. Доступна
-        // только автору/admin при отсутствии PublishedVersionData.
-        private static DishDetailDto MapFromWorking(Dish dish, IReadOnlyList<string> tagNames) => new(
+        // только автору/admin — при отсутствии снепшота либо по явному запросу
+        // рабочей версии (?version=working).
+        private static DishDetailDto MapFromWorking(
+            Dish dish,
+            IReadOnlyList<string> tagNames,
+            bool hasUnsavedChanges) => new(
             Id: dish.Id,
             AuthorUserId: dish.AuthorUserId,
             Name: dish.Name,
@@ -185,6 +198,6 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishById
             CreatedAt: dish.CreatedAt,
             UpdatedAt: dish.UpdatedAt,
             IsPublishedVersion: false,
-            HasUnsavedChanges: false);
+            HasUnsavedChanges: hasUnsavedChanges);
     }
 }

@@ -1,4 +1,6 @@
+using GastronomePlatform.Common.Application.Abstractions;
 using GastronomePlatform.Common.Application.Messaging;
+using GastronomePlatform.Common.Domain.Constants;
 using GastronomePlatform.Common.Domain.Results;
 using GastronomePlatform.Modules.Dishes.Application.Queries.Lookups.Dtos;
 using GastronomePlatform.Modules.Dishes.Domain.Entities;
@@ -30,14 +32,19 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishesByAutho
         : IQueryHandler<GetDishesByAuthorQuery, GetDishesByAuthorResult>
     {
         private readonly IDishRepository _dishRepository;
+        private readonly ICurrentUserService _currentUser;
 
         /// <summary>
         /// Инициализирует новый экземпляр <see cref="GetDishesByAuthorQueryHandler"/>.
         /// </summary>
         /// <param name="dishRepository">Репозиторий блюд.</param>
-        public GetDishesByAuthorQueryHandler(IDishRepository dishRepository)
+        /// <param name="currentUser">Сервис текущего пользователя (для флага правок владельцу).</param>
+        public GetDishesByAuthorQueryHandler(
+            IDishRepository dishRepository,
+            ICurrentUserService currentUser)
         {
             _dishRepository = dishRepository ?? throw new ArgumentNullException(nameof(dishRepository));
+            _currentUser = currentUser ?? throw new ArgumentNullException(nameof(currentUser));
         }
 
         /// <inheritdoc/>
@@ -52,8 +59,15 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishesByAutho
                     request.PageSize,
                     cancellationToken);
 
+            // Флаг «есть неопубликованные правки» — только владельцу списка и admin:
+            // «Мои блюда» показывают бейдж, посетителям страницы автора флаг не отдаётся.
+            Guid? currentUserId = _currentUser.UserId;
+            bool exposeUnsavedChanges =
+                (currentUserId.HasValue && currentUserId.Value == request.AuthorUserId)
+                || _currentUser.IsInRole(PlatformRoles.ADMIN);
+
             IReadOnlyList<DishCardListItemDto> dtos = items
-                .Select(ToDto)
+                .Select(dish => ToDto(dish, exposeUnsavedChanges))
                 .ToList();
 
             return new GetDishesByAuthorResult(
@@ -63,7 +77,7 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishesByAutho
                 PageSize: request.PageSize);
         }
 
-        private static DishCardListItemDto ToDto(Dish dish) => new(
+        private static DishCardListItemDto ToDto(Dish dish, bool exposeUnsavedChanges) => new(
             Id: dish.Id,
             AuthorUserId: dish.AuthorUserId,
             Slug: dish.Slug,
@@ -80,6 +94,9 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishesByAutho
             ViewsCount: dish.ViewsCount,
             FavoritesCount: dish.FavoritesCount,
             PublishedAt: dish.PublishedAt,
-            CreatedAt: dish.CreatedAt);
+            CreatedAt: dish.CreatedAt,
+            HasUnsavedChanges: exposeUnsavedChanges
+                ? (dish.PublishedAt.HasValue && dish.UpdatedAt > dish.PublishedAt.Value)
+                : null);
     }
 }

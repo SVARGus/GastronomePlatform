@@ -170,10 +170,22 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Intercept
                     continue;
                 }
 
+                // Если Domain уже проставил UpdatedAt в этой же операции (wrapper-метод
+                // вызвал MarkAsUpdated либо lifecycle-метод присвоил напрямую) — не
+                // перетираем: иначе Publish получает UpdatedAt на доли миллисекунды
+                // позже PublishedAt, и HasUnsavedChanges ложно поднимается сразу
+                // после публикации. Интерсептор — defensive-слой только для случаев,
+                // когда дочернюю сущность изменили мимо wrapper'а.
+                var updatedAtProperty = dishEntry.Property(nameof(Dish.UpdatedAt));
+                if (updatedAtProperty.IsModified)
+                {
+                    continue;
+                }
+
                 // Прямая запись через Property, без вызова Dish.MarkAsUpdated —
                 // чтобы не поднимать дубль DishUpdatedEvent (его поднимают wrapper-методы
                 // на Dish, через которые и пришло основное изменение).
-                dishEntry.Property(nameof(Dish.UpdatedAt)).CurrentValue = utcNow;
+                updatedAtProperty.CurrentValue = utcNow;
             }
         }
 

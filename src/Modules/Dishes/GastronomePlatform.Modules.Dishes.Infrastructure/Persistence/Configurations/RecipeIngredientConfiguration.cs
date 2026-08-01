@@ -104,9 +104,11 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Persistence.Configura
                 .HasForeignKey(ri => ri.MeasureUnitId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // UNIQUE (RecipeId, Order).
-            builder.HasIndex(ri => new { ri.RecipeId, ri.Order })
-                .IsUnique();
+            // Уникальность (RecipeId, Order) — constraint UNIQUE ... DEFERRABLE
+            // INITIALLY DEFERRED (raw SQL в миграции): проверка в конце
+            // транзакции позволяет переставлять Order местами одним SaveChanges
+            // (UC-DSH-033). В модели EF уникального индекса нет намеренно —
+            // см. аналогичный комментарий в RecipeStepConfiguration.
 
             // Индекс по IngredientId — для запросов «в каких рецептах используется ингредиент».
             builder.HasIndex(ri => ri.IngredientId);

@@ -1,6 +1,6 @@
 # UC-DSH-055: Получить блюда автора
 
-**Version:** 1.0 | **Date:** 2026-06-14
+**Version:** 1.1 (+`hasUnsavedChanges` в DTO — только владельцу списка/admin) | **Date:** 2026-08-01
 
 ---
 
@@ -33,7 +33,9 @@
 }
 ```
 
-`DishCardListItemDto`: `Id`, `AuthorUserId`, `Slug`, `Name`, `ShortDescription`, `MainImageId`, `DifficultyLevel`, `CostEstimate`, `DietLabelsMask`, `AllergensMask`, `HasUnverifiedAllergens`, `RatingAvg`, `RatingCount`, `ViewsCount`, `FavoritesCount`, `PublishedAt`, `CreatedAt`.
+`DishCardListItemDto`: `Id`, `AuthorUserId`, `Slug`, `Name`, `ShortDescription`, `MainImageId`, `DifficultyLevel`, `CostEstimate`, `DietLabelsMask`, `AllergensMask`, `HasUnverifiedAllergens`, `RatingAvg`, `RatingCount`, `ViewsCount`, `FavoritesCount`, `PublishedAt`, `CreatedAt`, `HasUnsavedChanges`.
+
+`HasUnsavedChanges` заполняется **только** когда запрашивающий — сам автор (`_currentUser.UserId == authorUserId`) или Admin: `true` при `UpdatedAt > PublishedAt` (в рабочем слое есть правки, не попавшие на витрину — бейдж в «Моих блюдах»). Остальным — `null`: процесс редактирования — приватная информация. В UC-DSH-054 SearchDishes поле всегда `null`.
 
 **Errors:**
 

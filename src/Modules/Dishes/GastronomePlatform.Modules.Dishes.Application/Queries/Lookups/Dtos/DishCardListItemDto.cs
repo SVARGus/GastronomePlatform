@@ -24,6 +24,11 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.Lookups.Dtos
     /// <param name="FavoritesCount">Количество добавлений в избранное.</param>
     /// <param name="PublishedAt">Момент последней публикации (для сортировки и индикаторов «новинка»).</param>
     /// <param name="CreatedAt">Момент создания блюда.</param>
+    /// <param name="HasUnsavedChanges">
+    /// Для владельца списка (автор смотрит свои публикации) и admin: <see langword="true"/>,
+    /// если в рабочем слое есть правки, не попавшие на витрину (<c>UpdatedAt &gt; PublishedAt</c>).
+    /// Для остальных — <see langword="null"/> (приватная информация о процессе редактирования).
+    /// </param>
     public sealed record DishCardListItemDto(
         Guid Id,
         Guid AuthorUserId,
@@ -41,5 +46,6 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.Lookups.Dtos
         long ViewsCount,
         int FavoritesCount,
         DateTimeOffset? PublishedAt,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        bool? HasUnsavedChanges = null);
 }

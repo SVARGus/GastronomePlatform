@@ -22,8 +22,18 @@ namespace GastronomePlatform.Modules.Dishes.Application.Queries.GetDishRecipe
     ///   <item>Снепшота нет, текущий пользователь — другой пользователь →
     ///         <c>404</c>.</item>
     ///   <item><c>Status = Archived</c> → <c>404</c> всем.</item>
+    ///   <item><paramref name="PreferWorkingVersion"/> = <see langword="true"/> и
+    ///         текущий пользователь — автор/admin → отдаётся рабочая версия рецепта
+    ///         даже при наличии снепшота (источник данных редактора рецепта).
+    ///         Для остальных параметр игнорируется.</item>
     /// </list>
     /// </remarks>
     /// <param name="DishId">Идентификатор блюда.</param>
-    public sealed record GetDishRecipeQuery(Guid DishId) : IQuery<DishRecipeDto>;
+    /// <param name="PreferWorkingVersion">
+    /// Запрос рабочей версии вместо снепшота (частичная реализация отложенного
+    /// UC-DSH-083). Учитывается только для автора/admin.
+    /// </param>
+    public sealed record GetDishRecipeQuery(
+        Guid DishId,
+        bool PreferWorkingVersion = false) : IQuery<DishRecipeDto>;
 }
