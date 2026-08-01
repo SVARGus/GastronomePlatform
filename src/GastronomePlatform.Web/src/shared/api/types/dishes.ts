@@ -76,6 +76,32 @@ export interface GetMyDraftsResult {
   pageSize: number;
 }
 
+/** Тело POST /api/dishes (UC-DSH-001) — создание черновика. */
+export interface CreateDishDraftRequest {
+  name: string;
+  difficultyLevel: DifficultyLevel;
+  costEstimate: CostEstimate;
+  shortDescription: string | null;
+  description: string | null;
+  dietLabelsMask: string | null;
+  historyText: string | null;
+}
+
+/** Результат создания черновика: id для редактора, slug для будущей витрины. */
+export interface CreateDishDraftResult {
+  id: string;
+  slug: string;
+}
+
+/** Тело PATCH /api/dishes/{id} (UC-DSH-002) — публичная карточка без диет/истории/фото. */
+export interface UpdateDishCardRequest {
+  name: string;
+  difficultyLevel: DifficultyLevel;
+  costEstimate: CostEstimate;
+  shortDescription: string | null;
+  description: string | null;
+}
+
 /** Параметры GET /api/dishes/search. Все фильтры опциональны. */
 export interface SearchDishesParams {
   text?: string;
@@ -132,6 +158,8 @@ export interface DishDetailDto {
   dietLabelsMask: DietLabelsMask;
   allergensMask: string;
   hasUnverifiedAllergens: boolean;
+  categoryIds: string[];
+  tagNames: string[];
   ratingAvg: number;
   ratingCount: number;
   viewsCount: number;

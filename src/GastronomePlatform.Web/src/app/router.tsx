@@ -9,6 +9,7 @@ import { RegisterPage } from '../pages/RegisterPage';
 import { PricingPage } from '../pages/PricingPage';
 import { SubscribePage } from '../pages/SubscribePage';
 import { AccountPage } from '../pages/AccountPage';
+import { DishEditorPage } from '../pages/DishEditorPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 /** Маршруты страниц приоритета 1 (docs/public/design/pages.md §2). */
@@ -25,6 +26,8 @@ export const router = createBrowserRouter([
       { path: '/pricing', element: <PricingPage /> },
       { path: '/subscribe', element: <SubscribePage /> },
       { path: '/account', element: <AccountPage /> },
+      { path: '/account/dishes/new', element: <DishEditorPage /> },
+      { path: '/account/dishes/:id/edit', element: <DishEditorPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

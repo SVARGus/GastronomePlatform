@@ -2,6 +2,8 @@ import { baseApi } from '../../shared/api/baseApi';
 import { toQueryString } from '../../shared/api/query';
 import type {
   CategoryNodeDto,
+  CreateDishDraftRequest,
+  CreateDishDraftResult,
   DishDetailDto,
   DishRecipeDto,
   DishStatus,
@@ -13,6 +15,7 @@ import type {
   SearchDishesParams,
   SearchDishesResult,
   TagDto,
+  UpdateDishCardRequest,
 } from '../../shared/api/types/dishes';
 
 /**
@@ -98,6 +101,70 @@ export const dishesApi = baseApi.injectEndpoints({
       query: (dishId) => ({ url: `dishes/${dishId}/archive`, method: 'POST' }),
       invalidatesTags: ['Dishes'],
     }),
+    /** Карточка блюда по id (UC-DSH-050): автору отдаётся рабочая версия — источник редактора. */
+    dishById: build.query<DishDetailDto, string>({
+      query: (id) => ({ url: `dishes/${id}` }),
+      providesTags: (_result, _error, id) => [{ type: 'Dishes', id }],
+    }),
+    /** Автокомплит тегов (UC-DSH-060) — подсказки в chips-вводе редактора. */
+    tagSearch: build.query<TagDto[], string>({
+      query: (query) => ({ url: `tags/search${toQueryString({ query })}` }),
+    }),
+    /** Создание черновика (UC-DSH-001) → id для редактора. */
+    createDish: build.mutation<CreateDishDraftResult, CreateDishDraftRequest>({
+      query: (body) => ({ url: 'dishes', method: 'POST', body }),
+      invalidatesTags: ['Dishes'],
+    }),
+    /** Публичная карточка (UC-DSH-002): name/difficulty/cost/описания. */
+    updateDishCard: build.mutation<void, { dishId: string } & UpdateDishCardRequest>({
+      query: ({ dishId, ...body }) => ({ url: `dishes/${dishId}`, method: 'PATCH', body }),
+      invalidatesTags: (_result, _error, { dishId }) => ['Dishes', { type: 'Dishes', id: dishId }],
+    }),
+    /** Категории блюда (UC-DSH-007): replace-семантика, ≤3. */
+    setDishCategories: build.mutation<void, { dishId: string; categoryIds: string[] }>({
+      query: ({ dishId, categoryIds }) => ({
+        url: `dishes/${dishId}/categories`,
+        method: 'PUT',
+        body: { categoryIds },
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => [{ type: 'Dishes', id: dishId }],
+    }),
+    /** Теги блюда (UC-DSH-008): ИМЕНА, replace, сервер делает find-or-create, ≤20. */
+    setDishTags: build.mutation<void, { dishId: string; tagNames: string[] }>({
+      query: ({ dishId, tagNames }) => ({
+        url: `dishes/${dishId}/tags`,
+        method: 'PUT',
+        body: { tagNames },
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => [{ type: 'Dishes', id: dishId }],
+    }),
+    /** Диетические метки (UC-DSH-009): маска строкой; «None» — снять все. */
+    setDishDietLabels: build.mutation<void, { dishId: string; dietLabelsMask: string }>({
+      query: ({ dishId, dietLabelsMask }) => ({
+        url: `dishes/${dishId}/diet-labels`,
+        method: 'PATCH',
+        body: { dietLabelsMask },
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => [{ type: 'Dishes', id: dishId }],
+    }),
+    /** История блюда (UC-DSH-010): null — очистить. */
+    setDishHistory: build.mutation<void, { dishId: string; historyText: string | null }>({
+      query: ({ dishId, historyText }) => ({
+        url: `dishes/${dishId}/history`,
+        method: 'PATCH',
+        body: { historyText },
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => [{ type: 'Dishes', id: dishId }],
+    }),
+    /** Главное фото (UC-DSH-011): id медиафайла; null — убрать. */
+    changeMainImage: build.mutation<void, { dishId: string; mainImageId: string | null }>({
+      query: ({ dishId, mainImageId }) => ({
+        url: `dishes/${dishId}/main-image`,
+        method: 'PATCH',
+        body: { mainImageId },
+      }),
+      invalidatesTags: (_result, _error, { dishId }) => ['Dishes', { type: 'Dishes', id: dishId }],
+    }),
   }),
 });
 
@@ -116,4 +183,13 @@ export const {
   usePublishDishMutation,
   useUnpublishDishMutation,
   useArchiveDishMutation,
+  useDishByIdQuery,
+  useLazyTagSearchQuery,
+  useCreateDishMutation,
+  useUpdateDishCardMutation,
+  useSetDishCategoriesMutation,
+  useSetDishTagsMutation,
+  useSetDishDietLabelsMutation,
+  useSetDishHistoryMutation,
+  useChangeMainImageMutation,
 } = dishesApi;

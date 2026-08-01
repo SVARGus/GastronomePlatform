@@ -1,4 +1,4 @@
-import { Archive, ExternalLink, Info, Plus } from 'lucide-react';
+import { Archive, ExternalLink, Info, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getErrorMessage } from '../auth/apiErrors';
@@ -92,11 +92,13 @@ export function MyDishesSection() {
   return (
     <>
       <div className="flex flex-wrap items-center gap-4">
-        {/* Задел под редактор блюда (приоритет 3) — кнопка пока неактивна. */}
-        <Button variant="primary" disabled title="Редактор блюда появится в следующей версии">
+        <Link
+          to="/account/dishes/new"
+          className="inline-flex h-11 items-center rounded-control bg-action px-5 text-[15px] font-medium text-on-action transition-colors duration-[120ms] hover:bg-action-hover hover:text-on-action"
+        >
           <Plus className="mr-2 h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
           Создать блюдо
-        </Button>
+        </Link>
         <div className="flex gap-2 overflow-x-auto">
           {(Object.keys(TAB_LABELS) as DishesTab[]).map((key) => (
             <button
@@ -131,6 +133,7 @@ export function MyDishesSection() {
                 error={publishErrors[dish.id] || null}
                 actions={
                   <>
+                    <EditLink dishId={dish.id} />
                     <Button variant="secondary" size="sm" onClick={() => handlePublish(dish.id)}>
                       Опубликовать
                     </Button>
@@ -178,6 +181,7 @@ export function MyDishesSection() {
                 error={publishErrors[dish.id] || null}
                 actions={
                   <>
+                    <EditLink dishId={dish.id} />
                     <Button variant="secondary" size="sm" onClick={() => handlePublish(dish.id)}>
                       Опубликовать снова
                     </Button>
@@ -318,6 +322,7 @@ function PublishedRow({
           Открыть
           <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
         </Link>
+        <EditLink dishId={dish.id} />
         <Button variant="secondary" size="sm" onClick={onUnpublish}>
           Снять с публикации
         </Button>
@@ -361,6 +366,20 @@ function StatusBadge({ kind }: { kind: 'draft' | 'published' | 'unpublished' }) 
     <span className="rounded-pill bg-sunken px-2.5 py-0.5 text-[13px] font-medium text-ink-secondary">
       Черновик
     </span>
+  );
+}
+
+/** Иконка-ссылка в редактор карточки блюда. */
+function EditLink({ dishId }: { dishId: string }) {
+  return (
+    <Link
+      to={`/account/dishes/${dishId}/edit`}
+      title="Редактировать"
+      aria-label="Редактировать"
+      className="flex h-9 w-9 items-center justify-center rounded-control border border-line-strong text-ink hover:bg-sunken hover:text-ink"
+    >
+      <Pencil className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
+    </Link>
   );
 }
 
