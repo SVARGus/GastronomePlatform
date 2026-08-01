@@ -1,4 +1,5 @@
-import { Star } from 'lucide-react';
+import { ChevronDown, ChevronRight, Star } from 'lucide-react';
+import { useState } from 'react';
 import type { CategoryNodeDto, TagDto } from '../../shared/api/types/dishes';
 import { costOptions, dietLabelOptions, difficultyOptions } from '../../shared/lib/labels';
 import type { ArrayFilterKey, CatalogFilters } from './useCatalogFilters';
@@ -30,7 +31,7 @@ export function FiltersSidebar({
   return (
     <div className="rounded-card bg-sunken p-5">
       <Section title="Категории">
-        <CategoryList nodes={categories} depth={0} selected={filters.categoryIds} onToggle={onToggle} />
+        <CategoryList nodes={categories} selected={filters.categoryIds} onToggle={onToggle} />
       </Section>
 
       <Section title="Диета">
@@ -104,41 +105,88 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+/**
+ * Дерево категорий фильтра. Роли кликов разделены: чекбокс выбирает
+ * только сам чекбокс; у узлов с потомками текст и шеврон разворачивают
+ * поддерево (свёрнуто по умолчанию), у листьев текст выбирает — «мёртвых»
+ * зон клика нет.
+ */
 function CategoryList({
   nodes,
-  depth,
   selected,
   onToggle,
 }: {
   nodes: CategoryNodeDto[];
-  depth: number;
   selected: string[];
   onToggle: (key: ArrayFilterKey, value: string) => void;
 }) {
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+
   if (nodes.length === 0) {
     return <p className="text-sm text-ink-muted">Категории появятся вместе с блюдами.</p>;
   }
 
-  return (
-    <ul className="space-y-2">
-      {nodes.map((node) => (
-        <li key={node.id} style={{ paddingLeft: depth * 16 }}>
-          <label className="flex cursor-pointer items-center gap-2.5 text-[15px] text-ink">
-            <input
-              type="checkbox"
-              checked={selected.includes(node.id)}
-              onChange={() => onToggle('categoryIds', node.id)}
-              className="h-4 w-4 cursor-pointer rounded-badge border-line accent-[#C25423]"
-            />
-            {node.name}
-          </label>
-          {node.children.length > 0 && (
-            <CategoryList nodes={node.children} depth={depth + 1} selected={selected} onToggle={onToggle} />
-          )}
-        </li>
-      ))}
-    </ul>
-  );
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function renderNodes(list: CategoryNodeDto[], depth: number): React.ReactNode {
+    return (
+      <ul className="space-y-1.5">
+        {list.map((node) => {
+          const hasChildren = node.children.length > 0;
+          const isExpanded = expanded.has(node.id);
+          return (
+            <li key={node.id} style={{ paddingLeft: depth * 16 }}>
+              <div className="flex items-center gap-2.5 text-[15px] text-ink">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(node.id)}
+                  onChange={() => onToggle('categoryIds', node.id)}
+                  aria-label={`Категория ${node.name}`}
+                  className="h-4.5 w-4.5 shrink-0 cursor-pointer accent-[#C25423]"
+                />
+                {hasChildren ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(node.id)}
+                    aria-expanded={isExpanded}
+                    className="flex min-w-0 cursor-pointer items-center gap-1 text-left hover:text-action"
+                  >
+                    <span className="truncate">{node.name}</span>
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onToggle('categoryIds', node.id)}
+                    className="min-w-0 cursor-pointer truncate text-left hover:text-action"
+                  >
+                    {node.name}
+                  </button>
+                )}
+              </div>
+              {hasChildren && isExpanded && renderNodes(node.children, depth + 1)}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return renderNodes(nodes, 0);
 }
 
 function ChipGroup({
