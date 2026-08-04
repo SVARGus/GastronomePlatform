@@ -1,0 +1,9 @@
+# Caddyfile — reverse-proxy с автоматическим HTTPS (Let's Encrypt).
+# Домен подставляется из переменной окружения DOMAIN (см. .env).
+# Сертификат выпускается автоматически при первом запросе — нужен только
+# A-record домена на IP VPS и открытые порты 80/443.
+
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8080
+}

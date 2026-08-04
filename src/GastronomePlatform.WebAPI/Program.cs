@@ -4,12 +4,19 @@ using System.Text.Json;
 using GastronomePlatform.Common.Application.Constants;
 using GastronomePlatform.Common.Infrastructure.Extensions;
 using GastronomePlatform.Modules.Auth.Infrastructure.Extensions;
+using GastronomePlatform.Modules.Auth.Infrastructure.Persistence;
 using GastronomePlatform.Modules.Dishes.Infrastructure.Extensions;
+using GastronomePlatform.Modules.Dishes.Infrastructure.Persistence;
 using GastronomePlatform.Modules.Media.Infrastructure.Extensions;
+using GastronomePlatform.Modules.Media.Infrastructure.Persistence;
 using GastronomePlatform.Modules.Subscriptions.Infrastructure.Extensions;
+using GastronomePlatform.Modules.Subscriptions.Infrastructure.Persistence;
 using GastronomePlatform.Modules.Users.Infrastructure.Extensions;
+using GastronomePlatform.Modules.Users.Infrastructure.Persistence;
 using MediatR.NotificationPublishers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
@@ -30,7 +37,10 @@ Log.Logger = new LoggerConfiguration()
         rollingInterval: RollingInterval.Day, 
         retainedFileCountLimit: 7,
         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
-    .WriteTo.Seq("http://localhost:5341")
+    // Bootstrap-логгер создаётся до чтения конфигурации — адрес Seq берём из
+    // переменной окружения (в docker-compose.prod.yml это http://seq:5341);
+    // локальная разработка работает по прежнему адресу без настройки.
+    .WriteTo.Seq(Environment.GetEnvironmentVariable("Seq__ServerUrl") ?? "http://localhost:5341")
     .CreateLogger();
 
 try
@@ -177,7 +187,39 @@ try
 
     WebApplication app = builder.Build();
 
+    // === 3.4. Применение миграций на старте (только по явному флагу) ===
+    // Включается конфигурацией Database:MigrateOnStartup = true
+    // (appsettings.Production.json): на VPS нет .NET SDK и dotnet-ef,
+    // а инстанс приложения один — Migrate() идемпотентен и безопасен.
+    // В Development флаг не задан — миграции применяются вручную через CLI,
+    // как и раньше (см. 08_Разработка-(Development-Guide)).
+    if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+    {
+        Log.Information("Database:MigrateOnStartup включён — применение миграций всех модулей");
+
+        using IServiceScope scope = app.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<AuthDbContext>().Database.Migrate();
+        scope.ServiceProvider.GetRequiredService<UsersDbContext>().Database.Migrate();
+        scope.ServiceProvider.GetRequiredService<DishesDbContext>().Database.Migrate();
+        scope.ServiceProvider.GetRequiredService<MediaDbContext>().Database.Migrate();
+        scope.ServiceProvider.GetRequiredService<SubscriptionsDbContext>().Database.Migrate();
+
+        Log.Information("Миграции применены");
+    }
+
     // === 4. Middleware конвейер (ПОРЯДОК ВАЖЕН!) ===
+
+    // За reverse-proxy (Caddy) TLS терминируется до приложения: восстанавливаем
+    // исходную схему/IP из заголовков X-Forwarded-* и не делаем собственный
+    // https-редирект — этим занимается Caddy.
+    if (app.Environment.IsProduction())
+    {
+        app.UseForwardedHeaders(new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+        });
+    }
+
     app.UseCommonInfrastructure();
 
     if (app.Environment.IsDevelopment())
@@ -186,7 +228,10 @@ try
         app.UseSwaggerUI();
     }
 
-    app.UseHttpsRedirection();
+    if (!app.Environment.IsProduction())
+    {
+        app.UseHttpsRedirection();
+    }
 
     // === 4.1. Статика SPA (production-сборка Vite в wwwroot) ===
     // Хэшированные ассеты (/assets/*.js|css) кэшируются агрессивно — имя файла

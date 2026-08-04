@@ -362,6 +362,9 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
+# --- Секреты прод-развёртывания (шаблон — deploy/.env.example) ---
+.env
+
 # --- Local private documentation ---
 /docs/_private/
 

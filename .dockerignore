@@ -1,0 +1,20 @@
+# Контекст docker-сборки — корень репозитория; всё лишнее отсекается здесь.
+.git
+.vs
+docs
+tests
+logs
+media-data
+
+# Артефакты сборки .NET — образ собирает сам
+**/bin
+**/obj
+
+# Dev-сборка SPA в wwwroot — образ собирает свою (стадия web)
+src/GastronomePlatform.WebAPI/wwwroot
+src/GastronomePlatform.Web/node_modules
+src/GastronomePlatform.Web/dist
+
+# Секреты и локальные настройки
+.env
+**/appsettings.Development.json

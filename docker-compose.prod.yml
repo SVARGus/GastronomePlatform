@@ -1,0 +1,110 @@
+# docker-compose.prod.yml — продакшен-развёртывание GastronomePlatform на VPS.
+#
+# Секреты — в файле .env рядом с этим файлом (шаблон: deploy/.env.example).
+# Запуск:  docker compose -f docker-compose.prod.yml up -d --build
+# Логи:    docker compose -f docker-compose.prod.yml logs -f api
+#
+# Наружу открыты ТОЛЬКО 80/443 (Caddy). PostgreSQL и RabbitMQ доступны
+# исключительно внутри docker-сети; веб-панель Seq — только с самого VPS
+# (127.0.0.1) — доступ с рабочей машины через SSH-туннель, см.
+# docs/_private/notes/_note_prod-deploy.md.
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: gastronome-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gastronome
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD не задан — заполните .env}
+      POSTGRES_DB: gastronome_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gastronome -d gastronome_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: gastronome-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: gastronome
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD не задан — заполните .env}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  seq:
+    image: datalust/seq:latest
+    container_name: gastronome-seq
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:80"   # только localhost VPS — доступ через SSH-туннель
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_ADMINPASSWORD: ${SEQ_ADMIN_PASSWORD:?SEQ_ADMIN_PASSWORD не задан — заполните .env}
+    volumes:
+      - seq-data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: src/GastronomePlatform.WebAPI/Dockerfile
+    container_name: gastronome-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Database: "Host=postgres;Port=5432;Database=gastronome_db;Username=gastronome;Password=${POSTGRES_PASSWORD}"
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Port: "5672"
+      RabbitMQ__Username: gastronome
+      RabbitMQ__Password: ${RABBITMQ_PASSWORD}
+      Seq__ServerUrl: "http://seq:5341"
+      JwtSettings__Secret: ${JWT_SECRET:?JWT_SECRET не задан — сгенерируйте (см. deploy/.env.example)}
+    volumes:
+      - media-data:/data/media
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  caddy:
+    image: caddy:2
+    container_name: gastronome-caddy
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN не задан — заполните .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  seq-data:
+  media-data:
+  caddy-data:
+  caddy-config:
