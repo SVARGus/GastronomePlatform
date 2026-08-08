@@ -54,6 +54,10 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
                 // выживают в БД — повторная публикация падает дубликатом PK.
                 .Include(d => d.CategoriesPublished)
                 .Include(d => d.TagsPublished)
+                // Несколько коллекционных Include в одном SQL дают декартово произведение
+                // строк (steps × ingredients × tags × …) — split-запрос грузит каждую
+                // коллекцию отдельным SELECT; для агрегата одного блюда это безопасно.
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 
         /// <inheritdoc/>
@@ -61,6 +65,7 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
             => await _context.Dishes
                 .Include(d => d.CategoriesPublished)
                 .Include(d => d.TagsPublished)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 
         /// <inheritdoc/>
@@ -68,6 +73,7 @@ namespace GastronomePlatform.Modules.Dishes.Infrastructure.Repositories
             => await _context.Dishes
                 .Include(d => d.Categories)
                 .Include(d => d.Tags)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 
         /// <inheritdoc/>

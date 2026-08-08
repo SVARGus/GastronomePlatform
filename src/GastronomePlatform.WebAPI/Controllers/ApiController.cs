@@ -68,6 +68,8 @@ namespace GastronomePlatform.WebAPI.Controllers
         /// </remarks>
         protected IActionResult MapError(Error error)
         {
+            LogDomainError(error);
+
             return error.Type switch
             {
                 ErrorType.NotFound      => NotFound(error),
@@ -76,6 +78,29 @@ namespace GastronomePlatform.WebAPI.Controllers
                 ErrorType.Forbidden     => StatusCode(StatusCodes.Status403Forbidden, error),
                 _                       => BadRequest(error)
             };
+        }
+
+        /// <summary>
+        /// Логирует доменную ошибку неуспешного <see cref="Result"/> уровнем Warning.
+        /// Единственная точка диагностики 4xx-ответов: без неё в логах виден только факт запроса,
+        /// а причина отказа (код и сообщение ошибки) терялась.
+        /// </summary>
+        /// <param name="error">Доменная ошибка.</param>
+        private void LogDomainError(Error error)
+        {
+            // Логгер берётся из RequestServices, а не через конструктор,
+            // чтобы не менять сигнатуры всех контроллеров-наследников.
+            ILogger logger = HttpContext.RequestServices
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger(GetType());
+
+            logger.LogWarning(
+                "Запрос {Method} {Path} завершился доменной ошибкой {ErrorCode} ({ErrorType}): {ErrorMessage}",
+                HttpContext.Request.Method,
+                HttpContext.Request.Path,
+                error.Code,
+                error.Type,
+                error.Message);
         }
     }
 }

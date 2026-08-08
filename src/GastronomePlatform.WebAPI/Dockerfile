@@ -42,7 +42,8 @@ COPY --from=web /web/dist ./wwwroot
 # Медиафайлы — на volume (см. docker-compose.prod.yml)
 VOLUME ["/data/media"]
 
-ENV ASPNETCORE_URLS=http://+:8080
+# Порт задаёт базовый образ (ASPNETCORE_HTTP_PORTS=8080); дублирование через
+# ASPNETCORE_URLS вызывало warning «Overriding HTTP_PORTS» при старте.
 EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "GastronomePlatform.WebAPI.dll"]

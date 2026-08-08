@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -30,12 +31,19 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .Enrich.WithMachineName()
     .Enrich.WithEnvironmentName()
+    // Docker-healthcheck опрашивает /health/live каждые 15 секунд — без фильтра
+    // этот шум составляет треть всех событий и мешает читать логи.
+    .Filter.ByExcluding(evt =>
+        evt.Properties.TryGetValue("RequestPath", out LogEventPropertyValue? requestPath) &&
+        requestPath.ToString().Contains("/health/live", StringComparison.Ordinal))
     .WriteTo.Console(outputTemplate:
         "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
     .WriteTo.File(
-        path: "logs/log-.txt", 
-        rollingInterval: RollingInterval.Day, 
-        retainedFileCountLimit: 7,
+        path: "logs/log-.txt",
+        rollingInterval: RollingInterval.Day,
+        // Файл в сутки, хранение 14 дней; каталог logs/ вынесен на bind mount
+        // в docker-compose.prod.yml — файлы переживают пересоздание контейнера.
+        retainedFileCountLimit: 14,
         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
     // Bootstrap-логгер создаётся до чтения конфигурации — адрес Seq берём из
     // переменной окружения (в docker-compose.prod.yml это http://seq:5341);
@@ -263,6 +271,17 @@ try
     app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
     {
         Predicate = _ => true   // Все зарегистрированные проверки
+    });
+
+    // Версия развёрнутого приложения — из <Version> в Directory.Build.props.
+    // Анонимный эндпоинт: позволяет с одного взгляда понять, что крутится на сервере.
+    app.MapGet("/api/version", () =>
+    {
+        string version = typeof(Program).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion ?? "unknown";
+
+        return Results.Ok(new { version });
     });
 
     // === 4.2. SPA-fallback ===

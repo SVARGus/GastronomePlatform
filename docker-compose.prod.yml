@@ -78,6 +78,11 @@ services:
       JwtSettings__Secret: ${JWT_SECRET:?JWT_SECRET не задан — сгенерируйте (см. deploy/.env.example)}
     volumes:
       - media-data:/data/media
+      # Файловые логи Serilog (ротация по дням, хранение 14 файлов) —
+      # доступны прямо на сервере: /root/GastronomePlatform/logs/
+      - ./logs:/app/logs
+      # Ключи DataProtection: без volume теряются при пересоздании контейнера
+      - dataprotection-keys:/root/.aspnet/DataProtection-Keys
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/live || exit 1"]
       interval: 15s
@@ -106,5 +111,6 @@ volumes:
   rabbitmq-data:
   seq-data:
   media-data:
+  dataprotection-keys:
   caddy-data:
   caddy-config:
