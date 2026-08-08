@@ -55,7 +55,7 @@ namespace GastronomePlatform.Modules.Media.Infrastructure.Extensions
             // Генератор ключей хранилища (без состояния — Singleton).
             services.AddSingleton<IStorageKeyGenerator, StorageKeyGenerator>();
 
-            // Обработчик изображений на базе SixLabors.ImageSharp v2.1.x (Singleton, thread-safe).
+            // Обработчик изображений на базе SkiaSharp (Singleton, thread-safe).
             services.AddSingleton<IImageProcessor, ImageProcessor>();
 
             // Санитайзер SVG на базе HtmlSanitizer (Singleton, thread-safe через static поле).
