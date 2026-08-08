@@ -6,7 +6,11 @@
 
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="12.1.1" />
-    <PackageReference Include="MediatR" Version="14.1.0" />
+    <!-- 12.5.0 — последняя версия под Apache 2.0; с 13.x MediatR перешёл на коммерческую лицензию. -->
+    <PackageReference Include="MediatR" Version="12.5.0" />
+    <!-- ILogger<T> для Application-слоя: MediatR 13+ тянул пакет транзитивно,
+         у 12.x этой зависимости нет — ссылка нужна явно. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
   </ItemGroup>
 
 </Project>
