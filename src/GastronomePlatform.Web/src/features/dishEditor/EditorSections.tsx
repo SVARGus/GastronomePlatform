@@ -9,6 +9,7 @@ import {
   useSetDishTagsMutation,
   useUpdateDishCardMutation,
 } from '../dishes/dishesApi';
+import { getErrorMessage } from '../auth/apiErrors';
 import { useUploadFileMutation } from '../media/mediaApi';
 import { mediaFileUrl, mediaThumbnailUrl } from '../../shared/api/media';
 import type {
@@ -164,8 +165,11 @@ export function PhotoSection({ dish }: { dish: DishDetailDto }) {
     try {
       const { mediaId } = await uploadFile({ file, intendedEntityType: 'Dish' }).unwrap();
       await changeImage({ dishId: dish.id, mainImageId: mediaId }).unwrap();
-    } catch {
-      setError('Не получилось загрузить фото. Проверьте формат (JPG/PNG) и размер (до 10 МБ).');
+    } catch (err) {
+      setError(
+        getErrorMessage(err) ??
+          'Не получилось загрузить фото. Проверьте формат (JPG/PNG) и размер (до 10 МБ).',
+      );
     }
   }
 

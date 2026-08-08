@@ -106,7 +106,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadFile
             if (imageInfo.Width < userUpload.MinImageDimension || imageInfo.Height < userUpload.MinImageDimension ||
                 imageInfo.Width > userUpload.MaxImageDimension || imageInfo.Height > userUpload.MaxImageDimension)
             {
-                return MediaErrors.InvalidImageDimensions;
+                return MediaErrors.InvalidImageDimensions(userUpload.MinImageDimension, userUpload.MaxImageDimension);
             }
 
             // mediaId генерируется до сохранения в storage — используется в пути файла.

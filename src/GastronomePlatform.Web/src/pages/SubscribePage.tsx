@@ -2,7 +2,7 @@ import { Check, ChevronRight, CircleAlert, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
-import { getErrorCode } from '../features/auth/apiErrors';
+import { getErrorCode, getErrorMessage } from '../features/auth/apiErrors';
 import {
   formatPrice,
   offerTitle,
@@ -135,7 +135,7 @@ export function SubscribePage() {
       {error !== undefined && errorCode !== 'SUBS.ALREADY_HAS_BASE' && errorCode !== 'SUBS.FORBIDDEN_ROLE_REQUIRED' && (
         <p className="mb-6 flex items-start gap-3 rounded-card bg-danger-bg p-4 text-[15px] text-danger-text">
           <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
-          Не получилось оформить подписку. Попробуйте ещё раз или зайдите позже.
+          {getErrorMessage(error) ?? 'Не получилось оформить подписку. Попробуйте ещё раз или зайдите позже.'}
         </p>
       )}
 

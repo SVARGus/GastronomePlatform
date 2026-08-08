@@ -1,6 +1,6 @@
 import { Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { getErrorCode, getValidationError } from '../auth/apiErrors';
+import { getErrorCode, getErrorMessage, getValidationError } from '../auth/apiErrors';
 import { useUploadFileMutation } from '../media/mediaApi';
 import {
   useChangeEmailMutation,
@@ -80,8 +80,11 @@ function AvatarCard({ profile }: { profile: UserProfileDto }) {
     try {
       const { mediaId } = await uploadFile({ file, intendedEntityType: 'UserAvatar' }).unwrap();
       await updateAvatar(mediaId).unwrap();
-    } catch {
-      setError('Не получилось загрузить фото. Проверьте формат (JPG/PNG) и размер (до 10 МБ).');
+    } catch (err) {
+      setError(
+        getErrorMessage(err) ??
+          'Не получилось загрузить фото. Проверьте формат (JPG/PNG) и размер (до 10 МБ).',
+      );
     }
   }
 
@@ -209,7 +212,13 @@ function PersonalInfoCard({ profile }: { profile: UserProfileDto }) {
           </div>
         </div>
       </div>
-      <SaveRow isLoading={isLoading} isSuccess={isSuccess} isError={error !== undefined} onSave={handleSave} />
+      <SaveRow
+        isLoading={isLoading}
+        isSuccess={isSuccess}
+        isError={error !== undefined}
+        errorText={getErrorMessage(error) ?? undefined}
+        onSave={handleSave}
+      />
     </section>
   );
 }
@@ -240,6 +249,7 @@ function LocationCard({ profile }: { profile: UserProfileDto }) {
         isLoading={isLoading}
         isSuccess={isSuccess}
         isError={error !== undefined}
+        errorText={getErrorMessage(error) ?? undefined}
         onSave={() => save({ country: orNull(country), region: orNull(region), city: orNull(city) })}
       />
     </section>
@@ -368,7 +378,9 @@ function CredentialRow({
       setError(
         code === takenCode
           ? takenMessage
-          : getValidationError(err, validationField) ?? 'Не получилось сохранить. Проверьте значение.',
+          : getValidationError(err, validationField) ??
+              getErrorMessage(err) ??
+              'Не получилось сохранить. Проверьте значение.',
       );
     } finally {
       setSaving(false);

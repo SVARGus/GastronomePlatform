@@ -2,7 +2,7 @@ import { CircleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
-import { getErrorCode, getValidationError } from '../features/auth/apiErrors';
+import { getErrorCode, getErrorMessage, getValidationError } from '../features/auth/apiErrors';
 import { useRegisterMutation } from '../features/auth/authApi';
 import { selectIsAuthenticated } from '../shared/api/authSlice';
 import { Button } from '../shared/ui/Button';
@@ -78,6 +78,8 @@ export function RegisterPage() {
   };
   const hasFieldError = Object.values(fieldErrors).some((message) => message !== null);
   const showGeneralError = error !== undefined && !hasFieldError;
+  // Сообщение сервера (VALIDATION.ERROR склеивает причины через «; ») — показываем списком.
+  const serverMessages = getErrorMessage(error)?.split('; ') ?? null;
 
   return (
     <section className="mx-auto w-full max-w-[400px] px-4 py-12 md:py-16">
@@ -94,7 +96,17 @@ export function RegisterPage() {
         {showGeneralError && (
           <p className="mt-6 flex items-start gap-2.5 rounded-control bg-danger-bg p-3.5 text-sm text-danger-text">
             <CircleAlert className="mt-0.5 h-4.5 w-4.5 shrink-0" strokeWidth={1.75} aria-hidden />
-            Не получилось создать аккаунт. Проверьте данные и попробуйте ещё раз.
+            {serverMessages ? (
+              <span>
+                {serverMessages.map((message) => (
+                  <span key={message} className="block">
+                    {message}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              'Не получилось создать аккаунт. Проверьте данные и попробуйте ещё раз.'
+            )}
           </p>
         )}
 

@@ -201,7 +201,7 @@ namespace GastronomePlatform.Modules.Media.Application.Commands.UploadSystemFile
             if (imageInfo.Width > opts.SystemUpload.MaxImageDimension ||
                 imageInfo.Height > opts.SystemUpload.MaxImageDimension)
             {
-                return MediaErrors.InvalidImageDimensions;
+                return MediaErrors.ImageTooLarge(opts.SystemUpload.MaxImageDimension);
             }
 
             var extension = GetExtension(request.ContentType);

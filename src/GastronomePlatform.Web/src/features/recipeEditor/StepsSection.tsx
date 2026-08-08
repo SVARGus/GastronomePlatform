@@ -95,8 +95,11 @@ export function StepsSection({ dishId, recipe }: { dishId: string; recipe: Recip
     try {
       const { mediaId } = await uploadFile({ file, intendedEntityType: 'RecipeStep' }).unwrap();
       setDraft((d) => ({ ...d, imageMediaId: mediaId }));
-    } catch {
-      setFormError('Не получилось загрузить фото шага. Проверьте формат (JPG/PNG) и размер (до 10 МБ).');
+    } catch (err) {
+      setFormError(
+        getErrorMessage(err) ??
+          'Не получилось загрузить фото шага. Проверьте формат (JPG/PNG) и размер (до 10 МБ).',
+      );
     }
   }
 

@@ -59,10 +59,24 @@ namespace GastronomePlatform.Modules.Media.Domain.Errors
             Error.Validation("MEDIA.FILE_TOO_LARGE",
                 "Размер файла превышает допустимый.");
 
-        /// <summary>Размеры изображения вне допустимого диапазона.</summary>
-        public static readonly Error InvalidImageDimensions =
+        /// <summary>
+        /// Размеры изображения вне допустимого диапазона (пользовательский upload).
+        /// </summary>
+        /// <param name="minDimensionPx">Минимально допустимая сторона изображения в пикселях.</param>
+        /// <param name="maxDimensionPx">Максимально допустимая сторона изображения в пикселях.</param>
+        /// <returns>Ошибка валидации с фактическими лимитами в сообщении.</returns>
+        public static Error InvalidImageDimensions(int minDimensionPx, int maxDimensionPx) =>
             Error.Validation("MEDIA.INVALID_DIMENSIONS",
-                "Размер изображения не соответствует требованиям.");
+                $"Стороны изображения должны быть от {minDimensionPx} до {maxDimensionPx} px.");
+
+        /// <summary>
+        /// Изображение превышает максимально допустимую сторону (системный upload — без нижнего лимита).
+        /// </summary>
+        /// <param name="maxDimensionPx">Максимально допустимая сторона изображения в пикселях.</param>
+        /// <returns>Ошибка валидации с фактическим лимитом в сообщении.</returns>
+        public static Error ImageTooLarge(int maxDimensionPx) =>
+            Error.Validation("MEDIA.INVALID_DIMENSIONS",
+                $"Стороны изображения не должны превышать {maxDimensionPx} px.");
 
         /// <summary>Сбой при сохранении файла в хранилище.</summary>
         public static readonly Error UploadFailed =
